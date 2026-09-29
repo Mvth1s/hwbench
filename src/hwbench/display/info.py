@@ -129,7 +129,9 @@ def _mhz(value: float | None) -> str:
 def _ram_speed(configured: int | None, rated: int | None) -> Text | str:
     if configured is None:
         return NA
-    if rated is not None and rated != configured:
+    if rated is not None and configured > rated:
+        return f"{configured} MT/s (profil EXPO/XMP, nominal {rated})"
+    if rated is not None and configured < rated:
         return f"{configured} MT/s (max {rated})"
     return f"{configured} MT/s"
 

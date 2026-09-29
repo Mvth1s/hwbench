@@ -1,11 +1,12 @@
 import pytest
-from conftest import fixture_text, laptop_commands, laptop_sysfs
+from conftest import LAPTOP, fixture_text, laptop_commands, laptop_sysfs
 
 from hwbench.collectors.linux.ram import (
     LinuxRamCollector,
     _parse_size_gb,
     parse_dmidecode_memory,
     parse_meminfo_total_gb,
+    slot_labels,
 )
 from hwbench.models import Unavailable
 
@@ -132,3 +133,56 @@ def test_without_dmidecode(fake_system) -> None:
     fake_system(files=laptop_sysfs(), commands=commands, root=True)
     ram = LinuxRamCollector().collect().data
     assert ram.modules_unavailable is Unavailable.TOOL_MISSING
+
+
+# Écrit à la main, au format de dmidecode 3.x : deux barrettes DDR5 « DIMM 1 » sur deux canaux
+# (disposition AM5), profil EXPO 6000 appliqué sur des modules nominaux 4800.
+AM5_EXPO = """
+Handle 0x0014, DMI type 17, 92 bytes
+Memory Device
+\tSize: 16 GB
+\tLocator: DIMM 1
+\tBank Locator: P0 CHANNEL A
+\tType: DDR5
+\tSpeed: 4800 MT/s
+\tManufacturer: Unknown
+\tModule Manufacturer ID: Bank 5, Hex 0xCD
+\tPart Number: F5-6000J3038F16G
+\tConfigured Memory Speed: 6000 MT/s
+
+Handle 0x0016, DMI type 17, 92 bytes
+Memory Device
+\tSize: 16 GB
+\tLocator: DIMM 1
+\tBank Locator: P0 CHANNEL B
+\tType: DDR5
+\tSpeed: 4800 MT/s
+\tManufacturer: Unknown
+\tModule Manufacturer ID: Bank 5, Hex 0xCD
+\tPart Number: F5-6000J3038F16G
+\tConfigured Memory Speed: 6000 MT/s
+"""
+
+
+def test_duplicate_locators_use_bank_locator() -> None:
+    blocks = parse_dmidecode_memory(AM5_EXPO)
+    assert slot_labels(blocks) == ["P0 CHANNEL A / DIMM 1", "P0 CHANNEL B / DIMM 1"]
+
+
+def test_unique_locators_stay_short() -> None:
+    blocks = parse_dmidecode_memory(fixture_text(f"{LAPTOP}/dmidecode_memory.txt"))
+    assert slot_labels(blocks) == ["DIMM B", "DIMM A"]
+
+
+def test_expo_profile_speed(fake_system) -> None:
+    fake_system(commands={("dmidecode", "-t", "memory"): AM5_EXPO}, root=True)
+    result = LinuxRamCollector().collect(include_identifiers=True)
+    modules = result.data.modules
+    assert modules is not None
+    assert [(m.slot, m.speed_mts, m.rated_speed_mts) for m in modules] == [
+        ("P0 CHANNEL A / DIMM 1", 6000, 4800),
+        ("P0 CHANNEL B / DIMM 1", 6000, 4800),
+    ]
+    assert modules[0].manufacturer == "G.Skill"
+    assert result.identifiers is not None
+    assert [i.slot for i in result.identifiers] == [m.slot for m in modules]
