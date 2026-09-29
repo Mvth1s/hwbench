@@ -33,7 +33,13 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/hwbench info            # essai réel (sudo pour dmidecode/smartctl)
 .venv/bin/hwbench bench cpu-single   # ~7 s ; multi-cœur jusqu'à ~90 s de warm-up sur portable
+.venv/bin/hwbench bench gpu          # ~2 min 30 (glmark2 ~2 min, vkmark ~30 s)
+.venv/bin/hwbench backends
+scripts/capture_tool_fixtures.sh     # bash : sorties réelles de sysbench/glmark2/vkmark
 ```
+
+Git : une branche par phase (ou lot de corrections) depuis `dev`, un commit par fonction
+ajoutée ou modifiée, merge dans `dev` à la fin. Ne pas réécrire l'historique déjà poussé.
 
 CI (`.github/workflows/ci.yml`) : ruff + pytest sur Python 3.11 à 3.14 (ubuntu-latest). Pas d'installation de Python supplémentaire en local (pas de `uv python install`) : la compatibilité 3.11 est vérifiée par la CI.
 
@@ -49,7 +55,18 @@ CI (`.github/workflows/ci.yml`) : ruff + pytest sur Python 3.11 à 3.14 (ubuntu-
 - Benchmarks (phase 2) : `Benchmark.run()` renvoie **une** `Measurement` ; `runner.run_benchmark(bench, RunSettings)` fait le warm-up adaptatif + runs (≥ 3), médiane, écart-type, avertissements, et relève l'état via `machine_state.capture_state` (seul pont vers les collecteurs). Modèles dans `results.py` ; avertissements stockés en codes (`BenchWarning`), traduits dans `display/bench.py`.
 - Warm-up adaptatif : itérations jusqu'à 2 consécutives à ≤ 3 % d'écart, plafond par catégorie (`DEFAULT_MAX_WARMUP_S` : 30 s single, 90 s multi), sinon `WARMUP_UNSTABLE`. Le 1er run à froid est `Result.burst` : affiché et exporté, **jamais** utilisé par le scoring. Tous les seuils (tolérance, plafond, CV 5 %, 70 °C) sont dans `RunSettings` et exposés en options de `hwbench bench`. Tests du runner : horloge simulée (`clock=`), jamais de vrai temps.
 - État machine : `MachineState` porte governor, secteur, température, `platform_profile` (+ choix) et l'EPP de cpu0. `MachineState.throttling_settings()` décide de `POWER_PROFILE` (« performance », ou le plus performant des choix de la machine ; `custom` et absent non jugés).
-- Unité du score natif : `"index"`, affichée « indice brut » tant que le scoring (phase 3) n'existe pas.
+- Unité du score natif : `"index"`, affichée « indice brut » ; les points viennent du scoring.
+- Alimentation : sans batterie système (`scope` ≠ Device), `on_ac = True` (desktop), affiché « secteur (pas de batterie) » ; `MachineState.has_battery`.
+- Capteurs : `chip` reste le nom brut hwmon (utilisé par `machine_state` pour la température CPU) ; `instance` distingue les homonymes (`nvme0` via la cible du lien `device`, sinon `spd5118 #1`…). Les captures stockent les liens sysfs sous la clé `<chemin>@link` (valeur = nom de la cible), lue par `_exec.link_name` / `FakeSystem.link_name`.
+- RAM : slot = `Bank Locator / Locator` quand le Locator seul n'est pas unique ; vitesse configurée > nominale = profil EXPO/XMP.
+
+## Conventions établies (phase 3)
+
+- Backends externes : `benchmarks/external/`, tout accès système via `benchmarks/external/_run.py` (`which`, `getenv`, `exists`, `run`, `output_or_raise` qui lève `ToolError`). Tests : fixture autouse `no_external_tools` (aucun vrai outil n'est jamais lancé), `fake_tools(outputs=, env=, files=, failing=)` pour en simuler.
+- Identité d'un backend (`BackendId`) : nom, version du protocole hwbench, version de l'outil, mode de présentation. Deux mesures ne sont comparables que si les quatre sont égaux. Changer scènes, durée, résolution ou paramètres = incrémenter `*_VERSION` du module.
+- GPU : 3840×2160, glmark2 `--off-screen`, vkmark `--winsys headless` (repli fenêtre + `--present-mode immediate` + `VSYNC_UNVERIFIED`). Scènes choisies par le critère ratio FPS 1080p/4K ≥ 1,8 (étude dans le README et `_gpu.py`). L'UUID GPU de vkmark n'est jamais parsé ; les fixtures le mettent à zéro.
+- Scoring (`scoring.py`) : CPU = natif seul ; GPU = moyenne géométrique des backends GPU mesurés, liste identique à la référence sinon `BACKENDS_DIFFER` ; combiné sans GPU mesuré = CPU seul + `gpu_missing`. Jamais de moyenne silencieuse.
+- Référence : `src/hwbench/data/reference.json` (package data), générée par `hwbench reference` sur la Latitude ; `reference.py` fait les contrôles (secteur, profil, warm-up) et `--force` les inscrit dans `forced_reasons`. Tests du scoring : `conftest.make_result`.
 - Bench natif : une classe par catégorie (`native-cpu-single`, `native-cpu-multi`), score = moyenne géométrique des débits des charges de `benchmarks/native/workloads.py`. Toute modification d'une charge change l'empreinte testée dans `tests/test_native_cpu.py` : incrémenter `NATIVE_CPU_VERSION` et mettre à jour l'empreinte. Multi-cœur : `multiprocessing` en `spawn`, barrière pour exclure démarrage et préparation du chrono, les charges passées en argument aux workers.
 - Tests des benchs : `conftest.TINY` (charges minuscules) ; patcher `cpu.WORKLOADS`, `cli.capture_state` et `runner.DEFAULT_MAX_WARMUP_S` (sinon le warm-up de charges bruitées court jusqu’à 90 s).
 - Donnée absente = `None`. Quand la cause compte pour l'utilisateur, le modèle porte un `Unavailable` (`NEEDS_ROOT`, `TOOL_MISSING`, `NO_DATA`) ; l'affichage traduit, il n'interroge jamais le système.
@@ -72,18 +89,20 @@ src/hwbench/
 ├── benchmarks/
 │   ├── base.py         # Benchmark (name, category, backend, version, unit, is_available(), run() -> Measurement) + registre @register
 │   ├── native/          # tests maison
-│   └── external/        # wrappers d'outils existants via subprocess + parsing (phase 3)
+│   └── external/        # sysbench, glmark2, vkmark ; _run.py = seul accès système, _gpu.py = conditions GPU
 ├── results.py          # Category, BenchWarning, Measurement, MachineState, Result
 ├── runner.py           # warm-up, runs, médiane/écart-type, avertissements -> Result
 ├── machine_state.py    # governor, secteur, température : seul pont benchmarks -> collecteurs
-├── scoring.py          # (phase 3) normalisation + score combiné pondéré
+├── scoring.py          # normalisation (référence = 1000), catégories, score combiné pondéré
 ├── privacy.py          # filtrage des identifiants
 ├── export.py           # (phase 4) export/import JSON versionné
+├── reference.py        # contrôles et génération du fichier de référence
+├── data/reference.json # référence du scoring (package data, générée)
 └── cli.py
-tests/                  # hors de src/, fixtures dans tests/fixtures/
+tests/                  # hors de src/, fixtures dans tests/fixtures/ (tools/ = outils externes)
 ```
 
-`benchmarks.base.benchmark_classes()` n'importe que `hwbench.benchmarks.native` pour peupler le registre : un nouveau paquet de backends (ex. `external`) doit y être ajouté, sinon ses classes n'apparaissent pas.
+`benchmarks.base.benchmark_classes()` importe `hwbench.benchmarks.native` et `hwbench.benchmarks.external` pour peupler le registre : un nouveau module de backend doit être importé dans le `__init__.py` de son paquet, sinon ses classes n'apparaissent pas.
 
 Séparation stricte : collecte, benchmark, scoring et affichage ne dépendent pas les uns des autres. L'affichage consomme des dataclasses, jamais la sortie brute d'une commande. La future TUI et le futur support Windows ne doivent être qu'une couche en plus.
 
@@ -146,8 +165,9 @@ Fiabilité des mesures :
 
 ```
 hwbench info [--json] [--show-serials]
-hwbench bench [cpu-single|cpu-multi|gpu|all] [--backend ...] [--runs N]
+hwbench bench [cpu-single|cpu-multi|gpu|all] [--backend ...] [--runs N] [--weights ...]
 hwbench backends          # liste les backends et leur disponibilité
+hwbench reference -o FILE [--force]   # machine de référence uniquement
 hwbench export -o FILE
 hwbench compare FILES...
 ```
