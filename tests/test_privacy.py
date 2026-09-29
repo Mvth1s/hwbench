@@ -11,10 +11,11 @@ FAKE_IDENTIFIER_VALUES = (
     "FAKE-SYS-SERIAL",
     "FAKE-BOARD-SERIAL",
     "FAKE-CHASSIS-SERIAL",
-    "FAKE-ASSET-TAG",
-    "FAKE0001",
-    "FAKE0002",
-    "FAKE-NVME-SERIAL-0001",
+    "FAKE-0001",
+    "FAKE-0002",
+    "FAKE-0003",
+    "FAKE-0004",
+    "FAKE-0005",
     "fake-host",
     "00000000-0000-0000-0000-000000000000",
 )
@@ -53,8 +54,8 @@ def test_snapshot_never_contains_identifiers_even_when_collected(laptop) -> None
         assert value not in dumped
     assert identifiers is not None
     assert identifiers.board is not None and identifiers.board.product_serial == "FAKE-SYS-SERIAL"
-    assert identifiers.disks and identifiers.disks[0].serial == "FAKE-NVME-SERIAL-0001"
-    assert identifiers.ram_modules and identifiers.ram_modules[0].serial == "FAKE0001"
+    assert identifiers.disks and identifiers.disks[0].serial == "FAKE-0005"
+    assert identifiers.ram_modules and identifiers.ram_modules[0].serial == "FAKE-0001"
 
 
 def test_no_identifiers_collected_by_default(laptop) -> None:

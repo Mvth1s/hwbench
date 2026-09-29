@@ -17,6 +17,35 @@ NVIDIA_SMI_ARGS = (
 )
 
 
+CAPTURED_FILES = {
+    "lscpu.json": ("lscpu", "-J"),
+    "lsblk.json": LSBLK_ARGS,
+    "lspci_mm.txt": ("lspci", "-mm", "-nn"),
+    "glxinfo_B.txt": ("glxinfo", "-B"),
+    "vulkaninfo_summary.txt": ("vulkaninfo", "--summary"),
+    "nvidia_smi.csv": NVIDIA_SMI_ARGS,
+    "dmidecode_memory.txt": ("dmidecode", "-t", "memory"),
+    "smartctl_version.txt": ("smartctl", "--version"),
+}
+
+
+def captured_machine_dirs() -> list[Path]:
+    """Dossiers produits par scripts/capture_fixtures.sh."""
+    return sorted(p for p in FIXTURES.iterdir() if p.is_dir())
+
+
+def captured_commands(machine: Path) -> dict[tuple[str, ...], str]:
+    commands = {
+        args: (machine / name).read_text()
+        for name, args in CAPTURED_FILES.items()
+        if (machine / name).exists()
+    }
+    for f in machine.glob("smartctl_*.json"):
+        disk = f.stem.removeprefix("smartctl_")
+        commands[("smartctl", "-j", "-a", f"/dev/{disk}")] = f.read_text()
+    return commands
+
+
 def fixture_text(name: str) -> str:
     return (FIXTURES / name).read_text()
 
@@ -84,24 +113,21 @@ def fake_system(monkeypatch: pytest.MonkeyPatch) -> Callable[..., FakeSystem]:
     return install
 
 
+# Capture réelle (scripts/capture_fixtures.sh) d'une Dell Latitude 5420, root compris.
+LAPTOP = "dell-inc-latitude-5420"
+
+
 def laptop_commands() -> dict[tuple[str, ...], str]:
-    return {
-        ("lscpu", "-J"): fixture_text("lscpu.json"),
-        ("lspci", "-mm", "-nn"): fixture_text("lspci_mm.txt"),
-        ("glxinfo", "-B"): fixture_text("glxinfo_B.txt"),
-        ("vulkaninfo", "--summary"): fixture_text("vulkaninfo_summary.txt"),
-        LSBLK_ARGS: fixture_text("lsblk.json"),
-        ("smartctl", "--version"): "smartctl 7.5 2025-04-30 r5714 [x86_64-linux] (local build)\n",
-        ("smartctl", "-j", "-a", "/dev/nvme0n1"): fixture_text("smartctl_nvme.json"),
-        ("dmidecode", "-t", "memory"): fixture_text("dmidecode_memory.txt"),
-    }
+    return captured_commands(FIXTURES / LAPTOP)
+
+
+def laptop_sysfs() -> dict[str, str]:
+    return sysfs_fixture(f"{LAPTOP}/sysfs.json")
 
 
 @pytest.fixture
 def laptop(fake_system: Callable[..., FakeSystem]) -> Callable[..., FakeSystem]:
     def install(root: bool = False) -> FakeSystem:
-        return fake_system(
-            files=sysfs_fixture("sysfs_laptop.json"), commands=laptop_commands(), root=root
-        )
+        return fake_system(files=laptop_sysfs(), commands=laptop_commands(), root=root)
 
     return install

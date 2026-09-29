@@ -13,7 +13,7 @@ from hwbench.models import Unavailable
 
 
 def test_lsblk_modern_skips_zram_and_partitions() -> None:
-    disks = parse_lsblk(json.loads(fixture_text("lsblk.json")))
+    disks = parse_lsblk(json.loads(fixture_text("dell-inc-latitude-5420/lsblk.json")))
     assert [d.name for d in disks] == ["nvme0n1"]
     d = disks[0]
     assert d.size_bytes == 1000204886016
@@ -35,7 +35,9 @@ def test_smartctl_json_support_detection() -> None:
 
 
 def test_smart_health() -> None:
-    assert parse_smart_health(json.loads(fixture_text("smartctl_nvme.json"))) == (True, 38.0)
+    assert parse_smart_health(
+        json.loads(fixture_text("dell-inc-latitude-5420/smartctl_nvme0n1.json"))
+    ) == (True, 38.0)
     assert parse_smart_health(json.loads(fixture_text("smartctl_sata_failed.json"))) == (
         False,
         44.0,
@@ -44,10 +46,12 @@ def test_smart_health() -> None:
 
 
 def test_smart_identifiers_nvme_and_sata() -> None:
-    nvme = parse_smart_identifiers("nvme0n1", json.loads(fixture_text("smartctl_nvme.json")))
-    assert nvme.serial == "FAKE-NVME-SERIAL-0001"
+    nvme = parse_smart_identifiers(
+        "nvme0n1", json.loads(fixture_text("dell-inc-latitude-5420/smartctl_nvme0n1.json"))
+    )
+    assert nvme.serial == "FAKE-0005"
     assert nvme.eui64 == "002538 0000000000"
-    assert nvme.nguid == "FAKE0000000000000000000000000000"
+    assert nvme.nguid is None
     assert nvme.wwn is None
     sata = parse_smart_identifiers("sda", json.loads(fixture_text("smartctl_sata_failed.json")))
     assert sata.wwn == "5 0014ee 000000000"
@@ -67,7 +71,7 @@ def test_collect_identifiers_when_requested(laptop) -> None:
     laptop(root=True)
     result = LinuxDiskCollector().collect(include_identifiers=True)
     assert result.identifiers is not None
-    assert [i.serial for i in result.identifiers] == ["FAKE-NVME-SERIAL-0001"]
+    assert [i.serial for i in result.identifiers] == ["FAKE-0005"]
 
 
 def test_collect_without_root_skips_smartctl(laptop) -> None:
@@ -86,7 +90,7 @@ def test_collect_with_old_smartctl(fake_system) -> None:
 
 
 def test_collect_without_smartctl(fake_system) -> None:
-    fake_system(commands={LSBLK_ARGS: fixture_text("lsblk.json")}, root=True)
+    fake_system(commands={LSBLK_ARGS: fixture_text("dell-inc-latitude-5420/lsblk.json")}, root=True)
     data = LinuxDiskCollector().collect().data
     assert data.smart_unavailable is Unavailable.TOOL_MISSING
     assert len(data.disks) == 1

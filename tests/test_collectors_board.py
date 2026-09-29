@@ -1,6 +1,6 @@
-from conftest import sysfs_fixture
+from conftest import laptop_sysfs, sysfs_fixture
 
-from hwbench.collectors.linux.board import LinuxBoardCollector
+from hwbench.collectors.linux.board import LinuxBoardCollector, parse_dmi_date
 
 IDENTIFIER_FILES = (
     "product_uuid",
@@ -21,7 +21,7 @@ def test_board_data(laptop) -> None:
     assert (data.bios_vendor, data.bios_version, data.bios_date) == (
         "Dell Inc.",
         "1.56.0",
-        "06/30/2026",
+        "2026-06-30",
     )
 
 
@@ -41,9 +41,17 @@ def test_identifiers_when_requested(laptop) -> None:
     assert ids is not None
     assert ids.hostname == "fake-host"
     assert ids.product_serial == "FAKE-SYS-SERIAL"
-    assert ids.board_serial == "/FAKE-BOARD-SERIAL/"
-    assert ids.chassis_asset_tag == "FAKE-ASSET-TAG"
+    assert ids.board_serial == "FAKE-BOARD-SERIAL"
+    assert ids.chassis_asset_tag is None
     assert ids.board_asset_tag is None
+
+
+def test_parse_dmi_date() -> None:
+    assert parse_dmi_date("06/30/2026") == "2026-06-30"
+    assert parse_dmi_date("12/31/99") == "1999-12-31"
+    assert parse_dmi_date("2026-06-30") is None
+    assert parse_dmi_date("garbage") is None
+    assert parse_dmi_date(None) is None
 
 
 def test_placeholders_become_none(fake_system) -> None:
@@ -55,7 +63,7 @@ def test_placeholders_become_none(fake_system) -> None:
 
 
 def test_unreadable_serials_are_none(fake_system) -> None:
-    files = {k: v for k, v in sysfs_fixture("sysfs_laptop.json").items() if "serial" not in k}
+    files = {k: v for k, v in laptop_sysfs().items() if "serial" not in k}
     fake_system(files=files)
     ids = LinuxBoardCollector().collect(include_identifiers=True).identifiers
     assert ids is not None

@@ -11,7 +11,7 @@ import pytest
 from hwbench.privacy import SENSITIVE_KEY_RE
 
 FIXTURES = Path(__file__).parent / "fixtures"
-FIXTURE_FILES = sorted(p for p in FIXTURES.iterdir() if p.is_file())
+FIXTURE_FILES = sorted(p for p in FIXTURES.rglob("*") if p.is_file())
 
 ZERO_UUID = "00000000-0000-0000-0000-000000000000"
 EMPTY_VALUES = {
@@ -36,7 +36,7 @@ def is_fake(value: str) -> bool:
     return v.lower() in EMPTY_VALUES or "fake" in v.lower() or v == ZERO_UUID
 
 
-@pytest.mark.parametrize("path", FIXTURE_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("path", FIXTURE_FILES, ids=lambda p: str(p.relative_to(FIXTURES)))
 def test_no_real_uuid_or_mac(path: Path) -> None:
     text = path.read_text()
     assert set(UUID_RE.findall(text)) <= {ZERO_UUID}
@@ -44,7 +44,9 @@ def test_no_real_uuid_or_mac(path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "path", [p for p in FIXTURE_FILES if p.suffix != ".json"], ids=lambda p: p.name
+    "path",
+    [p for p in FIXTURE_FILES if p.suffix != ".json"],
+    ids=lambda p: str(p.relative_to(FIXTURES)),
 )
 def test_text_identifier_lines_are_fake(path: Path) -> None:
     for match in TEXT_IDENTIFIER_LINE_RE.finditer(path.read_text()):
@@ -68,7 +70,9 @@ def _sensitive_leaves(obj: Any, sensitive: bool = False) -> list[tuple[bool, Any
 
 
 @pytest.mark.parametrize(
-    "path", [p for p in FIXTURE_FILES if p.suffix == ".json"], ids=lambda p: p.name
+    "path",
+    [p for p in FIXTURE_FILES if p.suffix == ".json"],
+    ids=lambda p: str(p.relative_to(FIXTURES)),
 )
 def test_json_identifier_values_are_fake(path: Path) -> None:
     for sensitive, value in _sensitive_leaves(json.loads(path.read_text())):

@@ -12,7 +12,7 @@ from hwbench.collectors.linux.cpu import (
 
 
 def test_parse_lscpu_real_output() -> None:
-    data = parse_lscpu(json.loads(fixture_text("lscpu.json")))
+    data = parse_lscpu(json.loads(fixture_text("dell-inc-latitude-5420/lscpu.json")))
     assert data.model == "11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz"
     assert data.vendor == "GenuineIntel"
     assert data.architecture == "x86_64"
@@ -50,8 +50,8 @@ def test_parse_proc_cpuinfo_fallback() -> None:
 def test_collect_reads_per_cpu_frequency_and_governor(laptop) -> None:
     laptop()
     data = LinuxCpuCollector().collect().data
-    assert [c.cpu for c in data.per_cpu] == [0, 1]
-    assert data.per_cpu[0].current_mhz == 2683.879
+    assert [c.cpu for c in data.per_cpu] == list(range(8))
+    assert data.per_cpu[0].current_mhz == 3999.959
     assert {c.governor for c in data.per_cpu} == {"performance"}
 
 

@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from datetime import date
 from statistics import mean
 
 from rich.console import Console, Group
@@ -6,6 +7,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from hwbench.display.fmt import compact, num
 from hwbench.models import (
     BoardData,
     CpuData,
@@ -39,6 +41,10 @@ def _v(value: object, suffix: str = "", fmt: str = "{}") -> Text | str:
     return fmt.format(value) + suffix
 
 
+def _n(value: float | None, suffix: str = "", decimals: int = 1) -> Text | str:
+    return NA if value is None else num(value, decimals) + suffix
+
+
 def _unavailable(reason: Unavailable, tool: str) -> Text:
     msg = UNAVAILABLE_MESSAGES[reason]
     text = Text(msg, style="yellow")
@@ -60,7 +66,7 @@ def _size(size_bytes: int | None) -> Text | str:
     value = float(size_bytes)
     for unit in ("o", "Kio", "Mio", "Gio", "Tio"):
         if value < 1024 or unit == "Tio":
-            return f"{value:.1f} {unit}" if unit != "o" else f"{int(value)} o"
+            return f"{num(value)} {unit}" if unit != "o" else f"{int(value)} o"
         value /= 1024
     return NA
 
@@ -113,23 +119,37 @@ def _mhz(value: float | None) -> str:
     return f"{value:.0f} MHz" if value is not None else "?"
 
 
+def _ram_speed(configured: int | None, rated: int | None) -> Text | str:
+    if configured is None:
+        return NA
+    if rated is not None and rated != configured:
+        return f"{configured} MT/s (max {rated})"
+    return f"{configured} MT/s"
+
+
 def render_ram(ram: RamData) -> Panel:
     parts: list[Table | Text] = []
     t = _kv_table()
-    t.add_row("Total", _v(ram.total_gb, " Gio", "{:.1f}"))
+    if ram.installed_gb is not None:
+        t.add_row("Installée", f"{compact(ram.installed_gb)} Gio")
+    t.add_row("Utilisable (MemTotal)", _n(ram.total_gb, " Gio"))
     parts.append(t)
     if ram.modules_unavailable is not None:
         t.add_row("Barrettes", _unavailable(ram.modules_unavailable, "dmidecode"))
-    elif ram.modules:
+    elif ram.modules is None:
+        t.add_row("Barrettes", NA)
+    elif not ram.modules:
+        t.add_row("Barrettes", Text("aucune barrette détectée", style="yellow"))
+    else:
         modules = Table(show_edge=False, box=None, header_style="bold")
         for col in ("Slot", "Taille", "Type", "Vitesse", "Fabricant", "Référence"):
             modules.add_column(col)
         for m in ram.modules:
             modules.add_row(
                 _v(m.slot),
-                _v(m.size_gb, " Gio", "{:g}"),
+                (NA if m.size_gb is None else f"{compact(m.size_gb)} Gio"),
                 _v(m.type),
-                _v(m.speed_mts, " MT/s"),
+                _ram_speed(m.speed_mts, m.rated_speed_mts),
                 _v(m.manufacturer),
                 _v(m.part_number),
             )
@@ -173,7 +193,7 @@ def render_disks(data: DiskData) -> Panel:
             kind,
             _v(d.transport),
             smart,
-            _v(d.temperature_c, " °C", "{:.0f}"),
+            _n(d.temperature_c, " °C", 0),
         )
     body: Table | Text = t if data.disks else NA
     return Panel(body, title="Disques", title_align="left")
@@ -183,8 +203,14 @@ def render_board(board: BoardData) -> Panel:
     t = _kv_table()
     t.add_row("Machine", _join(board.system_vendor, board.product_name, board.product_version))
     t.add_row("Carte mère", _join(board.board_vendor, board.board_name))
-    t.add_row("BIOS", _join(board.bios_vendor, board.bios_version, board.bios_date))
+    t.add_row("BIOS", _join(board.bios_vendor, board.bios_version, _fr_date(board.bios_date)))
     return Panel(t, title="Machine / carte mère", title_align="left")
+
+
+def _fr_date(iso: str | None) -> str | None:
+    if iso is None:
+        return None
+    return date.fromisoformat(iso).strftime("%d/%m/%Y")
 
 
 def _join(*values: str | None) -> Text | str:
@@ -202,9 +228,9 @@ def render_sensors(sensors: SensorsData) -> Panel:
             t.add_row(
                 r.chip,
                 r.label,
-                _v(r.current_c, " °C", "{:.1f}"),
-                _v(r.high_c, " °C", "{:.0f}"),
-                _v(r.critical_c, " °C", "{:.0f}"),
+                _n(r.current_c, " °C"),
+                _n(r.high_c, " °C", 0),
+                _n(r.critical_c, " °C", 0),
             )
         parts.append(t)
     if sensors.fans:
@@ -227,13 +253,32 @@ def render_power(power: PowerData) -> Panel:
         health = b.health_percent
         t.add_row(
             f"Batterie {b.name}",
-            f"{_plain(b.percent, ' %')} · {b.status or '?'} · santé "
+            f"{_plain(b.percent, ' %')} · {_battery_status(b.status)} · santé "
             f"{f'{health:.0f} %' if health is not None else '?'} "
-            f"({_plain(b.full_capacity_wh, ' Wh', '{:.1f}')} / "
-            f"{_plain(b.design_capacity_wh, ' Wh', '{:.1f}')}) · "
-            f"{_plain(b.cycle_count, ' cycles')}",
+            f"({_plain_n(b.full_capacity_wh, ' Wh')} / "
+            f"{_plain_n(b.design_capacity_wh, ' Wh')}) · "
+            + (f"{b.cycle_count} cycles" if b.cycle_count else "cycles non disponibles"),
         )
     return Panel(t, title="Alimentation", title_align="left")
+
+
+def _plain_n(value: float | None, suffix: str = "") -> str:
+    return "?" if value is None else num(value) + suffix
+
+
+BATTERY_STATUS = {
+    "Charging": "en charge",
+    "Discharging": "en décharge",
+    "Not charging": "pas en charge",
+    "Full": "pleine",
+    "Unknown": "état inconnu",
+}
+
+
+def _battery_status(status: str | None) -> str:
+    if status is None:
+        return "état inconnu"
+    return BATTERY_STATUS.get(status, status)
 
 
 def _plain(value: object, suffix: str = "", fmt: str = "{}") -> str:

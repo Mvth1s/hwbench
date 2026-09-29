@@ -34,7 +34,8 @@ def read_battery(name: str) -> Battery:
         status=_exec.read_sysfs(f"{base}/status"),
         design_capacity_wh=_capacity_wh(base, "full_design"),
         full_capacity_wh=_capacity_wh(base, "full"),
-        cycle_count=_read_int(f"{base}/cycle_count"),
+        # beaucoup de firmwares (Dell notamment) exposent 0 faute de compteur réel
+        cycle_count=_read_int(f"{base}/cycle_count") or None,
     )
 
 

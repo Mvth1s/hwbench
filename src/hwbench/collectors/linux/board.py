@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from hwbench.collectors.base import Collector, ComponentResult, register
 from hwbench.collectors.linux import _exec
 from hwbench.models import BoardData, BoardIdentifiers
@@ -25,6 +27,18 @@ def _dmi(name: str) -> str | None:
     return value.strip()
 
 
+def parse_dmi_date(value: str | None) -> str | None:
+    """DMI (SMBIOS) impose MM/DD/YYYY ; les très vieux BIOS écrivent MM/DD/YY."""
+    if value is None:
+        return None
+    for fmt in ("%m/%d/%Y", "%m/%d/%y"):
+        try:
+            return datetime.strptime(value.strip(), fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
+
+
 @register("Linux")
 class LinuxBoardCollector(Collector[BoardData, BoardIdentifiers]):
     component = "board"
@@ -40,7 +54,7 @@ class LinuxBoardCollector(Collector[BoardData, BoardIdentifiers]):
             board_name=_dmi("board_name"),
             bios_vendor=_dmi("bios_vendor"),
             bios_version=_dmi("bios_version"),
-            bios_date=_dmi("bios_date"),
+            bios_date=parse_dmi_date(_dmi("bios_date")),
         )
         if not include_identifiers:
             return ComponentResult(data)

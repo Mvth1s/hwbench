@@ -43,11 +43,13 @@ class RamModule:
     speed_mts: int | None
     manufacturer: str | None
     part_number: str | None
+    rated_speed_mts: int | None = None
 
 
 @dataclass(frozen=True)
 class RamData:
     total_gb: float | None = None
+    installed_gb: float | None = None
     modules: list[RamModule] | None = None
     modules_unavailable: Unavailable | None = None
 
@@ -97,7 +99,7 @@ class BoardData:
     board_name: str | None = None
     bios_vendor: str | None = None
     bios_version: str | None = None
-    bios_date: str | None = None
+    bios_date: str | None = None  # ISO 8601 (YYYY-MM-DD)
 
 
 @dataclass(frozen=True)

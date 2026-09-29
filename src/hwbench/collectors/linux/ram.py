@@ -2,19 +2,15 @@ import re
 
 import psutil
 
+from hwbench.collectors import jedec
 from hwbench.collectors.base import Collector, ComponentResult, register
 from hwbench.collectors.linux import _exec
 from hwbench.models import RamData, RamModule, RamModuleIdentifiers, Unavailable
 
 _EMPTY_VALUES = {"", "unknown", "not specified", "not provided", "none", "no module installed"}
-_SIZE_RE = re.compile(r"^(\d+(?:\.\d+)?)\s*(kB|KB|MB|GB|TB)$")
-_SIZE_TO_GB = {
-    "kB": 1 / (1024 * 1024),
-    "KB": 1 / (1024 * 1024),
-    "MB": 1 / 1024,
-    "GB": 1.0,
-    "TB": 1024.0,
-}
+# dmidecode < 3.7 écrit « GB », >= 3.7 « GiB » ; dans les deux cas ce sont des puissances de 1024
+_SIZE_RE = re.compile(r"^(\d+(?:\.\d+)?)\s*([kKMGT])i?B$")
+_SIZE_TO_GB = {"k": 1 / (1024 * 1024), "K": 1 / (1024 * 1024), "M": 1 / 1024, "G": 1.0, "T": 1024.0}
 _SPEED_RE = re.compile(r"^(\d+)\s*(MT/s|MHz)$")
 
 
@@ -72,13 +68,17 @@ def parse_dmidecode_memory(text: str) -> list[dict[str, str]]:
 
 
 def module_from_fields(fields: dict[str, str]) -> RamModule:
-    speed = _parse_speed(fields.get("Configured Memory Speed")) or _parse_speed(fields.get("Speed"))
+    rated = _parse_speed(fields.get("Speed"))
+    configured = _parse_speed(fields.get("Configured Memory Speed")) or rated
     return RamModule(
         slot=_clean(fields.get("Locator")),
         size_gb=_parse_size_gb(fields.get("Size")),
         type=_clean(fields.get("Type")),
-        speed_mts=speed,
-        manufacturer=_clean(fields.get("Manufacturer")),
+        speed_mts=configured,
+        rated_speed_mts=rated,
+        manufacturer=jedec.manufacturer_name(
+            _clean(fields.get("Module Manufacturer ID")), _clean(fields.get("Manufacturer"))
+        ),
         part_number=_clean(fields.get("Part Number")),
     )
 
@@ -123,6 +123,9 @@ class LinuxRamCollector(Collector[RamData, list[RamModuleIdentifiers]]):
             return ComponentResult(RamData(total_gb=total, modules_unavailable=Unavailable.NO_DATA))
 
         blocks = parse_dmidecode_memory(text)
-        data = RamData(total_gb=total, modules=[module_from_fields(b) for b in blocks])
+        modules = [module_from_fields(b) for b in blocks]
+        sizes = [m.size_gb for m in modules]
+        installed = sum(s for s in sizes if s is not None) if sizes and None not in sizes else None
+        data = RamData(total_gb=total, installed_gb=installed, modules=modules)
         ids = [identifiers_from_fields(b) for b in blocks] if include_identifiers else None
         return ComponentResult(data, ids)

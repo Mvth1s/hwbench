@@ -24,16 +24,33 @@ python3 -m venv .venv
 .venv/bin/ruff check .
 ```
 
+Pour ajouter une machine aux fixtures de test (sorties réelles, identifiants anonymisés) :
+
+```sh
+scripts/capture_fixtures.sh [nom]     # sans sudo : il le demande lui-même pour dmidecode/smartctl
+```
+
 ## Utilisation
 
 ```sh
 hwbench info                  # tableau récapitulatif
 hwbench info --json           # sortie JSON, sans aucun identifiant
-sudo hwbench info             # ajoute barrettes RAM (dmidecode) et santé SMART (smartctl)
 hwbench info --show-serials   # affiche serials / UUID / hostname à l'écran, localement
 ```
 
 `--json` et `--show-serials` sont incompatibles : les identifiants ne sortent jamais de l'écran.
+
+### Avec root (barrettes RAM et santé SMART)
+
+`dmidecode` et `smartctl` demandent root. Or `sudo` utilise son propre `PATH` (`secure_path`),
+qui ne contient ni `~/.local/bin` (pipx) ni le venv : `sudo hwbench` répond « command not found ».
+Passe le chemin complet :
+
+```sh
+sudo "$(command -v hwbench)" info     # bash, zsh, et fish ≥ 3.4
+sudo (command -v hwbench) info        # fish < 3.4
+sudo .venv/bin/hwbench info           # depuis le repo, en développement
+```
 
 Exemple (sans root) :
 

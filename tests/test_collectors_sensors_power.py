@@ -10,17 +10,17 @@ def test_hwmon_temperatures_and_fans(laptop) -> None:
     data = LinuxSensorsCollector().collect().data
     by_label = {(t.chip, t.label): t for t in data.temperatures}
     composite = by_label[("nvme", "Composite")]
-    assert (composite.current_c, composite.high_c, composite.critical_c) == (37.85, 81.85, 84.85)
-    assert by_label[("coretemp", "Package id 0")].current_c == 64.0
-    assert by_label[("dell_smm", "temp1")].current_c == 61.0
-    assert [(f.chip, f.label, f.rpm) for f in data.fans] == [("dell_smm", "Processor Fan", 1628)]
+    assert (composite.current_c, composite.high_c, composite.critical_c) == (37.85, 80.85, 84.85)
+    assert by_label[("coretemp", "Package id 0")].current_c == 68.0
+    assert by_label[("dell_smm", "temp1")].current_c == 54.0
+    assert [(f.chip, f.label, f.rpm) for f in data.fans] == [("dell_smm", "fan1", 2404)]
 
 
 def test_hwmon_sentinel_threshold_is_dropped(laptop) -> None:
     laptop()
     data = LinuxSensorsCollector().collect().data
     sensor1 = next(t for t in data.temperatures if t.label == "Sensor 1")
-    assert sensor1.current_c == 45.85
+    assert sensor1.current_c == 37.85
     assert sensor1.high_c is None
 
 
@@ -34,10 +34,10 @@ def test_laptop_battery_and_ac(laptop) -> None:
     laptop()
     power = LinuxPowerCollector().collect().data
     assert power.on_ac is True
-    # la batterie de souris (scope=Device) est ignorée
     (bat,) = power.batteries
     assert bat.name == "BAT0"
-    assert (bat.percent, bat.status, bat.cycle_count) == (79, "Not charging", 0)
+    # cycle_count = 0 côté firmware signifie « pas de compteur »
+    assert (bat.percent, bat.status, bat.cycle_count) == (79, "Not charging", None)
     # charge_* (µAh) × voltage_min_design (µV)
     assert bat.design_capacity_wh == pytest.approx(59.28)
     assert bat.health_percent == pytest.approx(100.0)
@@ -61,6 +61,31 @@ def test_energy_based_battery_on_battery_power(fake_system) -> None:
     assert (bat.full_capacity_wh, bat.design_capacity_wh) == (45.0, 50.0)
     assert bat.health_percent == pytest.approx(90.0)
     assert bat.cycle_count is None
+
+
+def test_peripheral_battery_is_ignored(fake_system) -> None:
+    fake_system(
+        files={
+            "/sys/class/power_supply/hidpp_battery_0/type": "Battery",
+            "/sys/class/power_supply/hidpp_battery_0/scope": "Device",
+            "/sys/class/power_supply/hidpp_battery_0/capacity": "55",
+        }
+    )
+    power = LinuxPowerCollector().collect().data
+    assert power.batteries == []
+    assert power.on_ac is None
+
+
+def test_labelled_fan(fake_system) -> None:
+    fake_system(
+        files={
+            "/sys/class/hwmon/hwmon5/name": "dell_smm",
+            "/sys/class/hwmon/hwmon5/fan1_input": "1628",
+            "/sys/class/hwmon/hwmon5/fan1_label": "Processor Fan",
+        }
+    )
+    fans = LinuxSensorsCollector().collect().data.fans
+    assert [(f.label, f.rpm) for f in fans] == [("Processor Fan", 1628)]
 
 
 def test_desktop_without_power_supply(fake_system) -> None:
