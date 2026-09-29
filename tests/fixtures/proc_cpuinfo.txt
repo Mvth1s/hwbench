@@ -1,0 +1,36 @@
+processor	: 0
+vendor_id	: GenuineIntel
+cpu family	: 6
+model		: 140
+model name	: 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz
+stepping	: 1
+cpu MHz		: 2600.000
+cache size	: 8192 KB
+physical id	: 0
+siblings	: 4
+core id		: 0
+cpu cores	: 2
+
+processor	: 1
+vendor_id	: GenuineIntel
+model name	: 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz
+cache size	: 8192 KB
+physical id	: 0
+core id		: 1
+cpu cores	: 2
+
+processor	: 2
+vendor_id	: GenuineIntel
+model name	: 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz
+cache size	: 8192 KB
+physical id	: 0
+core id		: 0
+cpu cores	: 2
+
+processor	: 3
+vendor_id	: GenuineIntel
+model name	: 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz
+cache size	: 8192 KB
+physical id	: 0
+core id		: 1
+cpu cores	: 2

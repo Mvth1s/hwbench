@@ -1,0 +1,11 @@
+{
+   "blockdevices": [
+      {"name": "sda", "size": "1000204886016", "model": "WDC WD10EZEX-08WN4A0", "type": "disk", "rota": "1", "tran": "sata",
+         "children": [
+            {"name": "sda1", "size": "1000203837440", "model": null, "type": "part", "rota": "1", "tran": null}
+         ]
+      },
+      {"name": "sr0", "size": "1073741312", "model": "DVD-RW", "type": "rom", "rota": "1", "tran": "sata"},
+      {"name": "loop0", "size": "4096", "model": null, "type": "loop", "rota": "0", "tran": null}
+   ]
+}

@@ -1,0 +1,62 @@
+{
+  "json_format_version": [1, 0],
+  "smartctl": {
+    "version": [7, 5],
+    "pre_release": false,
+    "svn_revision": "5714",
+    "platform_info": "x86_64-linux-7.2.6-200.fc44.x86_64",
+    "build_info": "(local build)",
+    "argv": ["smartctl", "-j", "-a", "/dev/nvme0n1"],
+    "exit_status": 0
+  },
+  "local_time": {"time_t": 1790000000, "asctime": "Tue Sep 29 16:00:00 2026 CEST"},
+  "device": {"name": "/dev/nvme0n1", "info_name": "/dev/nvme0n1", "type": "nvme", "protocol": "NVMe"},
+  "model_name": "Samsung SSD 990 EVO Plus 1TB",
+  "serial_number": "FAKE-NVME-SERIAL-0001",
+  "firmware_version": "2B2QKXG7",
+  "nvme_pci_vendor": {"id": 5197, "subsystem_id": 5197},
+  "nvme_ieee_oui_identifier": 9528,
+  "nvme_total_capacity": 1000204886016,
+  "nvme_unallocated_capacity": 0,
+  "nvme_controller_id": 1,
+  "nvme_version": {"string": "2.0", "value": 131072},
+  "nvme_number_of_namespaces": 1,
+  "nvme_namespaces": [
+    {
+      "id": 1,
+      "size": {"blocks": 1953525168, "bytes": 1000204886016},
+      "capacity": {"blocks": 1953525168, "bytes": 1000204886016},
+      "utilization": {"blocks": 402653184, "bytes": 206158430208},
+      "formatted_lba_size": 512,
+      "eui64": {"oui": 9528, "ext_id": 0},
+      "nguid": "FAKE0000000000000000000000000000"
+    }
+  ],
+  "user_capacity": {"blocks": 1953525168, "bytes": 1000204886016},
+  "logical_block_size": 512,
+  "smart_support": {"available": true, "enabled": true},
+  "smart_status": {"passed": true, "nvme": {"value": 0}},
+  "nvme_smart_health_information_log": {
+    "critical_warning": 0,
+    "temperature": 38,
+    "available_spare": 100,
+    "available_spare_threshold": 10,
+    "percentage_used": 1,
+    "data_units_read": 5244018,
+    "data_units_written": 6911204,
+    "host_reads": 61237720,
+    "host_writes": 99612447,
+    "controller_busy_time": 312,
+    "power_cycles": 842,
+    "power_on_hours": 1520,
+    "unsafe_shutdowns": 31,
+    "media_errors": 0,
+    "num_err_log_entries": 0,
+    "warning_temp_time": 0,
+    "critical_comp_time": 0,
+    "temperature_sensors": [46, 38]
+  },
+  "temperature": {"current": 38},
+  "power_cycle_count": 842,
+  "power_on_time": {"hours": 1520}
+}

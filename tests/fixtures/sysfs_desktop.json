@@ -1,0 +1,21 @@
+{
+  "/proc/meminfo": "MemTotal:       32768000 kB\n",
+  "/proc/sys/kernel/hostname": "fake-desktop",
+
+  "/sys/class/dmi/id/sys_vendor": "To Be Filled By O.E.M.",
+  "/sys/class/dmi/id/product_name": "To Be Filled By O.E.M.",
+  "/sys/class/dmi/id/product_version": "To Be Filled By O.E.M.",
+  "/sys/class/dmi/id/board_vendor": "ASRock",
+  "/sys/class/dmi/id/board_name": "B550M Pro4",
+  "/sys/class/dmi/id/bios_vendor": "American Megatrends International, LLC.",
+  "/sys/class/dmi/id/bios_version": "P3.20",
+  "/sys/class/dmi/id/bios_date": "01/12/2024",
+  "/sys/class/dmi/id/chassis_asset_tag": "Default string",
+
+  "/sys/class/hwmon/hwmon0/name": "k10temp",
+  "/sys/class/hwmon/hwmon0/temp1_input": "48250",
+  "/sys/class/hwmon/hwmon0/temp1_label": "Tctl",
+  "/sys/class/hwmon/hwmon1/name": "nct6775",
+  "/sys/class/hwmon/hwmon1/fan1_input": "0",
+  "/sys/class/hwmon/hwmon1/fan2_input": "912"
+}

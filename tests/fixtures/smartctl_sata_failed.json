@@ -1,0 +1,18 @@
+{
+  "json_format_version": [1, 0],
+  "smartctl": {
+    "version": [7, 4],
+    "argv": ["smartctl", "-j", "-a", "/dev/sda"],
+    "exit_status": 8
+  },
+  "device": {"name": "/dev/sda", "info_name": "/dev/sda [SAT]", "type": "sat", "protocol": "ATA"},
+  "model_family": "Western Digital Blue",
+  "model_name": "WDC WD10EZEX-08WN4A0",
+  "serial_number": "FAKE-SATA-SERIAL-0002",
+  "wwn": {"naa": 5, "oui": 5358, "id": 0},
+  "firmware_version": "02.01A02",
+  "user_capacity": {"blocks": 1953525168, "bytes": 1000204886016},
+  "rotation_rate": 7200,
+  "smart_status": {"passed": false},
+  "temperature": {"current": 44}
+}
