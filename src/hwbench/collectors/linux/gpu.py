@@ -49,12 +49,17 @@ def parse_vulkaninfo_summary(text: str) -> str | None:
     return None
 
 
+_DRIVER_VERSION_RE = re.compile(r"^\d+(?:\.\d+)+$")
+
+
 def parse_nvidia_smi_csv(text: str) -> dict[str, str | int]:
     line = next((ln for ln in text.splitlines() if ln.strip()), None)
     if line is None:
         return {}
     parts = [p.strip() for p in line.split(",")]
-    if len(parts) < 3:
+    # nvidia-smi sans pilote chargé écrit un message d'erreur sur stdout : exiger une vraie
+    # version de pilote (« 550.54.14 ») plutôt que de compter sur l'absence de virgules
+    if len(parts) < 3 or not _DRIVER_VERSION_RE.match(parts[1]):
         return {}
     out: dict[str, str | int] = {"nvidia_name": parts[0], "nvidia_driver_version": parts[1]}
     if parts[2].isdigit():
