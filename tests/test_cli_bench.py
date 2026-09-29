@@ -58,7 +58,8 @@ def test_unknown_backend() -> None:
 def test_gpu_without_backend_fails() -> None:
     result = runner.invoke(cli.app, ["bench", "gpu"], env=WIDE)
     assert result.exit_code == 1
-    assert "GPU : aucun backend disponible." in result.output
+    assert "GPU · glmark2 : indisponible (outil absent), ignoré." in result.output
+    assert "GPU · vkmark : indisponible (outil absent), ignoré." in result.output
 
 
 def test_warns_upfront_without_blocking(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -77,6 +78,7 @@ def _result(**overrides) -> Result:
         category=Category.CPU_SINGLE,
         backend="native",
         version="1",
+        tool_version=None,
         unit="index",
         higher_is_better=True,
         value=89.84,

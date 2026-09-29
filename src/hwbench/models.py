@@ -33,6 +33,7 @@ class CpuData:
     l2_cache_kb: int | None = None
     l3_cache_kb: int | None = None
     per_cpu: list[CpuCoreState] = field(default_factory=list)
+    scaling_driver: str | None = None  # cpu0 : « amd-pstate-epp », « intel_pstate »…
     # EPP de cpu0 (intel_pstate / amd-pstate en mode actif) : « performance », « balance_power »…
     energy_performance_preference: str | None = None
 

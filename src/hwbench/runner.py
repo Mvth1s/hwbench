@@ -109,7 +109,7 @@ def run_benchmark(
     values = [m.value for m in measurements]
     value = median(values)
     spread = stdev(values)
-    warnings = start_warnings(before, settings)
+    warnings = start_warnings(before, settings) + bench.warnings()
     if not stable:
         warnings.append(BenchWarning.WARMUP_UNSTABLE)
     if value and 100.0 * spread / value > settings.high_variance_cv_percent:
@@ -120,6 +120,7 @@ def run_benchmark(
         category=bench.category,
         backend=bench.backend,
         version=bench.version,
+        tool_version=bench.tool_version(),
         unit=bench.unit,
         higher_is_better=bench.higher_is_better,
         value=value,

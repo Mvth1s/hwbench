@@ -1,0 +1,25 @@
+=======================================================
+    glmark2 2023.01
+=======================================================
+    OpenGL Information
+    GL_VENDOR:      AMD
+    GL_RENDERER:    AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.7-arch1-1)
+    GL_VERSION:     4.6 (Compatibility Profile) Mesa 26.2.3-arch1.1
+    Surface Config: buf=32 r=8 g=8 b=8 a=8 depth=32 stencil=0 samples=0
+    Surface Size:   1920x1080 windowed
+=======================================================
+[build] use-vbo=false: FPS: 9661 FrameTime: 0.104 ms
+[build] use-vbo=true: FPS: 15786 FrameTime: 0.063 ms
+[texture] texture-filter=nearest: FPS: 15624 FrameTime: 0.064 ms
+[texture] texture-filter=linear: FPS: 15578 FrameTime: 0.064 ms
+[texture] texture-filter=mipmap: FPS: 15620 FrameTime: 0.064 ms
+[shading] shading=gouraud: FPS: 15592 FrameTime: 0.064 ms
+[shading] shading=blinn-phong-inf: FPS: 15561 FrameTime: 0.064 ms
+[shading] shading=phong: FPS: 15258 FrameTime: 0.066 ms
+[shading] shading=cel: FPS: 15177 FrameTime: 0.066 ms
+[bump] bump-render=high-poly: FPS: 14558 FrameTime: 0.069 ms
+[bump] bump-render=normals: FPS: 15646 FrameTime: 0.064 ms
+[bump] bump-render=height: FPS: 15562 FrameTime: 0.064 ms
+=======================================================
+                                  glmark2 Score: 14967 
+=======================================================

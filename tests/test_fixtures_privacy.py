@@ -25,21 +25,26 @@ EMPTY_VALUES = {
 }
 
 UUID_RE = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.I)
+# UUID sans tirets (ex. « Device UUID » de vkmark, UUID du GPU)
+HEX_UUID_RE = re.compile(r"\b[0-9a-f]{32}\b", re.I)
 MAC_RE = re.compile(r"\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){5}\b", re.I)
 TEXT_IDENTIFIER_LINE_RE = re.compile(
-    r"^\s*(serial number|asset tag|uuid|\w*uuid|serial)\s*[:=]\s*(.*?)\s*$", re.I | re.M
+    r"^\s*(serial number|asset tag|uuid|device uuid|\w*uuid|serial)\s*[:=]\s*(.*?)\s*$",
+    re.I | re.M,
 )
 
 
 def is_fake(value: str) -> bool:
     v = value.strip()
-    return v.lower() in EMPTY_VALUES or "fake" in v.lower() or v == ZERO_UUID
+    all_zero = bool(v) and set(v.replace("-", "")) == {"0"}
+    return v.lower() in EMPTY_VALUES or "fake" in v.lower() or all_zero
 
 
 @pytest.mark.parametrize("path", FIXTURE_FILES, ids=lambda p: str(p.relative_to(FIXTURES)))
 def test_no_real_uuid_or_mac(path: Path) -> None:
     text = path.read_text()
     assert set(UUID_RE.findall(text)) <= {ZERO_UUID}
+    assert all(is_fake(u) for u in HEX_UUID_RE.findall(text))
     assert MAC_RE.findall(text) == []
 
 

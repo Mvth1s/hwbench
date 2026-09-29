@@ -1,7 +1,6 @@
 import ctypes
 import ctypes.util
 import multiprocessing as mp
-import os
 import platform
 import ssl
 import threading
@@ -12,20 +11,13 @@ from statistics import geometric_mean
 from time import perf_counter
 from typing import Any
 
-from hwbench.benchmarks.base import Benchmark, BenchOptions, register
+from hwbench.benchmarks.base import Benchmark, BenchOptions, logical_cpus, register
 from hwbench.benchmarks.native.workloads import WORKLOADS, Workload
 from hwbench.results import Category, Measurement
 
 NATIVE_CPU_VERSION = "1"
 BARRIER_TIMEOUT_S = 120
 WORKER_TIMEOUT_S = 900
-
-
-def logical_cpus() -> int:
-    """CPU logiques réellement utilisables par ce processus (respecte l'affinité)."""
-    if hasattr(os, "sched_getaffinity"):
-        return len(os.sched_getaffinity(0))
-    return os.cpu_count() or 1
 
 
 def _liblzma_version() -> str | None:

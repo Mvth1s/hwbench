@@ -42,8 +42,12 @@ def test_registry() -> None:
     assert {"native-cpu-single", "native-cpu-multi"} <= names
     assert "native" in known_backends()
     assert select([Category.CPU_SINGLE], "native") == [NativeCpuSingle]
-    assert select([Category.GPU], "all") == []
-    assert select([Category.CPU_MULTI], "sysbench") == []
+    assert select([Category.GPU], "native") == []
+    assert [c.name for c in select([Category.CPU_MULTI], "all")] == [
+        "native-cpu-multi",
+        "sysbench-cpu-multi",
+    ]
+    assert {"sysbench", "glmark2", "vkmark"} <= known_backends()
 
 
 def test_single_core_measurement() -> None:

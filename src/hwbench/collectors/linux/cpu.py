@@ -150,7 +150,8 @@ class LinuxCpuCollector(Collector[CpuData, None]):
 
         updates: dict[str, Any] = {
             "per_cpu": read_per_cpu_state(),
-            # réglé par cœur mais uniforme en pratique : cpu0 suffit
+            # réglés par cœur mais uniformes en pratique : cpu0 suffit
+            "scaling_driver": _exec.read_sysfs(f"{SYS_CPU}/cpu0/cpufreq/scaling_driver") or None,
             "energy_performance_preference": _exec.read_sysfs(
                 f"{SYS_CPU}/cpu0/cpufreq/energy_performance_preference"
             )

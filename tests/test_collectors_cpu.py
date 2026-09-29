@@ -80,11 +80,17 @@ def test_collect_never_crashes_on_empty_system(fake_system, monkeypatch) -> None
 EPP = "/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference"
 
 
-def test_energy_performance_preference_from_cpu0(fake_system) -> None:
-    fake_system(files={EPP: "balance_performance\n", EPP.replace("cpu0", "cpu1"): "power"})
-    assert LinuxCpuCollector().collect().data.energy_performance_preference == (
-        "balance_performance"
+def test_energy_settings_from_cpu0(fake_system) -> None:
+    fake_system(
+        files={
+            EPP: "balance_performance\n",
+            EPP.replace("cpu0", "cpu1"): "power",
+            EPP.replace("energy_performance_preference", "scaling_driver"): "amd-pstate-epp",
+        }
     )
+    data = LinuxCpuCollector().collect().data
+    assert data.energy_performance_preference == "balance_performance"
+    assert data.scaling_driver == "amd-pstate-epp"
 
 
 def test_no_energy_performance_preference(laptop) -> None:
