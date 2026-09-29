@@ -16,6 +16,27 @@ class BenchWarning(StrEnum):
     HIGH_VARIANCE = "high_variance"
     POWER_PROFILE = "power_profile"
     WARMUP_UNSTABLE = "warmup_unstable"
+    VSYNC_UNVERIFIED = "vsync_unverified"  # présentation à l'écran, mode non vérifiable
+    SOFTWARE_RENDERING = "software_rendering"  # llvmpipe / lavapipe : le CPU fait le rendu
+
+
+class Availability(StrEnum):
+    AVAILABLE = "available"
+    TOOL_MISSING = "tool_missing"
+    NO_DISPLAY = "no_display"  # outil graphique sans session Wayland/X11 ni variante DRM
+
+
+@dataclass(frozen=True)
+class BackendId:
+    """Ce qui rend deux mesures comparables : même bench, même version, même version d'outil."""
+
+    name: str
+    version: str
+    tool_version: str | None = None
+
+    def label(self) -> str:
+        tool = f", outil {self.tool_version}" if self.tool_version else ""
+        return f"{self.name} v{self.version}{tool}"
 
 
 @dataclass(frozen=True)
@@ -74,6 +95,7 @@ class Result:
     category: Category
     backend: str
     version: str
+    tool_version: str | None  # version de l'outil externe (None pour le natif)
     unit: str
     higher_is_better: bool
     value: float  # médiane des runs
@@ -92,6 +114,10 @@ class Result:
     state_before: MachineState
     state_after: MachineState
     warnings: list[BenchWarning]
+
+    @property
+    def backend_id(self) -> BackendId:
+        return BackendId(self.name, self.version, self.tool_version)
 
     @property
     def cv_percent(self) -> float:

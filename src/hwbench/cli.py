@@ -1,6 +1,7 @@
 import json
 from dataclasses import asdict
 from enum import StrEnum
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -12,9 +13,23 @@ from hwbench.collect import collect_snapshot
 from hwbench.display.bench import CATEGORY_LABELS, render_result, warning_message
 from hwbench.display.fmt import num
 from hwbench.display.info import render_info
+from hwbench.display.scores import (
+    AVAILABILITY_LABELS,
+    NO_REFERENCE,
+    render_backends,
+    render_scores,
+)
 from hwbench.machine_state import capture_state
-from hwbench.results import Category
+from hwbench.reference import ReferenceIssue, build_reference, results_issues, state_issues
+from hwbench.results import Availability, Category, Result
 from hwbench.runner import MIN_RUNS, RunSettings, run_benchmark, start_warnings
+from hwbench.scoring import (
+    DEFAULT_WEIGHTS,
+    ReferenceError,
+    load_reference,
+    parse_weights,
+    score_results,
+)
 
 app = typer.Typer(
     help="Inventaire matériel et benchmarks notés.",
@@ -75,6 +90,67 @@ TARGET_CATEGORIES = {
 
 DEFAULTS = RunSettings()
 
+REFERENCE_ISSUE_MESSAGES = {
+    ReferenceIssue.NOT_ON_AC: "la machine n'est pas sur secteur",
+    ReferenceIssue.POWER_UNKNOWN: "alimentation inconnue (secteur non confirmé)",
+    ReferenceIssue.POWER_PROFILE: "profil d'énergie non « performance »",
+    ReferenceIssue.PROFILE_UNKNOWN: "profil d'énergie inconnu (ni platform_profile ni EPP)",
+    ReferenceIssue.WARMUP_UNSTABLE: "warm-up non stabilisé",
+}
+
+RunsOption = Annotated[
+    int, typer.Option("--runs", min=MIN_RUNS, help="Runs mesurés (médiane), après warm-up.")
+]
+WorkersOption = Annotated[
+    int | None,
+    typer.Option("--workers", min=1, help="Parallélisme du multi-cœur (défaut : CPU logiques)."),
+]
+MaxWarmupOption = Annotated[
+    float | None,
+    typer.Option(
+        "--max-warmup",
+        min=0,
+        help="Plafond du warm-up en secondes (défaut : 30 single-core, 90 multi-cœur et GPU).",
+    ),
+]
+
+
+def _run_all(
+    console: Console, classes: list, settings: RunSettings, options: BenchOptions
+) -> list[Result]:
+    """Lance chaque bench disponible ; un bench qui échoue est signalé et sauté."""
+    results: list[Result] = []
+    for cls in classes:
+        instance = cls(options)
+        label = f"{CATEGORY_LABELS[cls.category]} · {cls.backend}"
+        availability = instance.availability()
+        if availability is not Availability.AVAILABLE:
+            reason = AVAILABILITY_LABELS[availability].plain
+            console.print(f"[yellow]{label} : indisponible ({reason}), ignoré.[/yellow]")
+            continue
+        try:
+            with console.status(f"{label} : préparation…") as status:
+                cap = settings.warmup_cap(cls.category)
+
+                def progress(
+                    phase: str, index: int, total: int | None, status=status, label=label, cap=cap
+                ) -> None:
+                    if phase == "warmup":
+                        status.update(f"{label} : warm-up {index} (plafond {num(cap, 0)} s)…")
+                    else:
+                        status.update(f"{label} : run {index}/{total}…")
+
+                result = run_benchmark(instance, settings, probe=capture_state, progress=progress)
+        except KeyboardInterrupt:
+            console.print("[red]Interrompu.[/red]")
+            raise typer.Exit(code=130) from None
+        except RuntimeError as exc:
+            console.print(f"[red]{label} : échec, ignoré. {exc}[/red]")
+            continue
+        console.print(render_result(result))
+        results.append(result)
+    return results
+
 
 @app.command()
 def bench(
@@ -83,23 +159,9 @@ def bench(
         str,
         typer.Option("--backend", help="native, nom d'un outil, ou all (tous les disponibles)."),
     ] = "all",
-    runs: Annotated[
-        int, typer.Option("--runs", min=MIN_RUNS, help="Runs mesurés (médiane), après warm-up.")
-    ] = MIN_RUNS,
-    workers: Annotated[
-        int | None,
-        typer.Option(
-            "--workers", min=1, help="Processus du bench multi-cœur (défaut : CPU logiques)."
-        ),
-    ] = None,
-    max_warmup: Annotated[
-        float | None,
-        typer.Option(
-            "--max-warmup",
-            min=0,
-            help="Plafond du warm-up en secondes (défaut : 30 single-core, 90 multi-cœur).",
-        ),
-    ] = None,
+    runs: RunsOption = MIN_RUNS,
+    workers: WorkersOption = None,
+    max_warmup: MaxWarmupOption = None,
     warmup_tolerance: Annotated[
         float,
         typer.Option(
@@ -116,6 +178,13 @@ def bench(
         float,
         typer.Option("--hot-start", help="Température CPU (°C) de départ jugée trop chaude."),
     ] = DEFAULTS.hot_start_c,
+    weights: Annotated[
+        str | None,
+        typer.Option(
+            "--weights",
+            help="Pondération du score combiné, ex. « cpu-single=1,cpu-multi=1,gpu=1 ».",
+        ),
+    ] = None,
 ) -> None:
     """Lance les benchmarks notés."""
     console = Console()
@@ -127,6 +196,11 @@ def bench(
             err=True,
         )
         raise typer.Exit(code=2)
+    try:
+        weight_map = parse_weights(weights) if weights is not None else DEFAULT_WEIGHTS
+    except ValueError as exc:
+        typer.echo(f"Erreur : {exc}.", err=True)
+        raise typer.Exit(code=2) from None
 
     categories = TARGET_CATEGORIES[target]
     classes = select(categories, backend)
@@ -150,32 +224,88 @@ def bench(
     for warning in start_warnings(initial, settings):
         console.print(f"[yellow]⚠ {warning_message(warning, initial)}[/yellow]")
 
-    options = BenchOptions(workers=workers)
-    done = 0
-    for cls in classes:
-        instance = cls(options)
-        label = f"{CATEGORY_LABELS[cls.category]} · {cls.backend}"
-        if not instance.is_available():
-            console.print(f"[yellow]{label} : indisponible, ignoré.[/yellow]")
-            continue
-        try:
-            with console.status(f"{label} : préparation…") as status:
-                cap = settings.warmup_cap(cls.category)
-
-                def progress(
-                    phase: str, index: int, total: int | None, status=status, label=label, cap=cap
-                ) -> None:
-                    if phase == "warmup":
-                        status.update(f"{label} : warm-up {index} (plafond {num(cap, 0)} s)…")
-                    else:
-                        status.update(f"{label} : run {index}/{total}…")
-
-                result = run_benchmark(instance, settings, probe=capture_state, progress=progress)
-        except KeyboardInterrupt:
-            console.print("[red]Interrompu.[/red]")
-            raise typer.Exit(code=130) from None
-        console.print(render_result(result))
-        done += 1
-
-    if done == 0:
+    results = _run_all(console, classes, settings, BenchOptions(workers=workers))
+    if not results:
         raise typer.Exit(code=1)
+
+    try:
+        reference = load_reference()
+    except ReferenceError as exc:
+        console.print(f"[red]Référence illisible : {exc}[/red]")
+        return
+    if reference is None:
+        console.print(NO_REFERENCE)
+        return
+    console.print(render_scores(score_results(results, reference, weight_map)))
+
+
+@app.command()
+def backends() -> None:
+    """Liste les backends de benchmark et leur disponibilité."""
+    rows = [
+        (cls.name, cls.backend, cls.category, cls().availability())
+        for cls in select(list(Category), "all")
+    ]
+    Console().print(render_backends(rows))
+
+
+def _print_issues(console: Console, issues: list[str], header: str) -> None:
+    console.print(f"[red]{header}[/red]")
+    for issue in issues:
+        console.print(f"[red]  • {issue}[/red]")
+
+
+@app.command()
+def reference(
+    output: Annotated[
+        Path, typer.Option("--output", "-o", help="Fichier JSON de référence à écrire.")
+    ],
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Écrit la référence malgré les conditions non remplies (noté dans le fichier).",
+        ),
+    ] = False,
+    runs: RunsOption = MIN_RUNS,
+    workers: WorkersOption = None,
+    max_warmup: MaxWarmupOption = None,
+) -> None:
+    """Mesure la machine de référence (= 1000 points) : secteur, profil performance, régime
+    soutenu. Refuse d'écrire le fichier si une condition n'est pas remplie, sauf --force."""
+    console = Console()
+    initial = capture_state()
+    before = state_issues(initial)
+    if before and not force:
+        _print_issues(
+            console,
+            [REFERENCE_ISSUE_MESSAGES[i] for i in before],
+            "Référence refusée avant les mesures (--force pour passer outre) :",
+        )
+        raise typer.Exit(code=1)
+
+    settings = RunSettings(runs=runs, max_warmup_s=max_warmup)
+    classes = select(list(Category), "all")
+    results = _run_all(console, classes, settings, BenchOptions(workers=workers))
+    measured = {r.name for r in results}
+    for cls in classes:
+        if cls.name not in measured:
+            console.print(f"[yellow]{cls.name} : absent de la référence.[/yellow]")
+    if not results:
+        raise typer.Exit(code=1)
+
+    during = results_issues(results)
+    if during and not force:
+        _print_issues(
+            console,
+            [f"{name} : {REFERENCE_ISSUE_MESSAGES[i]}" for i, name in during],
+            "Référence refusée, fichier non écrit (--force pour passer outre) :",
+        )
+        raise typer.Exit(code=1)
+
+    reasons = [i.value for i in before] + [f"{i.value}:{name}" for i, name in during]
+    snapshot, _ = collect_snapshot()
+    payload = build_reference(results, snapshot, reasons)
+    output.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    note = " [yellow](forcée : " + ", ".join(reasons) + ")[/yellow]" if reasons else ""
+    console.print(f"Référence écrite : {output} ({len(results)} benchs){note}")

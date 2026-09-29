@@ -1,0 +1,16 @@
+WARNING: radv is not a conformant Vulkan implementation, testing use only.
+=======================================================
+    vkmark 2025.01
+=======================================================
+    Vendor ID:      0x1002
+    Device ID:      0x7550
+    Device Name:    AMD Radeon RX 9070 XT (RADV GFX1201)
+    Driver Version: 109060099
+    Device UUID:    00000000000000000000000000000000
+=======================================================
+[vertex] duration=1: FPS: 34701 FrameTime: 0.029 ms
+[texture] duration=1: FPS: 35180 FrameTime: 0.028 ms
+[cube] duration=1: FPS: 35529 FrameTime: 0.028 ms
+=======================================================
+                                   vkmark Score: 35136
+=======================================================

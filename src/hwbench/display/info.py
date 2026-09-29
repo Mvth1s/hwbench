@@ -102,7 +102,10 @@ def render_cpu(cpu: CpuData) -> Panel:
         else NA,
     )
     governors = sorted({c.governor for c in cpu.per_cpu if c.governor})
-    t.add_row("Governor", ", ".join(governors) if governors else NA)
+    governor = ", ".join(governors) if governors else None
+    if governor and cpu.scaling_driver:
+        governor += f" ({cpu.scaling_driver})"
+    t.add_row("Governor", governor or NA)
     if cpu.energy_performance_preference is not None:
         t.add_row("EPP", cpu.energy_performance_preference)
     caches = [

@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from hwbench.benchmarks.external import _run
 from hwbench.benchmarks.native.workloads import Workload
 from hwbench.collectors.linux import _exec
 
@@ -39,8 +40,8 @@ CAPTURED_FILES = {
 
 
 def captured_machine_dirs() -> list[Path]:
-    """Dossiers produits par scripts/capture_fixtures.sh."""
-    return sorted(p for p in FIXTURES.iterdir() if p.is_dir())
+    """Dossiers produits par scripts/capture_fixtures.sh (tools/ = sorties des benchs externes)."""
+    return sorted(p for p in FIXTURES.iterdir() if (p / "sysfs.json").is_file())
 
 
 def captured_commands(machine: Path) -> dict[tuple[str, ...], str]:
@@ -154,5 +155,74 @@ def laptop_sysfs() -> dict[str, str]:
 def laptop(fake_system: Callable[..., FakeSystem]) -> Callable[..., FakeSystem]:
     def install(root: bool = False) -> FakeSystem:
         return fake_system(files=laptop_sysfs(), commands=laptop_commands(), root=root)
+
+    return install
+
+
+# --- Outils externes des benchs (sysbench, glmark2, vkmark) ---------------------------
+
+TOOLS = FIXTURES / "tools"
+
+
+def tool_output(name: str) -> str:
+    return (TOOLS / name).read_text()
+
+
+class FakeTools:
+    """Remplace hwbench.benchmarks.external._run : aucun outil réellement lancé.
+
+    outputs : binaire -> sortie (ou liste de sorties rendues tour à tour, la dernière répétée).
+    failing : binaire -> stderr d'un échec (code 1).
+    """
+
+    def __init__(
+        self,
+        outputs: dict[str, str | list[str]] | None = None,
+        env: dict[str, str] | None = None,
+        files: set[str] | None = None,
+        failing: dict[str, str] | None = None,
+    ) -> None:
+        self.outputs = outputs or {}
+        self.env = env or {}
+        self.files = files or set()
+        self.failing = failing or {}
+        self.calls: list[list[str]] = []
+
+    def which(self, name: str) -> str | None:
+        known = name in self.outputs or name in self.failing
+        return f"/usr/bin/{name}" if known else None
+
+    def getenv(self, name: str) -> str | None:
+        return self.env.get(name) or None
+
+    def exists(self, path: str) -> bool:
+        return path in self.files
+
+    def run(self, args: list[str], timeout: float) -> _run.Completed:
+        self.calls.append(list(args))
+        if args[0] in self.failing:
+            return _run.Completed(1, "", self.failing[args[0]])
+        out = self.outputs[args[0]]
+        if isinstance(out, list):
+            out = out.pop(0) if len(out) > 1 else out[0]
+        return _run.Completed(0, out, "")
+
+
+def _install_tools(monkeypatch: pytest.MonkeyPatch, tools: FakeTools) -> FakeTools:
+    for name in ("which", "getenv", "exists", "run"):
+        monkeypatch.setattr(_run, name, getattr(tools, name))
+    return tools
+
+
+@pytest.fixture(autouse=True)
+def no_external_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Par défaut, aucun outil externe : les tests ne lancent jamais le vrai glmark2."""
+    _install_tools(monkeypatch, FakeTools())
+
+
+@pytest.fixture
+def fake_tools(monkeypatch: pytest.MonkeyPatch) -> Callable[..., FakeTools]:
+    def install(**kwargs: Any) -> FakeTools:
+        return _install_tools(monkeypatch, FakeTools(**kwargs))
 
     return install

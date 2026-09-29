@@ -19,10 +19,29 @@ DETAIL_LABELS = {
     "powmod": "Exponentiation modulaire 2048 bits",
 }
 
-# « index » : moyenne géométrique de débits, sans unité, tant que le scoring n'existe pas.
+# « index » : moyenne géométrique de débits, sans unité. Les points (référence = 1000) sont
+# calculés par le scoring et affichés à part (display/scores.py).
 UNIT_LABELS = {"MiB/s": "Mio/s", "index": "indice brut"}
 
 PROFILE_LABELS = {"platform_profile": "profil plateforme", "energy_performance_preference": "EPP"}
+
+# Conditions des benchs externes : libellé français devant la valeur brute.
+ENVIRONMENT_LABELS = {
+    "binary": "binaire",
+    "session": "session",
+    "resolution": "résolution",
+    "presentation": "présentation",
+    "renderer": "rendu",
+    "driver": "pilote",
+    "cpu-max-prime": "cpu-max-prime",
+    "time": "durée",
+}
+
+PRESENTATION_LABELS = {
+    "offscreen": "hors écran (sans vsync)",
+    "headless": "headless, sans affichage (sans vsync)",
+    "immediate-requested": "fenêtre, mode immediate demandé (non vérifiable)",
+}
 
 NA = Text("non disponible", style="dim")
 
@@ -72,6 +91,17 @@ def warning_message(
                 f"Warm-up non stabilisé après {num(result.warmup_s if result else 0, 0)} s : "
                 "la machine chauffe ou throttle encore. Allongez le plafond (--max-warmup)."
             )
+        case BenchWarning.VSYNC_UNVERIFIED:
+            return (
+                "Rendu à l'écran : vsync coupée à la demande (mode immediate), sans garantie "
+                "que le pilote l'applique ; le score peut être plafonné par l'écran. Installez "
+                "le plugin headless de vkmark pour un rendu sans affichage."
+            )
+        case BenchWarning.SOFTWARE_RENDERING:
+            return (
+                "Rendu logiciel (llvmpipe/lavapipe) : c'est le CPU qui dessine, le score ne "
+                "reflète pas le GPU. Vérifiez le pilote graphique."
+            )
 
 
 def _power(state: MachineState) -> str:
@@ -118,7 +148,8 @@ def render_result(result: Result) -> Panel:
     )
     t.add_row("Burst (à froid)", Text(f"{_value(result.burst)} {unit}  (hors score)", style="dim"))
     if result.workers is not None:
-        t.add_row("Processus", str(result.workers))
+        # le natif lance des processus (GIL) ; les outils externes, des threads
+        t.add_row("Processus" if result.backend == "native" else "Threads", str(result.workers))
     _state_rows(t, result)
 
     parts: list[Table | Text] = [t]
@@ -133,22 +164,28 @@ def render_result(result: Result) -> Panel:
             )
         parts.append(details)
     if result.environment:
-        parts.append(
-            Text(
-                " · ".join(
-                    # « CPython 3.14.7 » / « OpenSSL 3.5.1 » se nomment déjà eux-mêmes
-                    f"{k} {v}" if v[:1].isdigit() else v
-                    for k, v in result.environment.items()
-                ),
-                style="dim",
-            )
-        )
+        parts.append(Text(" · ".join(_environment(result.environment)), style="dim"))
     for warning in result.warnings:
         message = warning_message(warning, result.state_before, result)
         parts.append(Text(f"⚠ {message}", style="yellow"))
 
+    # v{version} : version du protocole hwbench (charges, scènes, durée) ; outil : son binaire
+    tool = f" · outil {result.tool_version}" if result.tool_version else ""
     return Panel(
         Group(*parts),
-        title=f"{CATEGORY_LABELS[result.category]} · {result.backend} v{result.version}",
+        title=f"{CATEGORY_LABELS[result.category]} · {result.backend} v{result.version}{tool}",
         title_align="left",
     )
+
+
+def _environment(env: dict[str, str]) -> list[str]:
+    items: list[str] = []
+    for key, value in env.items():
+        if key == "presentation":
+            items.append(f"présentation {PRESENTATION_LABELS.get(value, value)}")
+        elif key in ENVIRONMENT_LABELS:
+            items.append(f"{ENVIRONMENT_LABELS[key]} {value}")
+        else:
+            # « CPython 3.14.7 » / « OpenSSL 3.5.1 » se nomment déjà eux-mêmes
+            items.append(f"{key} {value}" if value[:1].isdigit() else value)
+    return items

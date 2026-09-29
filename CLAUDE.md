@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `hwbench` est un outil en ligne de commande pour Linux (Windows plus tard) qui affiche les composants d'une machine avec leurs détails importants et lance des benchmarks notés : CPU single-core, CPU multi-core, GPU, et un score combiné. Trois usages visés : diagnostic perso, projet portfolio propre, comparaison de machines entre elles.
 
-Machine de dev : Fedora 44, Python 3.11+, shell fish.
+Machines de dev (Python 3.11+, shell fish) :
+- Dell Latitude 5420 sous Fedora 44 : machine de référence du scoring.
+- Desktop B850 (Ryzen 7 8700F, Radeon RX 9070 XT) sous EndeavourOS : sysbench, glmark2 et vkmark installés, fixtures des outils externes capturées ici.
 
 ## Méthode de travail
 

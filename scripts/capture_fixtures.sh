@@ -179,8 +179,13 @@ def capture_sysfs() -> dict[str, str]:
         if real is not None:
             add(dmi / f, real if real.lower() in EMPTY else "FAKE-ASSET-TAG")
     for cpu in sorted(Path("/sys/devices/system/cpu").glob("cpu[0-9]*")):
-        for f in ("scaling_cur_freq", "scaling_governor", "energy_performance_preference"):
+        for f in ("scaling_cur_freq", "scaling_governor", "scaling_driver",
+                  "energy_performance_preference", "boost"):
             add(cpu / "cpufreq" / f)
+    # mode des pilotes amd-pstate / intel_pstate (active, passive, guided), boost global
+    add("/sys/devices/system/cpu/amd_pstate/status")
+    add("/sys/devices/system/cpu/intel_pstate/status")
+    add("/sys/devices/system/cpu/cpufreq/boost")
     add("/sys/firmware/acpi/platform_profile")
     add("/sys/firmware/acpi/platform_profile_choices")
     for ps in sorted(Path("/sys/class/power_supply").iterdir() if Path("/sys/class/power_supply").exists() else []):
