@@ -1,11 +1,12 @@
 from collections.abc import Iterator
 
 import pytest
-from conftest import laptop_commands, laptop_sysfs
+from conftest import laptop_commands, laptop_sysfs, sysfs_fixture
 
 from hwbench.benchmarks.base import Benchmark
 from hwbench.machine_state import capture_state, cpu_temperature
 from hwbench.models import SensorsData, TemperatureReading
+from hwbench.reference import ReferenceIssue, state_issues
 from hwbench.results import BenchWarning, Category, MachineState, Measurement, Result
 from hwbench.runner import RunSettings, run_benchmark, start_warnings
 
@@ -230,7 +231,17 @@ def test_cpu_temperature(readings: list[TemperatureReading], expected: float | N
 def test_capture_state_on_real_laptop_fixture(laptop) -> None:
     laptop()
     state = capture_state()
-    assert state == MachineState(governors=["performance"], on_ac=True, cpu_temp_c=68.0)
+    assert state == MachineState(
+        governors=["performance"], on_ac=True, cpu_temp_c=68.0, has_battery=True
+    )
+
+
+def test_desktop_state_is_on_ac_without_battery(fake_system) -> None:
+    fake_system(files=sysfs_fixture("sysfs_desktop.json"))
+    state = capture_state()
+    assert (state.on_ac, state.has_battery) == (True, False)
+    assert ReferenceIssue.POWER_UNKNOWN not in state_issues(state)
+    assert ReferenceIssue.NOT_ON_AC not in state_issues(state)
 
 
 def test_capture_state_reads_profile_and_epp(laptop_with_profile) -> None:

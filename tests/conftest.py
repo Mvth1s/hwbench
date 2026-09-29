@@ -8,6 +8,7 @@ import pytest
 from hwbench.benchmarks.external import _run
 from hwbench.benchmarks.native.workloads import Workload
 from hwbench.collectors.linux import _exec
+from hwbench.results import Category, MachineState, Result
 
 # Charges natives réduites : mêmes chemins de code, en quelques millisecondes.
 TINY = (
@@ -112,6 +113,10 @@ class FakeSystem:
         value = self.files.get(str(path))
         return value.strip() if value is not None else None
 
+    def link_name(self, path: str | Path) -> str | None:
+        # liens sysfs capturés sous la clé « <chemin>@link » (valeur = nom de la cible)
+        return self.files.get(f"{path}@link")
+
     def exists(self, path: str | Path) -> bool:
         return str(path) in self.files or str(path) in self.unreadable
 
@@ -131,6 +136,7 @@ def fake_system(monkeypatch: pytest.MonkeyPatch) -> Callable[..., FakeSystem]:
             "run_json",
             "read_sysfs",
             "exists",
+            "link_name",
             "list_dir",
         ):
             monkeypatch.setattr(_exec, name, getattr(system, name))
@@ -226,3 +232,60 @@ def fake_tools(monkeypatch: pytest.MonkeyPatch) -> Callable[..., FakeTools]:
         return _install_tools(monkeypatch, FakeTools(**kwargs))
 
     return install
+
+
+# --- Résultats de bench fabriqués (scoring, référence, affichage) ------------------------
+
+COOL_AC_STATE = MachineState(
+    ["performance"], on_ac=True, cpu_temp_c=45.0, platform_profile="performance"
+)
+
+
+def make_result(
+    name: str,
+    value: float,
+    *,
+    backend: str | None = None,
+    category: Category | None = None,
+    version: str = "1",
+    tool_version: str | None = None,
+    presentation: str | None = None,
+    **overrides: Any,
+) -> Result:
+    """Result minimal ; backend et catégorie déduits du nom (« native-cpu-multi », « vkmark »)."""
+    if backend is None:
+        backend = "native" if name.startswith("native-") else name.split("-")[0]
+    if category is None:
+        category = (
+            Category.CPU_SINGLE
+            if name.endswith("single")
+            else Category.CPU_MULTI
+            if name.endswith("multi")
+            else Category.GPU
+        )
+    base: dict[str, Any] = dict(
+        name=name,
+        category=category,
+        backend=backend,
+        version=version,
+        tool_version=tool_version,
+        presentation=presentation,
+        unit="index",
+        higher_is_better=True,
+        value=value,
+        stdev=0.0,
+        runs=[value] * 3,
+        warmup_runs=2,
+        warmup_s=1.0,
+        warmup_stable=True,
+        burst=value,
+        duration_s=4.0,
+        details={},
+        detail_units={},
+        workers=None,
+        environment={},
+        state_before=COOL_AC_STATE,
+        state_after=COOL_AC_STATE,
+        warnings=[],
+    )
+    return Result(**(base | overrides))

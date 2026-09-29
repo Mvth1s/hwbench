@@ -3,6 +3,7 @@ from conftest import sysfs_fixture
 
 from hwbench.collectors.linux.power import LinuxPowerCollector
 from hwbench.collectors.linux.sensors import LinuxSensorsCollector
+from hwbench.machine_state import cpu_temperature
 
 
 def test_hwmon_temperatures_and_fans(laptop) -> None:
@@ -73,7 +74,8 @@ def test_peripheral_battery_is_ignored(fake_system) -> None:
     )
     power = LinuxPowerCollector().collect().data
     assert power.batteries == []
-    assert power.on_ac is None
+    # batterie de souris seulement (cas du desktop B850) : pas de batterie système -> secteur
+    assert power.on_ac is True
 
 
 def test_labelled_fan(fake_system) -> None:
@@ -91,7 +93,7 @@ def test_labelled_fan(fake_system) -> None:
 def test_desktop_without_power_supply(fake_system) -> None:
     fake_system(files=sysfs_fixture("sysfs_desktop.json"))
     power = LinuxPowerCollector().collect().data
-    assert power.on_ac is None
+    assert power.on_ac is True
     assert power.batteries == []
 
 
@@ -111,3 +113,49 @@ def test_no_platform_profile(laptop) -> None:
     laptop()
     power = LinuxPowerCollector().collect().data
     assert power.platform_profile is None and power.platform_profile_choices == []
+
+
+def _hwmon(n: int, name: str, device: str, temp_mc: int, label: str | None = None) -> dict:
+    base = f"/sys/class/hwmon/hwmon{n}"
+    files = {
+        f"{base}/name": name,
+        f"{base}/device@link": device,
+        f"{base}/temp1_input": str(temp_mc),
+    }
+    if label:
+        files[f"{base}/temp1_label"] = label
+    return files
+
+
+# Disposition du desktop B850 : hwmon0 -> nvme1, hwmon1 -> nvme0, deux spd5118 sur i2c-2
+B850_HWMON = (
+    _hwmon(0, "nvme", "nvme1", 41850, "Composite")
+    | _hwmon(1, "nvme", "nvme0", 38850, "Composite")
+    | _hwmon(2, "k10temp", "0000:00:18.3", 45125, "Tctl")
+    | _hwmon(5, "spd5118", "2-0051", 36500)
+    | _hwmon(6, "spd5118", "2-0053", 37250)
+)
+
+
+def test_same_named_chips_are_disambiguated(fake_system) -> None:
+    fake_system(files=B850_HWMON)
+    temps = LinuxSensorsCollector().collect().data.temperatures
+    by_source = {t.source: t for t in temps}
+    assert set(by_source) == {"nvme0", "nvme1", "k10temp", "spd5118 #1", "spd5118 #2"}
+    assert by_source["nvme0"].current_c == 38.85  # hwmon1, pas hwmon0
+    assert by_source["spd5118 #1"].current_c == 36.5  # 2-0051 avant 2-0053
+    assert by_source["k10temp"].instance is None
+    # le nom brut reste celui de la puce : machine_state trouve toujours le CPU
+    assert {t.chip for t in temps} == {"nvme", "k10temp", "spd5118"}
+
+
+def test_cpu_temperature_still_found_with_duplicates(fake_system) -> None:
+    fake_system(files=B850_HWMON)
+    assert cpu_temperature(LinuxSensorsCollector().collect().data) == 45.125
+
+
+def test_duplicates_without_device_link_use_index(fake_system) -> None:
+    files = {k: v for k, v in B850_HWMON.items() if not k.endswith("@link")}
+    fake_system(files=files)
+    sources = sorted(t.source for t in LinuxSensorsCollector().collect().data.temperatures)
+    assert sources == ["k10temp", "nvme #1", "nvme #2", "spd5118 #1", "spd5118 #2"]

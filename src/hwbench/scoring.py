@@ -2,7 +2,7 @@
 
 Règles :
 - un backend n'est noté que si la référence contient le même bench, à la même version, avec la
-  même version d'outil (BackendId) ;
+  même version d'outil et le même mode de présentation (BackendId) ;
 - catégorie CPU (single, multi) : seul le natif compte ; les autres backends CPU sont notés à
   part, pour information ;
 - catégorie GPU : moyenne géométrique de tous les backends GPU mesurés. La liste doit être
@@ -37,6 +37,7 @@ class ScoreIssue(StrEnum):
     NOT_IN_REFERENCE = "not_in_reference"
     VERSION_MISMATCH = "version_mismatch"
     TOOL_VERSION_MISMATCH = "tool_version_mismatch"
+    PRESENTATION_MISMATCH = "presentation_mismatch"
     BACKENDS_DIFFER = "backends_differ"  # composition de la catégorie ≠ référence
     CATEGORY_NOT_COMPARABLE = "category_not_comparable"  # combiné : une catégorie ne l'est pas
     CPU_NOT_MEASURED = "cpu_not_measured"  # combiné : single ou multi manquant
@@ -116,7 +117,7 @@ def reference_from_dict(payload: Mapping[str, Any]) -> Reference:
     try:
         entries = [
             ReferenceEntry(
-                id=BackendId(b["name"], b["version"], b.get("tool_version")),
+                id=BackendId(b["name"], b["version"], b.get("tool_version"), b.get("presentation")),
                 backend=b["backend"],
                 category=Category(b["category"]),
                 unit=b["unit"],
@@ -165,6 +166,8 @@ def normalize(result: Result, reference: Reference) -> BackendScore:
         issue = ScoreIssue.VERSION_MISMATCH
     elif entry.id.tool_version != ours.tool_version:
         issue = ScoreIssue.TOOL_VERSION_MISMATCH
+    elif entry.id.presentation != ours.presentation:
+        issue = ScoreIssue.PRESENTATION_MISMATCH
     else:
         ratio = (
             result.value / entry.value if result.higher_is_better else entry.value / result.value

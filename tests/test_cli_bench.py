@@ -79,6 +79,7 @@ def _result(**overrides) -> Result:
         backend="native",
         version="1",
         tool_version=None,
+        presentation=None,
         unit="index",
         higher_is_better=True,
         value=89.84,
@@ -132,6 +133,12 @@ def test_render_unstable_warmup() -> None:
     )
     assert "8,2 s" not in out and "91,4 s (non stabilisé)" in out
     assert "Warm-up non stabilisé après 91 s" in out and "--max-warmup" in out
+
+
+def test_render_desktop_power() -> None:
+    desktop = MachineState(["performance"], on_ac=True, cpu_temp_c=40.0, has_battery=False)
+    out = _text(_result(state_before=desktop, state_after=desktop))
+    assert re.search(r"Alimentation +secteur \(pas de batterie\)", out)
 
 
 def test_render_power_profile_and_epp() -> None:

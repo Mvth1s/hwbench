@@ -67,11 +67,29 @@ def parse_dmidecode_memory(text: str) -> list[dict[str, str]]:
     return devices
 
 
-def module_from_fields(fields: dict[str, str]) -> RamModule:
+def slot_labels(blocks: list[dict[str, str]]) -> list[str | None]:
+    """Locator seul s'il est unique ; sinon « Bank Locator / Locator ».
+
+    Sur AM5 par exemple, les deux barrettes sont « DIMM 1 », sur « P0 CHANNEL A » et « B ».
+    """
+    locators = [_clean(b.get("Locator")) for b in blocks]
+    labels: list[str | None] = []
+    for block, locator in zip(blocks, locators, strict=True):
+        bank = _clean(block.get("Bank Locator"))
+        if locator is None or (locators.count(locator) > 1 and bank):
+            labels.append(" / ".join(p for p in (bank, locator) if p) or None)
+        else:
+            labels.append(locator)
+    return labels
+
+
+def module_from_fields(fields: dict[str, str], slot: str | None = None) -> RamModule:
+    # SMBIOS : « Speed » = vitesse nominale (JEDEC) ; « Configured Memory Speed » = appliquée,
+    # supérieure à la nominale avec un profil EXPO/XMP.
     rated = _parse_speed(fields.get("Speed"))
     configured = _parse_speed(fields.get("Configured Memory Speed")) or rated
     return RamModule(
-        slot=_clean(fields.get("Locator")),
+        slot=slot if slot is not None else _clean(fields.get("Locator")),
         size_gb=_parse_size_gb(fields.get("Size")),
         type=_clean(fields.get("Type")),
         speed_mts=configured,
@@ -83,9 +101,11 @@ def module_from_fields(fields: dict[str, str]) -> RamModule:
     )
 
 
-def identifiers_from_fields(fields: dict[str, str]) -> RamModuleIdentifiers:
+def identifiers_from_fields(
+    fields: dict[str, str], slot: str | None = None
+) -> RamModuleIdentifiers:
     return RamModuleIdentifiers(
-        slot=_clean(fields.get("Locator")),
+        slot=slot if slot is not None else _clean(fields.get("Locator")),
         serial=_clean(fields.get("Serial Number")),
         asset_tag=_clean(fields.get("Asset Tag")),
     )
@@ -123,9 +143,14 @@ class LinuxRamCollector(Collector[RamData, list[RamModuleIdentifiers]]):
             return ComponentResult(RamData(total_gb=total, modules_unavailable=Unavailable.NO_DATA))
 
         blocks = parse_dmidecode_memory(text)
-        modules = [module_from_fields(b) for b in blocks]
+        slots = slot_labels(blocks)
+        modules = [module_from_fields(b, s) for b, s in zip(blocks, slots, strict=True)]
         sizes = [m.size_gb for m in modules]
         installed = sum(s for s in sizes if s is not None) if sizes and None not in sizes else None
         data = RamData(total_gb=total, installed_gb=installed, modules=modules)
-        ids = [identifiers_from_fields(b) for b in blocks] if include_identifiers else None
+        ids = (
+            [identifiers_from_fields(b, s) for b, s in zip(blocks, slots, strict=True)]
+            if include_identifiers
+            else None
+        )
         return ComponentResult(data, ids)

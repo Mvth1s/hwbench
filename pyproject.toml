@@ -28,6 +28,10 @@ hwbench = "hwbench.cli:app"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+# référence du scoring, générée sur la machine de référence par `hwbench reference`
+hwbench = ["data/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

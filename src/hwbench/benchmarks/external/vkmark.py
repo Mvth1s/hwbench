@@ -9,18 +9,14 @@ from hwbench.benchmarks.base import Benchmark, register
 from hwbench.benchmarks.external import _gpu, _run
 from hwbench.results import Availability, BenchWarning, Category, Measurement
 
-VKMARK_VERSION = "1"  # à incrémenter si les scènes, leur durée ou la résolution changent
+VKMARK_VERSION = "2"  # à incrémenter si les scènes, leur durée ou la résolution changent
 
-SCENES = (
-    "vertex",
-    "texture",
-    "shading:shading=gouraud",
-    "shading:shading=phong",
-    "effect2d",
-    "desktop",
-    "cube",
-    "clear",
-)
+# Seules scènes de vkmark dont le coût suit le nombre de pixels (voir _gpu.py) : les autres
+# plafonnent au même FPS en 1080p et en 4K.
+SCENES = {
+    "effect2d-blur": "effect2d:kernel=blur",
+    "effect2d-edge": "effect2d:kernel=edge",
+}
 
 # vkmark n'expose pas son dossier de plugins : emplacements des paquets usuels.
 PLUGIN_DIRS = (
@@ -131,19 +127,17 @@ class Vkmark(Benchmark):
         return Measurement(
             value=out.score,
             duration_s=float(len(SCENES) * _gpu.SCENE_SECONDS),
-            details={scene: fps for scene, (_, fps) in zip(SCENES, out.scene_fps, strict=True)},
+            details={key: fps for key, (_, fps) in zip(SCENES, out.scene_fps, strict=True)},
         )
 
     def tool_version(self) -> str | None:
         return self._last.version if self._last else None
 
+    def presentation(self) -> str:
+        return "headless" if self._headless else "immediate-requested"
+
     def environment(self) -> dict[str, str]:
-        env = {
-            "binary": "vkmark",
-            "session": self.winsys,
-            "resolution": _gpu.RESOLUTION,
-            "presentation": "headless" if self._headless else "immediate-requested",
-        }
+        env = {"binary": "vkmark", "session": self.winsys, "resolution": _gpu.RESOLUTION}
         if self._last:
             if self._last.device_name:
                 env["renderer"] = self._last.device_name
