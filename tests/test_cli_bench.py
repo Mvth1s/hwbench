@@ -20,6 +20,8 @@ COOL_AC = MachineState(governors=["performance"], on_ac=True, cpu_temp_c=45.0)
 def fast_and_isolated(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cpu, "WORKLOADS", TINY)
     monkeypatch.setattr(cli, "capture_state", lambda: COOL_AC)
+    # indépendant de la référence du paquet (testée dans test_reference_file.py)
+    monkeypatch.setattr(cli, "load_reference", lambda: None)
     # charges minuscules et bruitées : plafond de warm-up court pour garder les tests rapides
     monkeypatch.setattr(bench_runner, "DEFAULT_MAX_WARMUP_S", dict.fromkeys(Category, 0.2))
 
