@@ -135,37 +135,13 @@ def test_without_dmidecode(fake_system) -> None:
     assert ram.modules_unavailable is Unavailable.TOOL_MISSING
 
 
-# Écrit à la main, au format de dmidecode 3.x : deux barrettes DDR5 « DIMM 1 » sur deux canaux
-# (disposition AM5), profil EXPO 6000 appliqué sur des modules nominaux 4800.
-AM5_EXPO = """
-Handle 0x0014, DMI type 17, 92 bytes
-Memory Device
-\tSize: 16 GB
-\tLocator: DIMM 1
-\tBank Locator: P0 CHANNEL A
-\tType: DDR5
-\tSpeed: 4800 MT/s
-\tManufacturer: Unknown
-\tModule Manufacturer ID: Bank 5, Hex 0xCD
-\tPart Number: F5-6000J3038F16G
-\tConfigured Memory Speed: 6000 MT/s
-
-Handle 0x0016, DMI type 17, 92 bytes
-Memory Device
-\tSize: 16 GB
-\tLocator: DIMM 1
-\tBank Locator: P0 CHANNEL B
-\tType: DDR5
-\tSpeed: 4800 MT/s
-\tManufacturer: Unknown
-\tModule Manufacturer ID: Bank 5, Hex 0xCD
-\tPart Number: F5-6000J3038F16G
-\tConfigured Memory Speed: 6000 MT/s
-"""
+# Capture réelle du desktop B850 (AM5) : deux barrettes « DIMM 1 » sur les canaux A et B, deux
+# slots « DIMM 0 » vides, profil EXPO 6000 MT/s sur des modules nominaux 4800.
+B850 = "asrock-b850-riptide-wifi"
 
 
 def test_duplicate_locators_use_bank_locator() -> None:
-    blocks = parse_dmidecode_memory(AM5_EXPO)
+    blocks = parse_dmidecode_memory(fixture_text(f"{B850}/dmidecode_memory.txt"))
     assert slot_labels(blocks) == ["P0 CHANNEL A / DIMM 1", "P0 CHANNEL B / DIMM 1"]
 
 
@@ -175,7 +151,8 @@ def test_unique_locators_stay_short() -> None:
 
 
 def test_expo_profile_speed(fake_system) -> None:
-    fake_system(commands={("dmidecode", "-t", "memory"): AM5_EXPO}, root=True)
+    text = fixture_text(f"{B850}/dmidecode_memory.txt")
+    fake_system(commands={("dmidecode", "-t", "memory"): text}, root=True)
     result = LinuxRamCollector().collect(include_identifiers=True)
     modules = result.data.modules
     assert modules is not None
@@ -183,6 +160,7 @@ def test_expo_profile_speed(fake_system) -> None:
         ("P0 CHANNEL A / DIMM 1", 6000, 4800),
         ("P0 CHANNEL B / DIMM 1", 6000, 4800),
     ]
-    assert modules[0].manufacturer == "G.Skill"
+    assert {m.manufacturer for m in modules} == {"Corsair"}  # Bank 3, Hex 0x9E
+    assert result.data.installed_gb == 32.0
     assert result.identifiers is not None
     assert [i.slot for i in result.identifiers] == [m.slot for m in modules]

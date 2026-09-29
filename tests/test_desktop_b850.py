@@ -1,8 +1,12 @@
 """Desktop B850 capturé (scripts/capture_fixtures.sh, sans root) : cas propres aux desktops."""
 
+import re
+
 import pytest
 from conftest import FIXTURES, captured_commands, fixture_text, sysfs_fixture
+from typer.testing import CliRunner
 
+from hwbench import cli
 from hwbench.collect import collect_snapshot
 from hwbench.collectors.linux.gpu import parse_nvidia_smi_csv
 from hwbench.machine_state import capture_state
@@ -13,10 +17,15 @@ DESKTOP = "asrock-b850-riptide-wifi"
 
 @pytest.fixture
 def b850(fake_system):
-    return fake_system(
-        files=sysfs_fixture(f"{DESKTOP}/sysfs.json"),
-        commands=captured_commands(FIXTURES / DESKTOP),
-    )
+    def install(root: bool = False):
+        return fake_system(
+            files=sysfs_fixture(f"{DESKTOP}/sysfs.json"),
+            commands=captured_commands(FIXTURES / DESKTOP),
+            root=root,
+        )
+
+    install()
+    return install
 
 
 def test_desktop_without_battery_is_on_ac(b850) -> None:
@@ -55,3 +64,29 @@ def test_nvidia_smi_without_driver_is_ignored(b850) -> None:
     snapshot, _ = collect_snapshot(os_name="Linux")
     assert snapshot.gpu.nvidia_name is None
     assert snapshot.gpu.vulkan_device_name == "AMD Radeon RX 9070 XT (RADV GFX1201)"
+
+
+def test_desktop_ram_and_smart_as_root(b850) -> None:
+    b850(root=True)
+    snapshot, _ = collect_snapshot(os_name="Linux")
+    modules = snapshot.ram.modules
+    assert modules is not None
+    assert [m.slot for m in modules] == ["P0 CHANNEL A / DIMM 1", "P0 CHANNEL B / DIMM 1"]
+    assert snapshot.ram.installed_gb == 32.0
+    assert snapshot.ram.total_gb is not None and snapshot.ram.total_gb <= 32.0
+    disks = {d.name: d for d in snapshot.disks.disks}
+    assert set(disks) == {"nvme0n1", "nvme1n1"}
+    assert all(d.smart_passed is True for d in disks.values())
+
+
+def test_desktop_info_display_as_root(b850) -> None:
+    b850(root=True)
+    result = CliRunner().invoke(cli.app, ["info"], env={"COLUMNS": "200"})
+    assert result.exit_code == 0, result.output
+    out = result.output
+    assert re.search(
+        r"P0 CHANNEL A / DIMM 1 +16 Gio +DDR5 +6000 MT/s \(profil EXPO/XMP, nominal 4800\)", out
+    )
+    assert "P0 CHANNEL B / DIMM 1" in out and "Corsair" in out
+    assert "secteur (pas de batterie)" in out
+    assert "nvme0" in out and "spd5118 #2" in out
