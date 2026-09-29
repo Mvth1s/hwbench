@@ -112,6 +112,10 @@ class FakeSystem:
         value = self.files.get(str(path))
         return value.strip() if value is not None else None
 
+    def link_name(self, path: str | Path) -> str | None:
+        # liens sysfs capturés sous la clé « <chemin>@link » (valeur = nom de la cible)
+        return self.files.get(f"{path}@link")
+
     def exists(self, path: str | Path) -> bool:
         return str(path) in self.files or str(path) in self.unreadable
 
@@ -131,6 +135,7 @@ def fake_system(monkeypatch: pytest.MonkeyPatch) -> Callable[..., FakeSystem]:
             "run_json",
             "read_sysfs",
             "exists",
+            "link_name",
             "list_dir",
         ):
             monkeypatch.setattr(_exec, name, getattr(system, name))

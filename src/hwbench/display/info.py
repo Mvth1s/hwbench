@@ -233,7 +233,7 @@ def render_sensors(sensors: SensorsData) -> Panel:
             t.add_column(col)
         for r in sensors.temperatures:
             t.add_row(
-                r.chip,
+                r.source,
                 r.label,
                 _n(r.current_c, " °C"),
                 _n(r.high_c, " °C", 0),
@@ -245,7 +245,7 @@ def render_sensors(sensors: SensorsData) -> Panel:
         for col in ("Puce", "Ventilateur", "Vitesse"):
             f.add_column(col)
         for fan in sensors.fans:
-            f.add_row(fan.chip, fan.label, _v(fan.rpm, " tr/min"))
+            f.add_row(fan.source, fan.label, _v(fan.rpm, " tr/min"))
         parts.append(f)
     return Panel(Group(*parts) if parts else NA, title="Capteurs", title_align="left")
 

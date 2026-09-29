@@ -107,11 +107,17 @@ class BoardData:
 
 @dataclass(frozen=True)
 class TemperatureReading:
-    chip: str
+    chip: str  # nom brut de la puce hwmon (« nvme », « k10temp »)
     label: str
     current_c: float | None
     high_c: float | None
     critical_c: float | None
+    # nom distinctif quand plusieurs puces portent le même nom : « nvme1 », « spd5118 #2 »
+    instance: str | None = None
+
+    @property
+    def source(self) -> str:
+        return self.instance or self.chip
 
 
 @dataclass(frozen=True)
@@ -119,6 +125,11 @@ class FanReading:
     chip: str
     label: str
     rpm: int | None
+    instance: str | None = None
+
+    @property
+    def source(self) -> str:
+        return self.instance or self.chip
 
 
 @dataclass(frozen=True)

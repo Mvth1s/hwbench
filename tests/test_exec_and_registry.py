@@ -80,3 +80,11 @@ def test_registry_selects_linux_implementation() -> None:
 def test_registry_windows_not_yet_supported() -> None:
     with pytest.raises(UnsupportedPlatformError):
         get_collector("cpu", "Windows")
+
+
+def test_link_name(tmp_path) -> None:
+    target = tmp_path / "nvme0"
+    target.mkdir()
+    (tmp_path / "device").symlink_to(target)
+    assert _exec.link_name(tmp_path / "device") == "nvme0"
+    assert _exec.link_name(tmp_path / "absent") is None

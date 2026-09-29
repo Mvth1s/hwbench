@@ -195,6 +195,9 @@ def capture_sysfs() -> dict[str, str]:
             add(ps / f)
     for hw in sorted(Path("/sys/class/hwmon").iterdir() if Path("/sys/class/hwmon").exists() else []):
         add(hw / "name")
+        # nom de la cible du lien device (nvme0, 2-0051…) : distingue les puces homonymes
+        if (hw / "device").exists():
+            files[f"{hw}/device@link"] = (hw / "device").resolve().name
         for f in sorted(hw.iterdir()):
             if re.fullmatch(r"(temp\d+_(input|label|max|crit)|fan\d+_(input|label))", f.name):
                 add(f)
