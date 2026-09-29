@@ -8,7 +8,8 @@ WARNING: radv is not a conformant Vulkan implementation, testing use only.
     Driver Version: 109060099
     Device UUID:    00000000000000000000000000000000
 =======================================================
-[cube] duration=1: FPS: 20696 FrameTime: 0.048 ms
+[effect2d] kernel=blur:duration=1: FPS: 5344 FrameTime: 0.187 ms
+[effect2d] kernel=edge:duration=1: FPS: 14518 FrameTime: 0.069 ms
 =======================================================
-                                   vkmark Score: 20696
+                                   vkmark Score: 9931
 =======================================================
