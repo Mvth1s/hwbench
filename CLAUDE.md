@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `hwbench` est un outil en ligne de commande pour Linux (Windows plus tard) qui affiche les composants d'une machine avec leurs détails importants et lance des benchmarks notés : CPU single-core, CPU multi-core, GPU, et un score combiné. Trois usages visés : diagnostic perso, projet portfolio propre, comparaison de machines entre elles.
 
 Machines de dev (Python 3.11+, shell fish) :
-- Dell Latitude 5420 sous Fedora 44 : machine de référence du scoring.
-- Desktop B850 (Ryzen 7 8700F, Radeon RX 9070 XT) sous EndeavourOS : sysbench, glmark2 et vkmark installés, fixtures des outils externes capturées ici.
+- Desktop B850 (Ryzen 7 8700F, Radeon RX 9070 XT) sous EndeavourOS : **machine de référence du scoring** (mesures stables, CV ≤ 1,3 %, pas de batterie ni de profil d'énergie, toujours disponible), sysbench, glmark2 et vkmark installés, fixtures des outils externes capturées ici.
+- Dell Latitude 5420 sous Fedora 44 : portable de test (batterie, platform_profile, Intel).
 
 ## Méthode de travail
 
@@ -66,7 +66,7 @@ CI (`.github/workflows/ci.yml`) : ruff + pytest sur Python 3.11 à 3.14 (ubuntu-
 - Identité d'un backend (`BackendId`) : nom, version du protocole hwbench, version de l'outil, mode de présentation. Deux mesures ne sont comparables que si les quatre sont égaux. Changer scènes, durée, résolution ou paramètres = incrémenter `*_VERSION` du module.
 - GPU : 3840×2160, glmark2 `--off-screen`, vkmark `--winsys headless` (repli fenêtre + `--present-mode immediate` + `VSYNC_UNVERIFIED`). Scènes choisies par le critère ratio FPS 1080p/4K ≥ 1,8 (étude dans le README et `_gpu.py`). L'UUID GPU de vkmark n'est jamais parsé ; les fixtures le mettent à zéro.
 - Scoring (`scoring.py`) : CPU = natif seul ; GPU = moyenne géométrique des backends GPU mesurés, liste identique à la référence sinon `BACKENDS_DIFFER` ; combiné sans GPU mesuré = CPU seul + `gpu_missing`. Jamais de moyenne silencieuse.
-- Référence : `src/hwbench/data/reference.json` (package data), générée par `hwbench reference` sur la Latitude ; `reference.py` fait les contrôles (secteur, profil, warm-up) et `--force` les inscrit dans `forced_reasons`. Tests du scoring : `conftest.make_result`.
+- Référence : `src/hwbench/data/reference.json` (package data), générée sur le desktop B850 par `.venv/bin/hwbench reference -o src/hwbench/data/reference.json` (session graphique, machine au repos) ; `reference.py` fait les contrôles (secteur, profil, warm-up) et `--force` les inscrit dans `forced_reasons`. `tests/test_reference_file.py` vérifie le vrai fichier (3 catégories, 6 benchs, versions de protocole à jour, aucun identifiant) : incrémenter la version d'un bench impose de régénérer la référence. Les tests CLI patchent `cli.load_reference` pour ne pas dépendre du fichier. Tests du scoring : `conftest.make_result`.
 - Bench natif : une classe par catégorie (`native-cpu-single`, `native-cpu-multi`), score = moyenne géométrique des débits des charges de `benchmarks/native/workloads.py`. Toute modification d'une charge change l'empreinte testée dans `tests/test_native_cpu.py` : incrémenter `NATIVE_CPU_VERSION` et mettre à jour l'empreinte. Multi-cœur : `multiprocessing` en `spawn`, barrière pour exclure démarrage et préparation du chrono, les charges passées en argument aux workers.
 - Tests des benchs : `conftest.TINY` (charges minuscules) ; patcher `cpu.WORKLOADS`, `cli.capture_state` et `runner.DEFAULT_MAX_WARMUP_S` (sinon le warm-up de charges bruitées court jusqu’à 90 s).
 - Donnée absente = `None`. Quand la cause compte pour l'utilisateur, le modèle porte un `Unavailable` (`NEEDS_ROOT`, `TOOL_MISSING`, `NO_DATA`) ; l'affichage traduit, il n'interroge jamais le système.

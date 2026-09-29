@@ -190,8 +190,20 @@ unité. Les points viennent du scoring, ci-dessous.
 
 ## Scoring
 
-Chaque bench est normalisé par rapport à la machine de référence, une Dell Latitude 5420 en
-profil « performance », sur secteur, en régime soutenu : elle vaut **1000 points**.
+Chaque bench est normalisé par rapport à la machine de référence, qui vaut **1000 points** : un
+desktop ASRock B850 Riptide WiFi (AMD Ryzen 7 8700F, Radeon RX 9070 XT, EndeavourOS, Mesa
+26.2.3), mesuré en régime soutenu. Choisi parce que ses mesures sont stables (CV ≤ 1,3 %), qu'il
+n'a ni batterie ni profil d'énergie à surveiller, qu'il reste disponible pour régénérer la
+référence, et qu'il a le même environnement d'outils que les fixtures de test.
+
+| Bench | Valeur de référence | CV |
+|---|---:|---:|
+| native-cpu-single v1 | 122,7 (indice) | 0,8 % |
+| native-cpu-multi v1 | 1 122,8 (indice) | 1,35 % |
+| sysbench-cpu-single v1 (sysbench 1.0.20) | 5 554 events/s | 0,15 % |
+| sysbench-cpu-multi v1 (sysbench 1.0.20) | 45 104 events/s | 0,22 % |
+| glmark2 v2 (2023.01, hors écran) | 3 650 fps | 0,16 % |
+| vkmark v2 (2025.01, headless) | 10 690 fps | 0,04 % |
 
 - Un backend n'est noté que s'il a la même identité que dans la référence : même bench, même
   version du protocole, même version de l'outil, même mode de présentation. Sinon il est
@@ -205,12 +217,17 @@ profil « performance », sur secteur, en régime soutenu : elle vaut **1000 poi
   `--weights`). Sans GPU mesuré, il est calculé sur le CPU seul et le signale ; un GPU mesuré mais
   non comparable rend le combiné non comparable.
 
-La référence est `src/hwbench/data/reference.json`, versionnée dans le repo. Elle se génère sur
-la machine de référence :
+La référence est `src/hwbench/data/reference.json`, versionnée dans le repo. Elle se régénère
+sur le desktop B850, depuis la session graphique (pour glmark2 et vkmark), rien d'autre ne
+tournant :
 
 ```sh
 .venv/bin/hwbench reference -o src/hwbench/data/reference.json
 ```
+
+À refaire quand la version d'un bench change (un test l'impose) ou quand l'une de ses
+conditions change sur le desktop : version de sysbench, glmark2 ou vkmark, pilote Mesa.
+Un résultat mesuré avec une autre version d'outil que la référence est déclaré non comparable.
 
 La commande refuse d'écrire le fichier si la machine n'est pas sur secteur, si le profil
 d'énergie n'est pas « performance » (vérifié avant les mesures) ou si un warm-up ne se

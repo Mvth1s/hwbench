@@ -236,9 +236,3 @@ def test_reference_payload_content() -> None:
 def test_invalid_reference_is_rejected(broken: dict) -> None:
     with pytest.raises(ReferenceError):
         reference_from_dict(broken)
-
-
-def test_packaged_reference_absent_or_valid() -> None:
-    """Tant que la Latitude n'a pas généré la référence, load_reference() renvoie None."""
-    reference = load_reference()
-    assert reference is None or reference.entries
