@@ -30,7 +30,6 @@ ENVIRONMENT_LABELS = {
     "binary": "binaire",
     "session": "session",
     "resolution": "résolution",
-    "presentation": "présentation",
     "renderer": "rendu",
     "driver": "pilote",
     "cpu-max-prime": "cpu-max-prime",
@@ -152,6 +151,8 @@ def render_result(result: Result) -> Panel:
     if result.workers is not None:
         # le natif lance des processus (GIL) ; les outils externes, des threads
         t.add_row("Processus" if result.backend == "native" else "Threads", str(result.workers))
+    if result.presentation is not None:
+        t.add_row("Présentation", PRESENTATION_LABELS.get(result.presentation, result.presentation))
     _state_rows(t, result)
 
     parts: list[Table | Text] = [t]
@@ -183,9 +184,7 @@ def render_result(result: Result) -> Panel:
 def _environment(env: dict[str, str]) -> list[str]:
     items: list[str] = []
     for key, value in env.items():
-        if key == "presentation":
-            items.append(f"présentation {PRESENTATION_LABELS.get(value, value)}")
-        elif key in ENVIRONMENT_LABELS:
+        if key in ENVIRONMENT_LABELS:
             items.append(f"{ENVIRONMENT_LABELS[key]} {value}")
         else:
             # « CPython 3.14.7 » / « OpenSSL 3.5.1 » se nomment déjà eux-mêmes

@@ -12,6 +12,7 @@ ISSUE_LABELS = {
     ScoreIssue.NOT_IN_REFERENCE: "absent de la référence",
     ScoreIssue.VERSION_MISMATCH: "version du bench différente de la référence",
     ScoreIssue.TOOL_VERSION_MISMATCH: "version de l'outil différente de la référence",
+    ScoreIssue.PRESENTATION_MISMATCH: "mode de présentation différent de la référence",
     ScoreIssue.BACKENDS_DIFFER: "backends différents de la référence",
     ScoreIssue.CATEGORY_NOT_COMPARABLE: "une catégorie n'est pas comparable",
     ScoreIssue.CPU_NOT_MEASURED: "CPU single-core et multi-core requis",

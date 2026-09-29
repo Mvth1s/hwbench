@@ -28,15 +28,17 @@ class Availability(StrEnum):
 
 @dataclass(frozen=True)
 class BackendId:
-    """Ce qui rend deux mesures comparables : même bench, même version, même version d'outil."""
+    """Ce qui rend deux mesures comparables : même bench, même version, même version d'outil,
+    même mode de présentation (hors écran, headless, à l'écran)."""
 
     name: str
     version: str
     tool_version: str | None = None
+    presentation: str | None = None
 
     def label(self) -> str:
-        tool = f", outil {self.tool_version}" if self.tool_version else ""
-        return f"{self.name} v{self.version}{tool}"
+        extra = [f"outil {self.tool_version}" if self.tool_version else None, self.presentation]
+        return ", ".join([f"{self.name} v{self.version}", *filter(None, extra)])
 
 
 @dataclass(frozen=True)
@@ -97,6 +99,7 @@ class Result:
     backend: str
     version: str
     tool_version: str | None  # version de l'outil externe (None pour le natif)
+    presentation: str | None  # GPU : offscreen, headless, immediate-requested
     unit: str
     higher_is_better: bool
     value: float  # médiane des runs
@@ -118,7 +121,7 @@ class Result:
 
     @property
     def backend_id(self) -> BackendId:
-        return BackendId(self.name, self.version, self.tool_version)
+        return BackendId(self.name, self.version, self.tool_version, self.presentation)
 
     @property
     def cv_percent(self) -> float:

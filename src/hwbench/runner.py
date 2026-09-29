@@ -121,6 +121,7 @@ def run_benchmark(
         backend=bench.backend,
         version=bench.version,
         tool_version=bench.tool_version(),
+        presentation=bench.presentation(),
         unit=bench.unit,
         higher_is_better=bench.higher_is_better,
         value=value,
