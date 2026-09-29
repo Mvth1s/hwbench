@@ -7,21 +7,19 @@ from hwbench.benchmarks.base import Benchmark, register
 from hwbench.benchmarks.external import _gpu, _run
 from hwbench.results import Availability, BenchWarning, Category, Measurement
 
-GLMARK2_VERSION = "1"  # à incrémenter si les scènes, leur durée ou la résolution changent
+GLMARK2_VERSION = "2"  # à incrémenter si les scènes, leur durée ou la résolution changent
 
-# Sous-ensemble fixe des scènes par défaut de glmark2 (une variante par scène).
-SCENES = (
-    "build:use-vbo=true",
-    "texture:texture-filter=linear",
-    "shading:shading=phong",
-    "bump:bump-render=high-poly",
-    "effect2d",
-    "pulsar",
-    "desktop",
-    "jellyfish",
-    "terrain",
-    "refract",
-)
+# Scènes du jeu par défaut de glmark2 dont le coût suit le nombre de pixels (voir _gpu.py).
+SCENES = {
+    "effect2d-edge": "effect2d:kernel=0,1,0;1,-4,1;0,1,0;",
+    "effect2d-blur": "effect2d:kernel=1,1,1,1,1;1,1,1,1,1;1,1,1,1,1;",
+    "desktop-blur": "desktop:blur-radius=5:effect=blur:passes=1:separable=true:windows=4",
+    "desktop-shadow": "desktop:effect=shadow:windows=4",
+    "jellyfish": "jellyfish",
+    "terrain": "terrain",
+    "shadow": "shadow",
+    "refract": "refract",
+}
 
 # Binaires par session, par ordre de préférence. Sous Wayland, glmark2 (X11) passe par
 # XWayland : acceptable en repli, et relevé dans le résultat.
@@ -94,7 +92,6 @@ class Glmark2(Benchmark):
     def command(self) -> list[str]:
         if self._binary is None:
             raise _run.ToolError("glmark2 : aucun binaire adapté à la session")
-        # --off-screen : rendu dans un FBO, jamais présenté -> pas de vsync, pas de fenêtre
         return [
             self._binary[0],
             "--off-screen",
@@ -114,14 +111,18 @@ class Glmark2(Benchmark):
         return Measurement(
             value=out.score,
             duration_s=float(len(SCENES) * _gpu.SCENE_SECONDS),
-            details={scene: fps for scene, (_, fps) in zip(SCENES, out.scene_fps, strict=True)},
+            details={key: fps for key, (_, fps) in zip(SCENES, out.scene_fps, strict=True)},
         )
 
     def tool_version(self) -> str | None:
         return self._last.version if self._last else None
 
+    def presentation(self) -> str:
+        # --off-screen : rendu dans un FBO jamais présenté, donc sans vsync
+        return "offscreen"
+
     def environment(self) -> dict[str, str]:
-        env = {"resolution": _gpu.RESOLUTION, "presentation": "offscreen"}
+        env = {"resolution": _gpu.RESOLUTION}
         if self._binary:
             env |= {"binary": self._binary[0], "session": self._binary[1]}
         if self._last:
