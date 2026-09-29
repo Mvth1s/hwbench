@@ -26,7 +26,8 @@ AVAILABILITY_LABELS = {
 
 INSTALL_HINTS = {
     "sysbench": "sudo dnf install sysbench  |  sudo apt install sysbench",
-    "glmark2": "sudo dnf install glmark2  |  sudo apt install glmark2",
+    # Debian/Ubuntu découpent glmark2 : glmark2-x11 fournit /usr/bin/glmark2
+    "glmark2": "sudo dnf install glmark2  |  sudo apt install glmark2-wayland glmark2-x11",
     "vkmark": "sudo dnf install vkmark  |  sudo apt install vkmark",
 }
 
