@@ -75,3 +75,18 @@ def test_collect_never_crashes_on_empty_system(fake_system, monkeypatch) -> None
     result = LinuxCpuCollector().collect()
     assert result.data.model is None
     assert result.identifiers is None
+
+
+EPP = "/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference"
+
+
+def test_energy_performance_preference_from_cpu0(fake_system) -> None:
+    fake_system(files={EPP: "balance_performance\n", EPP.replace("cpu0", "cpu1"): "power"})
+    assert LinuxCpuCollector().collect().data.energy_performance_preference == (
+        "balance_performance"
+    )
+
+
+def test_no_energy_performance_preference(laptop) -> None:
+    laptop()
+    assert LinuxCpuCollector().collect().data.energy_performance_preference is None

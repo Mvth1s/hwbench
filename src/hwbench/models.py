@@ -33,6 +33,8 @@ class CpuData:
     l2_cache_kb: int | None = None
     l3_cache_kb: int | None = None
     per_cpu: list[CpuCoreState] = field(default_factory=list)
+    # EPP de cpu0 (intel_pstate / amd-pstate en mode actif) : « performance », « balance_power »…
+    energy_performance_preference: str | None = None
 
 
 @dataclass(frozen=True)
@@ -144,6 +146,9 @@ class Battery:
 class PowerData:
     on_ac: bool | None = None
     batteries: list[Battery] = field(default_factory=list)
+    # /sys/firmware/acpi/platform_profile : « performance », « balanced », « quiet »…
+    platform_profile: str | None = None
+    platform_profile_choices: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -159,16 +164,20 @@ class MachineSnapshot:
 
 # --- Identifiants : structures séparées, jamais référencées par MachineSnapshot ---
 
+# None = champ lu mais vide ou valeur bidon du firmware (« non renseigné ») ;
+# Unavailable = champ illisible (NEEDS_ROOT sans root, NO_DATA si absent).
+IdentifierValue = str | Unavailable | None
+
 
 @dataclass(frozen=True)
 class BoardIdentifiers:
-    hostname: str | None = None
-    product_uuid: str | None = None
-    product_serial: str | None = None
-    board_serial: str | None = None
-    chassis_serial: str | None = None
-    board_asset_tag: str | None = None
-    chassis_asset_tag: str | None = None
+    hostname: IdentifierValue = None
+    product_uuid: IdentifierValue = None
+    product_serial: IdentifierValue = None
+    board_serial: IdentifierValue = None
+    chassis_serial: IdentifierValue = None
+    board_asset_tag: IdentifierValue = None
+    chassis_asset_tag: IdentifierValue = None
 
 
 @dataclass(frozen=True)

@@ -19,7 +19,10 @@ DETAIL_LABELS = {
     "powmod": "Exponentiation modulaire 2048 bits",
 }
 
-UNIT_LABELS = {"MiB/s": "Mio/s"}
+# « index » : moyenne géométrique de débits, sans unité, tant que le scoring n'existe pas.
+UNIT_LABELS = {"MiB/s": "Mio/s", "index": "indice brut"}
+
+PROFILE_LABELS = {"platform_profile": "profil plateforme", "energy_performance_preference": "EPP"}
 
 NA = Text("non disponible", style="dim")
 
@@ -33,7 +36,7 @@ def _value(value: float) -> str:
 
 
 def warning_message(
-    warning: BenchWarning, cpu_temp_c: float | None = None, cv_percent: float | None = None
+    warning: BenchWarning, state: MachineState, result: Result | None = None
 ) -> str:
     match warning:
         case BenchWarning.ON_BATTERY:
@@ -43,13 +46,31 @@ def warning_message(
             )
         case BenchWarning.HOT_START:
             return (
-                f"CPU déjà chaud au départ ({num(cpu_temp_c or 0, 0)} °C) : risque de throttling. "
-                "Laissez refroidir avant de relancer."
+                f"CPU déjà chaud au départ ({num(state.cpu_temp_c or 0, 0)} °C) : "
+                "risque de throttling. Laissez refroidir avant de relancer."
+            )
+        case BenchWarning.POWER_PROFILE:
+            current = {
+                "platform_profile": state.platform_profile,
+                "energy_performance_preference": state.energy_performance_preference,
+            }
+            settings = ", ".join(
+                f"{PROFILE_LABELS[name]} « {current[name]} »"
+                for name in state.throttling_settings()
+            )
+            return (
+                f"Réglage d'énergie non « performance » ({settings}) : le CPU est peut-être "
+                "bridé. Passez en profil performance pour des résultats comparables."
             )
         case BenchWarning.HIGH_VARIANCE:
             return (
-                f"Mesures instables (CV {num(cv_percent or 0)} %) : une tâche de fond "
-                "perturbe peut-être le bench."
+                f"Mesures instables (CV {num(result.cv_percent if result else 0)} %) : "
+                "une tâche de fond perturbe peut-être le bench."
+            )
+        case BenchWarning.WARMUP_UNSTABLE:
+            return (
+                f"Warm-up non stabilisé après {num(result.warmup_s if result else 0, 0)} s : "
+                "la machine chauffe ou throttle encore. Allongez le plafond (--max-warmup)."
             )
 
 
@@ -62,6 +83,8 @@ def _power(state: MachineState) -> str:
 def _state_rows(t: Table, result: Result) -> None:
     before, after = result.state_before, result.state_after
     t.add_row("Governor", ", ".join(before.governors) if before.governors else NA)
+    t.add_row("Profil plateforme", before.platform_profile or NA)
+    t.add_row("EPP", before.energy_performance_preference or NA)
     power = _power(before)
     if after.on_ac != before.on_ac:
         power += f" → {_power(after)}"
@@ -86,11 +109,14 @@ def render_result(result: Result) -> Panel:
         style="yellow" if BenchWarning.HIGH_VARIANCE in result.warnings else "dim",
     )
     t.add_row("Score (médiane)", score)
+    t.add_row("Runs", " · ".join(_value(v) for v in result.runs))
     t.add_row(
-        "Runs",
-        " · ".join(_value(v) for v in result.runs)
-        + f"  (+ {result.warmup_runs} warm-up, {num(result.duration_s)} s au total)",
+        "Warm-up",
+        f"{result.warmup_runs} itérations, {num(result.warmup_s)} s"
+        + ("" if result.warmup_stable else " (non stabilisé)")
+        + f" · {num(result.duration_s)} s au total",
     )
+    t.add_row("Burst (à froid)", Text(f"{_value(result.burst)} {unit}  (hors score)", style="dim"))
     if result.workers is not None:
         t.add_row("Processus", str(result.workers))
     _state_rows(t, result)
@@ -118,7 +144,7 @@ def render_result(result: Result) -> Panel:
             )
         )
     for warning in result.warnings:
-        message = warning_message(warning, result.state_before.cpu_temp_c, result.cv_percent)
+        message = warning_message(warning, result.state_before, result)
         parts.append(Text(f"⚠ {message}", style="yellow"))
 
     return Panel(

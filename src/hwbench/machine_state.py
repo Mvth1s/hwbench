@@ -1,10 +1,8 @@
-"""État de la machine relevé autour d'un benchmark (governor, secteur, température CPU)."""
+"""État de la machine relevé autour d'un benchmark (réglages d'énergie, secteur, température)."""
 
 from hwbench.collectors import get_collector
 from hwbench.models import CpuData, PowerData, SensorsData
 from hwbench.results import MachineState
-
-HOT_START_C = 70.0
 
 # (puce hwmon, libellés par ordre de préférence) ; "*" = n'importe quel capteur de la puce
 _CPU_SENSORS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -30,6 +28,9 @@ def state_from(cpu: CpuData, power: PowerData, sensors: SensorsData) -> MachineS
         governors=sorted({c.governor for c in cpu.per_cpu if c.governor}),
         on_ac=power.on_ac,
         cpu_temp_c=cpu_temperature(sensors),
+        platform_profile=power.platform_profile,
+        platform_profile_choices=list(power.platform_profile_choices),
+        energy_performance_preference=cpu.energy_performance_preference,
     )
 
 

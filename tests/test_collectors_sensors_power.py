@@ -93,3 +93,21 @@ def test_desktop_without_power_supply(fake_system) -> None:
     power = LinuxPowerCollector().collect().data
     assert power.on_ac is None
     assert power.batteries == []
+
+
+PROFILE = "/sys/firmware/acpi/platform_profile"
+
+
+def test_platform_profile(fake_system) -> None:
+    fake_system(
+        files={PROFILE: "balanced\n", f"{PROFILE}_choices": "low-power balanced performance\n"}
+    )
+    power = LinuxPowerCollector().collect().data
+    assert power.platform_profile == "balanced"
+    assert power.platform_profile_choices == ["low-power", "balanced", "performance"]
+
+
+def test_no_platform_profile(laptop) -> None:
+    laptop()
+    power = LinuxPowerCollector().collect().data
+    assert power.platform_profile is None and power.platform_profile_choices == []

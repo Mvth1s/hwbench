@@ -51,6 +51,11 @@ def read_sysfs(path: str | Path) -> str | None:
         return None
 
 
+def exists(path: str | Path) -> bool:
+    """Distingue un fichier absent d'un fichier présent mais illisible (droits)."""
+    return Path(path).exists()
+
+
 def list_dir(path: str | Path) -> list[str]:
     try:
         return sorted(os.listdir(path))

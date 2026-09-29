@@ -1,6 +1,7 @@
 from conftest import laptop_sysfs, sysfs_fixture
 
-from hwbench.collectors.linux.board import LinuxBoardCollector, parse_dmi_date
+from hwbench.collectors.linux.board import DMI_DIR, LinuxBoardCollector, parse_dmi_date
+from hwbench.models import Unavailable
 
 IDENTIFIER_FILES = (
     "product_uuid",
@@ -62,9 +63,33 @@ def test_placeholders_become_none(fake_system) -> None:
     assert data.board_name == "B550M Pro4"
 
 
-def test_unreadable_serials_are_none(fake_system) -> None:
-    files = {k: v for k, v in laptop_sysfs().items() if "serial" not in k}
-    fake_system(files=files)
+SERIAL_FILES = {f"{DMI_DIR}/{f}" for f in ("product_serial", "board_serial", "chassis_serial")}
+
+
+def test_unreadable_serials_need_root(fake_system) -> None:
+    # serials en 0400 root, asset tags en 0444 : sans root, seuls les serials sont illisibles
+    files = {k: v for k, v in laptop_sysfs().items() if k not in SERIAL_FILES}
+    fake_system(files=files, unreadable=SERIAL_FILES)
     ids = LinuxBoardCollector().collect(include_identifiers=True).identifiers
     assert ids is not None
-    assert (ids.product_serial, ids.board_serial, ids.chassis_serial) == (None, None, None)
+    assert (ids.product_serial, ids.board_serial, ids.chassis_serial) == (
+        Unavailable.NEEDS_ROOT,
+    ) * 3
+    assert (ids.board_asset_tag, ids.chassis_asset_tag) == (None, None)
+
+
+def test_empty_asset_tags_as_root_are_not_set_not_unreadable(laptop) -> None:
+    """Régression : en root, un asset tag vide s'affichait « relancer avec sudo »."""
+    laptop(root=True)
+    ids = LinuxBoardCollector().collect(include_identifiers=True).identifiers
+    assert ids is not None
+    assert ids.board_asset_tag is None and ids.chassis_asset_tag is None
+    assert ids.product_serial == "FAKE-SYS-SERIAL"
+
+
+def test_missing_identifier_files_are_no_data(fake_system) -> None:
+    files = {k: v for k, v in laptop_sysfs().items() if k not in SERIAL_FILES}
+    fake_system(files=files, root=True)
+    ids = LinuxBoardCollector().collect(include_identifiers=True).identifiers
+    assert ids is not None
+    assert ids.product_serial is Unavailable.NO_DATA

@@ -70,6 +70,7 @@ def test_read_sysfs_missing_or_forbidden(tmp_path) -> None:
     f.write_text("42\n")
     assert _exec.read_sysfs(f) == "42"
     assert _exec.list_dir(tmp_path / "absent") == []
+    assert _exec.exists(f) and not _exec.exists(tmp_path / "absent")
 
 
 def test_registry_selects_linux_implementation() -> None:

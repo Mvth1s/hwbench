@@ -3,6 +3,7 @@ from hwbench.collectors.linux import _exec
 from hwbench.models import Battery, PowerData
 
 POWER_SUPPLY_DIR = "/sys/class/power_supply"
+PLATFORM_PROFILE = "/sys/firmware/acpi/platform_profile"
 _AC_TYPES = {"Mains", "USB"}
 
 
@@ -61,7 +62,13 @@ def read_power_supply() -> PowerData:
         on_ac = not any(b.status == "Discharging" for b in batteries)
     else:
         on_ac = None
-    return PowerData(on_ac=on_ac, batteries=batteries)
+    choices = _exec.read_sysfs(f"{PLATFORM_PROFILE}_choices")
+    return PowerData(
+        on_ac=on_ac,
+        batteries=batteries,
+        platform_profile=_exec.read_sysfs(PLATFORM_PROFILE) or None,
+        platform_profile_choices=choices.split() if choices else [],
+    )
 
 
 @register("Linux")

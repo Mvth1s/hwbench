@@ -81,6 +81,8 @@ hwbench bench                          # toutes les catégories, tous les backen
 hwbench bench cpu-single               # une seule catégorie : cpu-single, cpu-multi, gpu, all
 hwbench bench cpu-multi --workers 4    # nombre de processus (défaut : CPU logiques)
 hwbench bench --backend native --runs 5
+hwbench bench cpu-multi --max-warmup 180   # plafond du warm-up en secondes
+hwbench bench --max-cv 3 --hot-start 60    # seuils des avertissements (défaut : 5 %, 70 °C)
 ```
 
 ### Backend natif (CPU)
@@ -95,29 +97,43 @@ sont relevées avec chaque résultat.
 
 ### Fiabilité des mesures
 
-Chaque bench fait un warm-up puis au moins 3 runs ; le score est la médiane, l'écart-type est
-conservé. Le governor CPU, l'alimentation (secteur ou batterie) et la température CPU sont
-relevés avant et après. hwbench avertit, sans bloquer, si la machine est sur batterie, si le
-CPU dépasse 70 °C au départ, ou si les runs varient de plus de 5 %.
+Warm-up adaptatif : le bench enchaîne les itérations jusqu'à ce que deux consécutives soient à
+moins de 3 % l'une de l'autre (`--warmup-tolerance`), dans la limite d'un plafond de 30 s en
+single-core et 90 s en multi-cœur (`--max-warmup`). Si le plafond est atteint sans stabilité,
+hwbench l'indique. Suivent au moins 3 runs mesurés ; le score est leur médiane, l'écart-type est
+conservé.
 
-Sur un portable, le multi-cœur est souvent instable : le CPU tient un turbo court (PL2) puis
-redescend à sa puissance soutenue (PL1). Laisser refroidir la machine et la brancher sur secteur
-avant de mesurer.
+Le premier run, à froid, est gardé à part comme « burst » : sur un portable, le CPU tient un
+turbo court (PL2) avant de redescendre à sa puissance soutenue (PL1). Il est affiché pour
+information, mais n'entre jamais dans le score.
+
+Le governor, le profil plateforme ACPI (`platform_profile`), l'EPP de cpu0
+(`energy_performance_preference`), l'alimentation et la température CPU sont relevés avant et
+après. hwbench avertit, sans bloquer, si la machine est sur batterie, si le profil d'énergie
+n'est pas « performance », si le CPU dépasse 70 °C au départ (`--hot-start`) ou si les runs
+varient de plus de 5 % (`--max-cv`).
+
+Tant que le scoring (phase 3) n'existe pas, le score natif est un **indice brut** : la moyenne
+géométrique de débits hétérogènes, sans unité, qui ne sert qu'à comparer deux résultats de la
+même version du bench.
 
 ```
 ╭─ CPU single-core · native v1 ────────────────────────────────────────────────╮
-│ Score (médiane)  89,8 pts  ± 0,4 (CV 0,5 %)                                  │
-│ Runs             89,8 · 90,2 · 89,3  (+ 1 warm-up, 6,9 s au total)           │
-│ Governor         performance                                                 │
-│ Alimentation     secteur                                                     │
-│ Température CPU  70 °C avant → 71 °C après                                   │
+│ Score (médiane)    126,0 indice brut  ± 0,8 (CV 0,6 %)                       │
+│ Runs               125,0 · 126,0 · 126,6                                     │
+│ Warm-up            2 itérations, 2,6 s · 6,3 s au total                      │
+│ Burst (à froid)    125,1 indice brut  (hors score)                           │
+│ Governor           performance                                               │
+│ Profil plateforme  non disponible                                            │
+│ EPP                performance                                               │
+│ Alimentation       non disponible                                            │
+│ Température CPU    41 °C avant → 62 °C après                                 │
 │  Charge                                   Médiane                            │
-│  SHA-256                             1624,2 Mio/s                            │
-│  Compression zlib (niveau 6)           79,2 Mio/s                            │
-│  Compression LZMA (preset 1)           12,0 Mio/s                            │
-│  Exponentiation modulaire 2048 bits     42,3 op/s                            │
-│ CPython 3.14.7 · OpenSSL 3.5.8 25 Aug 2026 · zlib 1.3.1.zlib-ng · liblzma    │
-│ 5.8.2                                                                        │
+│  SHA-256                             2368,3 Mio/s                            │
+│  Compression zlib (niveau 6)           66,0 Mio/s                            │
+│  Compression LZMA (preset 1)           23,6 Mio/s                            │
+│  Exponentiation modulaire 2048 bits     69,0 op/s                            │
+│ CPython 3.14.7 · OpenSSL 3.6.4 25 Aug 2026 · zlib 1.3.2 · liblzma 5.8.4      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 

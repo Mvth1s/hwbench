@@ -63,7 +63,7 @@ def run_workloads(workloads: tuple[Workload, ...], inputs: list[Any]) -> dict[st
 class _NativeCpu(Benchmark):
     backend = "native"
     version = NATIVE_CPU_VERSION
-    unit = "pts"
+    unit = "index"  # moyenne géométrique de débits hétérogènes : sans unité
     detail_units = {w.key: w.unit for w in WORKLOADS}
 
     def __init__(

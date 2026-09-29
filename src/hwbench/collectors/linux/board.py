@@ -2,7 +2,7 @@ from datetime import datetime
 
 from hwbench.collectors.base import Collector, ComponentResult, register
 from hwbench.collectors.linux import _exec
-from hwbench.models import BoardData, BoardIdentifiers
+from hwbench.models import BoardData, BoardIdentifiers, IdentifierValue, Unavailable
 
 DMI_DIR = "/sys/class/dmi/id"
 
@@ -20,11 +20,24 @@ _PLACEHOLDERS = {
 }
 
 
-def _dmi(name: str) -> str | None:
-    value = _exec.read_sysfs(f"{DMI_DIR}/{name}")
+def _clean(value: str | None) -> str | None:
     if value is None or value.strip().lower() in _PLACEHOLDERS:
         return None
     return value.strip()
+
+
+def _dmi(name: str) -> str | None:
+    return _clean(_exec.read_sysfs(f"{DMI_DIR}/{name}"))
+
+
+def _identifier(path: str) -> IdentifierValue:
+    """Valeur, None si vide ou bidon, ou la raison pour laquelle le fichier est illisible."""
+    value = _exec.read_sysfs(path)
+    if value is not None:
+        return _clean(value)
+    if _exec.exists(path) and not _exec.is_root():
+        return Unavailable.NEEDS_ROOT
+    return Unavailable.NO_DATA
 
 
 def parse_dmi_date(value: str | None) -> str | None:
@@ -59,12 +72,17 @@ class LinuxBoardCollector(Collector[BoardData, BoardIdentifiers]):
         if not include_identifiers:
             return ComponentResult(data)
         ids = BoardIdentifiers(
-            hostname=_exec.read_sysfs("/proc/sys/kernel/hostname"),
-            product_uuid=_dmi("product_uuid"),
-            product_serial=_dmi("product_serial"),
-            board_serial=_dmi("board_serial"),
-            chassis_serial=_dmi("chassis_serial"),
-            board_asset_tag=_dmi("board_asset_tag"),
-            chassis_asset_tag=_dmi("chassis_asset_tag"),
+            hostname=_identifier("/proc/sys/kernel/hostname"),
+            **{
+                name: _identifier(f"{DMI_DIR}/{name}")
+                for name in (
+                    "product_uuid",
+                    "product_serial",
+                    "board_serial",
+                    "chassis_serial",
+                    "board_asset_tag",
+                    "chassis_asset_tag",
+                )
+            },
         )
         return ComponentResult(data, ids)

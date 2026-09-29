@@ -10,10 +10,11 @@ from hwbench import privacy
 from hwbench.benchmarks.base import BenchOptions, known_backends, select
 from hwbench.collect import collect_snapshot
 from hwbench.display.bench import CATEGORY_LABELS, render_result, warning_message
+from hwbench.display.fmt import num
 from hwbench.display.info import render_info
 from hwbench.machine_state import capture_state
 from hwbench.results import Category
-from hwbench.runner import MIN_RUNS, run_benchmark, start_warnings
+from hwbench.runner import MIN_RUNS, RunSettings, run_benchmark, start_warnings
 
 app = typer.Typer(
     help="Inventaire matériel et benchmarks notés.",
@@ -72,7 +73,7 @@ TARGET_CATEGORIES = {
     Target.ALL: list(Category),
 }
 
-PHASE_LABELS = {"warmup": "warm-up", "run": "run"}
+DEFAULTS = RunSettings()
 
 
 @app.command()
@@ -91,6 +92,30 @@ def bench(
             "--workers", min=1, help="Processus du bench multi-cœur (défaut : CPU logiques)."
         ),
     ] = None,
+    max_warmup: Annotated[
+        float | None,
+        typer.Option(
+            "--max-warmup",
+            min=0,
+            help="Plafond du warm-up en secondes (défaut : 30 single-core, 90 multi-cœur).",
+        ),
+    ] = None,
+    warmup_tolerance: Annotated[
+        float,
+        typer.Option(
+            "--warmup-tolerance",
+            min=0,
+            help="Écart max (%) entre 2 itérations consécutives pour déclarer le warm-up stable.",
+        ),
+    ] = DEFAULTS.warmup_tolerance_percent,
+    max_cv: Annotated[
+        float,
+        typer.Option("--max-cv", min=0, help="Seuil (%) de l'avertissement « mesures instables »."),
+    ] = DEFAULTS.high_variance_cv_percent,
+    hot_start: Annotated[
+        float,
+        typer.Option("--hot-start", help="Température CPU (°C) de départ jugée trop chaude."),
+    ] = DEFAULTS.hot_start_c,
 ) -> None:
     """Lance les benchmarks notés."""
     console = Console()
@@ -114,9 +139,16 @@ def bench(
             )
             console.print(f"[yellow]{CATEGORY_LABELS[category]} : {reason}.[/yellow]")
 
+    settings = RunSettings(
+        runs=runs,
+        max_warmup_s=max_warmup,
+        warmup_tolerance_percent=warmup_tolerance,
+        high_variance_cv_percent=max_cv,
+        hot_start_c=hot_start,
+    )
     initial = capture_state()
-    for warning in start_warnings(initial):
-        console.print(f"[yellow]⚠ {warning_message(warning, initial.cpu_temp_c)}[/yellow]")
+    for warning in start_warnings(initial, settings):
+        console.print(f"[yellow]⚠ {warning_message(warning, initial)}[/yellow]")
 
     options = BenchOptions(workers=workers)
     done = 0
@@ -128,13 +160,17 @@ def bench(
             continue
         try:
             with console.status(f"{label} : préparation…") as status:
+                cap = settings.warmup_cap(cls.category)
 
                 def progress(
-                    phase: str, index: int, total: int, status=status, label=label
+                    phase: str, index: int, total: int | None, status=status, label=label, cap=cap
                 ) -> None:
-                    status.update(f"{label} : {PHASE_LABELS[phase]} {index}/{total}…")
+                    if phase == "warmup":
+                        status.update(f"{label} : warm-up {index} (plafond {num(cap, 0)} s)…")
+                    else:
+                        status.update(f"{label} : run {index}/{total}…")
 
-                result = run_benchmark(instance, runs, probe=capture_state, progress=progress)
+                result = run_benchmark(instance, settings, probe=capture_state, progress=progress)
         except KeyboardInterrupt:
             console.print("[red]Interrompu.[/red]")
             raise typer.Exit(code=130) from None

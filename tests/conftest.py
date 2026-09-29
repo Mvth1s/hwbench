@@ -72,8 +72,11 @@ class FakeSystem:
         commands: dict[tuple[str, ...], str] | None = None,
         tools: set[str] | None = None,
         root: bool = False,
+        unreadable: set[str] | None = None,
     ) -> None:
         self.files = files or {}
+        # présents mais illisibles (ex. serials DMI en 0400 sans root)
+        self.unreadable = unreadable or set()
         self.commands = commands or {}
         self.tools = tools if tools is not None else {cmd[0] for cmd in self.commands}
         self.root = root
@@ -103,8 +106,13 @@ class FakeSystem:
 
     def read_sysfs(self, path: str | Path) -> str | None:
         self.paths_read.append(str(path))
+        if str(path) in self.unreadable:
+            return None
         value = self.files.get(str(path))
         return value.strip() if value is not None else None
+
+    def exists(self, path: str | Path) -> bool:
+        return str(path) in self.files or str(path) in self.unreadable
 
     def list_dir(self, path: str | Path) -> list[str]:
         prefix = str(path).rstrip("/") + "/"
@@ -115,7 +123,15 @@ class FakeSystem:
 def fake_system(monkeypatch: pytest.MonkeyPatch) -> Callable[..., FakeSystem]:
     def install(**kwargs: Any) -> FakeSystem:
         system = FakeSystem(**kwargs)
-        for name in ("which", "is_root", "run_text", "run_json", "read_sysfs", "list_dir"):
+        for name in (
+            "which",
+            "is_root",
+            "run_text",
+            "run_json",
+            "read_sysfs",
+            "exists",
+            "list_dir",
+        ):
             monkeypatch.setattr(_exec, name, getattr(system, name))
         return system
 

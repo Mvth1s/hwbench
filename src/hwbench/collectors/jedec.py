@@ -2,19 +2,24 @@
 
 import re
 
+# Source de chaque entrée : JEP106BB (JEDEC, 2020), lue dans sa transcription par i2c-tools
+# (eeprom/decode-dimms, commit « Update the list of vendors to Jedec JEP106BB », livré
+# dans i2c-tools 4.2 à 4.4). Table indexée par banque puis par code sans bit de parité ;
+# le libellé officiel figure en commentaire quand le nom affiché est abrégé.
+# N'ajouter une entrée que si elle est vérifiable dans une révision JEP106 citée ici.
 JEDEC_MANUFACTURERS: dict[tuple[int, int], str] = {
-    (1, 0x2C): "Micron",
-    (1, 0xAD): "SK Hynix",
-    (1, 0xCE): "Samsung",
-    (2, 0x4F): "Transcend",
-    (2, 0x98): "Kingston",
-    (3, 0x9E): "Corsair",
-    (4, 0x0B): "Nanya",
-    (5, 0xCB): "ADATA",
-    (5, 0xCD): "G.Skill",
-    (5, 0xEF): "Team Group",
-    (6, 0x02): "Patriot",
-    (6, 0x9B): "Crucial",
+    (1, 0x2C): "Micron",  # JEP106BB : « Micron Technology »
+    (1, 0xAD): "SK Hynix",  # JEP106BB : « SK Hynix (former Hyundai Electronics) »
+    (1, 0xCE): "Samsung",  # JEP106BB : « Samsung »
+    (2, 0x4F): "Transcend",  # JEP106BB : « Transcend Information »
+    (2, 0x98): "Kingston",  # JEP106BB : « Kingston »
+    (3, 0x9E): "Corsair",  # JEP106BB : « Corsair »
+    (4, 0x0B): "Nanya",  # JEP106BB : « Nanya Technology »
+    (5, 0xCB): "ADATA",  # JEP106BB : « A-DATA Technology »
+    (5, 0xCD): "G.Skill",  # JEP106BB : « G Skill Intl »
+    (5, 0xEF): "Team Group",  # JEP106BB : « Team Group Inc. »
+    (6, 0x02): "Patriot",  # JEP106BB : « Patriot Memory » (≠ Patriot Scientific, banque 5)
+    (6, 0x9B): "Crucial",  # JEP106BB : « Crucial Technology »
 }
 
 _MODULE_ID_RE = re.compile(r"Bank\s+(\d+),\s*Hex\s+0x([0-9a-f]{2})", re.IGNORECASE)

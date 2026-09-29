@@ -14,6 +14,7 @@ from hwbench.models import (
     DiskData,
     GpuData,
     Identifiers,
+    IdentifierValue,
     MachineSnapshot,
     PowerData,
     RamData,
@@ -22,6 +23,7 @@ from hwbench.models import (
 )
 
 NA = Text("non disponible", style="dim")
+NOT_SET = Text("non renseigné", style="dim")
 
 UNAVAILABLE_MESSAGES = {
     Unavailable.NEEDS_ROOT: "relancer avec sudo",
@@ -101,6 +103,8 @@ def render_cpu(cpu: CpuData) -> Panel:
     )
     governors = sorted({c.governor for c in cpu.per_cpu if c.governor})
     t.add_row("Governor", ", ".join(governors) if governors else NA)
+    if cpu.energy_performance_preference is not None:
+        t.add_row("EPP", cpu.energy_performance_preference)
     caches = [
         f"{name} {_cache(kb)}"
         for name, kb in (
@@ -247,6 +251,8 @@ def render_power(power: PowerData) -> Panel:
     t = _kv_table()
     ac = NA if power.on_ac is None else ("secteur" if power.on_ac else "batterie")
     t.add_row("Alimentation", ac)
+    if power.platform_profile is not None:
+        t.add_row("Profil plateforme", power.platform_profile)
     if not power.batteries:
         t.add_row("Batterie", Text("aucune", style="dim"))
     for b in power.batteries:
@@ -285,9 +291,16 @@ def _plain(value: object, suffix: str = "", fmt: str = "{}") -> str:
     return "?" if value is None else fmt.format(value) + suffix
 
 
+def _identifier(value: IdentifierValue) -> Text | str:
+    if isinstance(value, Unavailable):  # avant str : Unavailable est un StrEnum
+        if value is Unavailable.NEEDS_ROOT:
+            return Text("non lisible (relancer avec sudo)", style="yellow")
+        return NA
+    return value if value else NOT_SET
+
+
 def render_identifiers(ids: Identifiers) -> Panel:
     t = _kv_table()
-    missing = Text("non lisible (relancer avec sudo)", style="yellow")
     if ids.board is not None:
         for label, value in (
             ("Hostname", ids.board.hostname),
@@ -298,9 +311,10 @@ def render_identifiers(ids: Identifiers) -> Panel:
             ("Asset tag carte mère", ids.board.board_asset_tag),
             ("Asset tag châssis", ids.board.chassis_asset_tag),
         ):
-            t.add_row(label, value or missing)
+            t.add_row(label, _identifier(value))
+    # barrettes et disques viennent de dmidecode / smartctl (root) : présents = lisibles
     for m in ids.ram_modules or []:
-        t.add_row(f"RAM {m.slot or '?'}", m.serial or missing)
+        t.add_row(f"RAM {m.slot or '?'}", m.serial or NOT_SET)
     for d in ids.disks or []:
         details = [
             f"serial {d.serial}" if d.serial else None,
@@ -308,7 +322,7 @@ def render_identifiers(ids: Identifiers) -> Panel:
             f"EUI-64 {d.eui64}" if d.eui64 else None,
             f"NGUID {d.nguid}" if d.nguid else None,
         ]
-        t.add_row(f"Disque {d.name}", " · ".join(x for x in details if x) or missing)
+        t.add_row(f"Disque {d.name}", " · ".join(x for x in details if x) or NOT_SET)
     return Panel(
         t,
         title="Identifiants — affichage local uniquement, jamais exportés",

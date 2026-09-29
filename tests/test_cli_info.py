@@ -2,7 +2,7 @@ import json
 import re
 
 import pytest
-from conftest import sysfs_fixture
+from conftest import laptop_commands, laptop_sysfs, sysfs_fixture
 from rich.console import Console
 from typer.testing import CliRunner
 
@@ -62,6 +62,29 @@ def test_info_show_serials_displays_identifiers_locally(laptop) -> None:
     assert "FAKE-SYS-SERIAL" in result.output
     assert "FAKE-0005" in result.output
     assert "fake-host" in result.output
+
+
+def test_show_serials_as_root_empty_asset_tag_is_not_set(laptop) -> None:
+    """Régression : en root, un asset tag vide ne doit pas demander sudo."""
+    laptop(root=True)
+    result = runner.invoke(cli.app, ["info", "--show-serials"], env={"COLUMNS": "200"})
+    assert result.exit_code == 0, result.output
+    lines = {line.split("  ")[0].strip("│ "): line for line in result.output.splitlines()}
+    assert "non renseigné" in lines["Asset tag châssis"]
+    assert "sudo" not in lines["Asset tag châssis"]
+    assert "sudo" not in lines["Serial système"]
+
+
+def test_show_serials_without_root_asks_sudo_only_for_unreadable(fake_system) -> None:
+    serials = {f"/sys/class/dmi/id/{f}" for f in ("product_serial", "board_serial")}
+    files = {k: v for k, v in laptop_sysfs().items() if k not in serials}
+    fake_system(files=files, commands=laptop_commands(), unreadable=serials)
+    result = runner.invoke(cli.app, ["info", "--show-serials"], env={"COLUMNS": "200"})
+    assert result.exit_code == 0, result.output
+    lines = {line.split("  ")[0].strip("│ "): line for line in result.output.splitlines()}
+    assert "relancer avec sudo" in lines["Serial système"]
+    assert "FAKE-CHASSIS-SERIAL" in lines["Serial châssis"]
+    assert "non renseigné" in lines["Asset tag carte mère"]
 
 
 def test_info_on_bare_desktop_does_not_crash(fake_system) -> None:
@@ -154,3 +177,9 @@ def test_num(value: float, decimals: int, expected: str) -> None:
 def test_compact() -> None:
     assert compact(8.0) == "8"
     assert compact(8.5) == "8,5"
+
+
+def test_render_power_profile_only_when_present() -> None:
+    assert "Profil plateforme" not in _render(render_power(PowerData(on_ac=True)))
+    out = _render(render_power(PowerData(on_ac=True, platform_profile="performance")))
+    assert re.search(r"Profil plateforme +performance", out)

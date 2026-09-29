@@ -148,7 +148,14 @@ class LinuxCpuCollector(Collector[CpuData, None]):
             text = _exec.read_sysfs("/proc/cpuinfo")
             data = parse_proc_cpuinfo(text) if text else CpuData()
 
-        updates: dict[str, Any] = {"per_cpu": read_per_cpu_state()}
+        updates: dict[str, Any] = {
+            "per_cpu": read_per_cpu_state(),
+            # réglé par cœur mais uniforme en pratique : cpu0 suffit
+            "energy_performance_preference": _exec.read_sysfs(
+                f"{SYS_CPU}/cpu0/cpufreq/energy_performance_preference"
+            )
+            or None,
+        }
         if data.model is None:
             updates["model"] = _py_cpuinfo_brand()
         return ComponentResult(data=replace(data, **updates))
