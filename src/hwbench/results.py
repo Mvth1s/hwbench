@@ -67,6 +67,7 @@ class MachineState:
     platform_profile: str | None = None
     platform_profile_choices: list[str] = field(default_factory=list)
     energy_performance_preference: str | None = None
+    has_battery: bool | None = None  # False : desktop, secteur par construction
 
     def throttling_settings(self) -> list[str]:
         """Réglages d'énergie qui brident le CPU : noms des champs concernés, vide si aucun.

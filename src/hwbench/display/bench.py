@@ -107,6 +107,8 @@ def warning_message(
 def _power(state: MachineState) -> str:
     if state.on_ac is None:
         return "?"
+    if state.on_ac and state.has_battery is False:
+        return "secteur (pas de batterie)"
     return "secteur" if state.on_ac else "batterie"
 
 

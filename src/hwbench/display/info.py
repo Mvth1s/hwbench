@@ -252,7 +252,12 @@ def render_sensors(sensors: SensorsData) -> Panel:
 
 def render_power(power: PowerData) -> Panel:
     t = _kv_table()
-    ac = NA if power.on_ac is None else ("secteur" if power.on_ac else "batterie")
+    if power.on_ac is None:
+        ac: Text | str = NA
+    elif power.on_ac:
+        ac = "secteur" if power.batteries else "secteur (pas de batterie)"
+    else:
+        ac = "batterie"
     t.add_row("Alimentation", ac)
     if power.platform_profile is not None:
         t.add_row("Profil plateforme", power.platform_profile)

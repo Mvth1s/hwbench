@@ -31,6 +31,7 @@ def state_from(cpu: CpuData, power: PowerData, sensors: SensorsData) -> MachineS
         platform_profile=power.platform_profile,
         platform_profile_choices=list(power.platform_profile_choices),
         energy_performance_preference=cpu.energy_performance_preference,
+        has_battery=bool(power.batteries),
     )
 
 

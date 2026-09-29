@@ -73,7 +73,8 @@ def test_peripheral_battery_is_ignored(fake_system) -> None:
     )
     power = LinuxPowerCollector().collect().data
     assert power.batteries == []
-    assert power.on_ac is None
+    # batterie de souris seulement (cas du desktop B850) : pas de batterie système -> secteur
+    assert power.on_ac is True
 
 
 def test_labelled_fan(fake_system) -> None:
@@ -91,7 +92,7 @@ def test_labelled_fan(fake_system) -> None:
 def test_desktop_without_power_supply(fake_system) -> None:
     fake_system(files=sysfs_fixture("sysfs_desktop.json"))
     power = LinuxPowerCollector().collect().data
-    assert power.on_ac is None
+    assert power.on_ac is True
     assert power.batteries == []
 
 

@@ -179,6 +179,11 @@ def test_compact() -> None:
     assert compact(8.5) == "8,5"
 
 
+def test_render_power_desktop_without_battery() -> None:
+    out = _render(render_power(PowerData(on_ac=True)))
+    assert re.search(r"Alimentation +secteur \(pas de batterie\)", out)
+
+
 def test_render_power_profile_only_when_present() -> None:
     assert "Profil plateforme" not in _render(render_power(PowerData(on_ac=True)))
     out = _render(render_power(PowerData(on_ac=True, platform_profile="performance")))
