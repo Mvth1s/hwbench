@@ -5,7 +5,16 @@ from typing import Any
 
 import pytest
 
+from hwbench.benchmarks.native.workloads import Workload
 from hwbench.collectors.linux import _exec
+
+# Charges natives réduites : mêmes chemins de code, en quelques millisecondes.
+TINY = (
+    Workload("sha256", "MiB/s", size=64 * 1024, repeat=2),
+    Workload("zlib", "MiB/s", size=64 * 1024, repeat=1),
+    Workload("lzma", "MiB/s", size=16 * 1024, repeat=1),
+    Workload("powmod", "op/s", size=256, repeat=2),
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

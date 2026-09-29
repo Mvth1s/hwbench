@@ -1,11 +1,11 @@
 # hwbench
 
-Outil en ligne de commande pour Linux qui inventorie les composants d'une machine et, à terme,
-lance des benchmarks notés (CPU single-core, CPU multi-core, GPU, score combiné) pour comparer
-des machines entre elles.
+Outil en ligne de commande pour Linux qui inventorie les composants d'une machine et lance des
+benchmarks (CPU single-core, CPU multi-core, et à terme GPU et score combiné) pour comparer des
+machines entre elles.
 
-> État : phase 1. `hwbench info` est disponible ; les benchmarks, l'export et la comparaison
-> arrivent dans les phases suivantes.
+> État : phase 2. `hwbench info` et les benchmarks CPU natifs (`hwbench bench`) sont
+> disponibles ; backends externes, GPU, scoring, export et comparaison arrivent ensuite.
 
 ## Installation
 
@@ -71,6 +71,53 @@ Exemple (sans root) :
 │  Nom      Modèle                        Taille     Type  Bus   SMART         │
 │  nvme0n1  Samsung SSD 990 EVO Plus 1TB  931.5 Gio  SSD   nvme  relancer avec │
 │                                                                sudo          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+## Benchmarks
+
+```sh
+hwbench bench                          # toutes les catégories, tous les backends disponibles
+hwbench bench cpu-single               # une seule catégorie : cpu-single, cpu-multi, gpu, all
+hwbench bench cpu-multi --workers 4    # nombre de processus (défaut : CPU logiques)
+hwbench bench --backend native --runs 5
+```
+
+### Backend natif (CPU)
+
+Quatre charges déterministes, identiques sur toutes les machines, dont le temps est passé dans du
+code C (pour limiter l'effet de la version de Python) : SHA-256 (OpenSSL), compression zlib
+niveau 6, compression LZMA preset 1, exponentiation modulaire 2048 bits (entiers de CPython).
+Le score est la moyenne géométrique des débits des quatre charges ; le détail par charge est
+affiché. Le multi-cœur lance la même charge dans N processus (`multiprocessing`, pas de threads
+à cause du GIL) et additionne leurs débits. Les versions de Python, OpenSSL, zlib et liblzma
+sont relevées avec chaque résultat.
+
+### Fiabilité des mesures
+
+Chaque bench fait un warm-up puis au moins 3 runs ; le score est la médiane, l'écart-type est
+conservé. Le governor CPU, l'alimentation (secteur ou batterie) et la température CPU sont
+relevés avant et après. hwbench avertit, sans bloquer, si la machine est sur batterie, si le
+CPU dépasse 70 °C au départ, ou si les runs varient de plus de 5 %.
+
+Sur un portable, le multi-cœur est souvent instable : le CPU tient un turbo court (PL2) puis
+redescend à sa puissance soutenue (PL1). Laisser refroidir la machine et la brancher sur secteur
+avant de mesurer.
+
+```
+╭─ CPU single-core · native v1 ────────────────────────────────────────────────╮
+│ Score (médiane)  89,8 pts  ± 0,4 (CV 0,5 %)                                  │
+│ Runs             89,8 · 90,2 · 89,3  (+ 1 warm-up, 6,9 s au total)           │
+│ Governor         performance                                                 │
+│ Alimentation     secteur                                                     │
+│ Température CPU  70 °C avant → 71 °C après                                   │
+│  Charge                                   Médiane                            │
+│  SHA-256                             1624,2 Mio/s                            │
+│  Compression zlib (niveau 6)           79,2 Mio/s                            │
+│  Compression LZMA (preset 1)           12,0 Mio/s                            │
+│  Exponentiation modulaire 2048 bits     42,3 op/s                            │
+│ CPython 3.14.7 · OpenSSL 3.5.8 25 Aug 2026 · zlib 1.3.1.zlib-ng · liblzma    │
+│ 5.8.2                                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 

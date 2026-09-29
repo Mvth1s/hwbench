@@ -30,6 +30,7 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/pytest tests/test_collectors_disk.py::test_smart_health   # un seul test
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/hwbench info            # essai réel (sudo pour dmidecode/smartctl)
+.venv/bin/hwbench bench cpu-single   # ~7 s ; `bench` complet ~30 s
 ```
 
 ## Conventions établies (phase 1)
@@ -40,6 +41,9 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 - Les identifiants vivent dans `BoardIdentifiers`/`RamModuleIdentifiers`/`DiskIdentifiers`, agrégés dans `Identifiers`, jamais référencés par `MachineSnapshot`. `privacy.scrub()` est un filet appliqué à toute sortie JSON.
 - Affichage rich en français : nombres via `display/fmt.py` (`num`, `compact`, virgule décimale), libellés système traduits dans `display/` (ex. statut batterie). Les modèles et le JSON gardent les valeurs brutes (nombres standard, dates ISO, statuts sysfs en anglais). Les libellés fabricant (nom CPU, version OpenGL) ne sont jamais reformatés.
 - Fabricants RAM : `collectors/jedec.py` (indépendant de l'OS) décode les codes JEP106 ; code brut conservé si inconnu.
+- Benchmarks (phase 2) : `Benchmark.run()` renvoie **une** `Measurement` ; `runner.run_benchmark` fait warm-up + runs (≥ 3), médiane, écart-type, avertissements, et relève l'état via `machine_state.capture_state` (seul pont vers les collecteurs). Modèles dans `results.py` ; avertissements stockés en codes (`BenchWarning`), traduits dans `display/bench.py`.
+- Bench natif : une classe par catégorie (`native-cpu-single`, `native-cpu-multi`), score = moyenne géométrique des débits des charges de `benchmarks/native/workloads.py`. Toute modification d'une charge change l'empreinte testée dans `tests/test_native_cpu.py` : incrémenter `NATIVE_CPU_VERSION` et mettre à jour l'empreinte. Multi-cœur : `multiprocessing` en `spawn`, barrière pour exclure démarrage et préparation du chrono, les charges passées en argument aux workers.
+- Tests des benchs : `conftest.TINY` (charges minuscules) ; patcher `cpu.WORKLOADS` et `cli.capture_state`.
 - Donnée absente = `None`. Quand la cause compte pour l'utilisateur, le modèle porte un `Unavailable` (`NEEDS_ROOT`, `TOOL_MISSING`, `NO_DATA`) ; l'affichage traduit, il n'interroge jamais le système.
 - Tests : `tests/conftest.py` fournit `FakeSystem` (fixtures `fake_system`, `laptop`) qui remplace `_exec` à partir de `tests/fixtures/`. Les fichiers `sysfs_*.json` sont des arborescences `chemin -> contenu`.
 - Fixtures réelles : `scripts/capture_fixtures.sh` (lancé par l'utilisateur, sans sudo devant) écrit `tests/fixtures/<fabricant-modèle>/` anonymisé ; `tests/test_real_fixtures.py` rejoue les collecteurs sur chaque dossier avec des assertions génériques. Les fixtures écrites à la main à la racine de `tests/fixtures/` ne servent qu'aux cas limites (desktop, SATA en échec, smartctl < 7.0, dmidecode < 3.7 en « GB »).
