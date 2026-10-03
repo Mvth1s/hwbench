@@ -182,3 +182,10 @@ def test_upfront_hot_threshold_uses_option(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(cli, "capture_state", lambda: warm)
     result = runner.invoke(cli.app, ["bench", "cpu-single", "--hot-start", "60"], env=WIDE)
     assert "CPU déjà chaud au départ (65 °C)" in result.output
+
+
+def test_tool_error_text_is_not_rich_markup(fake_tools) -> None:
+    fake_tools(failing={"sysbench": "[/boom] FATAL: invalid option"})
+    result = runner.invoke(cli.app, ["bench", "cpu-single", "--backend", "sysbench"], env=WIDE)
+    assert result.exit_code == 1  # aucun résultat, mais pas de MarkupError
+    assert "[/boom] FATAL: invalid option" in result.output

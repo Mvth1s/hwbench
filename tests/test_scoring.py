@@ -1,10 +1,12 @@
 import json
 import math
+import re
 from datetime import UTC, datetime
 
 import pytest
 from conftest import make_result
 
+from hwbench import privacy
 from hwbench.models import (
     BoardData,
     CpuData,
@@ -236,3 +238,16 @@ def test_reference_payload_content() -> None:
 def test_invalid_reference_is_rejected(broken: dict) -> None:
     with pytest.raises(ReferenceError):
         reference_from_dict(broken)
+
+
+def test_reference_digest_identifies_content_not_formatting() -> None:
+    data = payload()
+    same = json.loads(json.dumps(data, indent=4))
+    other = payload(["power_unknown"])
+    assert reference_from_dict(data).digest == reference_from_dict(same).digest
+    assert reference_from_dict(data).digest != reference_from_dict(other).digest
+    digest = reference_from_dict(data).digest
+    assert re.fullmatch(r"sha256:[0-9a-f]{12}", digest)
+    assert privacy.scrub(digest) == digest
+    info = reference_from_dict(data).info()
+    assert (info.machine, info.digest) == ("Dell Inc. Latitude 5420", digest)

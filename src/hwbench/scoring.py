@@ -12,6 +12,7 @@ Règles :
   lui et le signale ; un GPU mesuré mais non comparable rend le combiné non comparable.
 """
 
+import hashlib
 import json
 import math
 from collections.abc import Iterable, Mapping
@@ -58,12 +59,29 @@ class ReferenceEntry:
 
 
 @dataclass(frozen=True)
+class ReferenceInfo:
+    """Ce qu'un export retient de la référence : de quoi savoir si deux scores ont la même base."""
+
+    machine: str
+    created: str
+    forced: bool
+    forced_reasons: list[str]
+    digest: str  # empreinte du contenu : deux références différentes ne se comparent pas
+
+
+@dataclass(frozen=True)
 class Reference:
     machine: str
     created: str
     forced: bool
     forced_reasons: list[str]
     entries: list[ReferenceEntry]
+    digest: str = ""
+
+    def info(self) -> ReferenceInfo:
+        return ReferenceInfo(
+            self.machine, self.created, self.forced, list(self.forced_reasons), self.digest
+        )
 
     def find(self, name: str) -> ReferenceEntry | None:
         return next((e for e in self.entries if e.id.name == name), None)
@@ -108,6 +126,13 @@ class Scores:
 # --- Référence -------------------------------------------------------------------------
 
 
+def reference_digest(payload: Mapping[str, Any]) -> str:
+    """12 caractères hexadécimaux : assez pour distinguer deux références, et trop court pour
+    que privacy.scrub le prenne pour un EUI-64 (16 ou 32)."""
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()[:12]
+
+
 def reference_from_dict(payload: Mapping[str, Any]) -> Reference:
     if payload.get("schema_version") != REFERENCE_SCHEMA_VERSION:
         raise ReferenceError(
@@ -132,6 +157,7 @@ def reference_from_dict(payload: Mapping[str, Any]) -> Reference:
             forced=bool(payload.get("forced", False)),
             forced_reasons=[str(r) for r in payload.get("forced_reasons", [])],
             entries=entries,
+            digest=reference_digest(payload),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ReferenceError(f"fichier de référence invalide : {exc}") from exc

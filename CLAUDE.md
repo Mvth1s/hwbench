@@ -74,6 +74,13 @@ CI (`.github/workflows/ci.yml`) : ruff + pytest sur Python 3.11 à 3.14 (ubuntu-
 - Fixtures réelles : `scripts/capture_fixtures.sh` (lancé par l'utilisateur, sans sudo devant) écrit `tests/fixtures/<fabricant-modèle>/` anonymisé ; `tests/test_real_fixtures.py` rejoue les collecteurs sur chaque dossier avec des assertions génériques. Les fixtures écrites à la main à la racine de `tests/fixtures/` ne servent qu'aux cas limites (desktop, SATA en échec, smartctl < 7.0, dmidecode < 3.7 en « GB »).
 - Fixtures : repo public. Tout serial/UUID/asset tag doit contenir `FAKE`, valoir l'UUID nul, ou un id numérique à 0. `tests/test_fixtures_privacy.py` le vérifie, et vérifie aussi qu'aucun identifiant de la machine qui lance les tests n'apparaît dans les fixtures.
 
+## Conventions établies (phase 4)
+
+- Export (`export.py`) : `MachineExport` (schéma `EXPORT_SCHEMA_VERSION` = 1), écrit via `privacy.scrub`, relu en dataclasses par un désérialiseur générique (`_build` : dataclasses, listes, dicts à clés d'enum, unions, enums) avec erreurs explicites nommant le fichier. Changer la forme d'un modèle exporté = incrémenter `EXPORT_SCHEMA_VERSION`. `hwbench export` lance les benchs (même session que `bench`, `_bench_session`) puis écrit le fichier.
+- Référence dans l'export : `ReferenceInfo` avec `digest` (`sha256:` + 12 hex du JSON canonique ; 12 et pas 16/32 pour ne pas être masqué par `privacy.scrub`).
+- Compare (`compare.py`, logique pure ; `display/compare.py`, rendu) : premier fichier = base. Écart d'un bench seulement si même `BackendId` ; écart d'un score seulement si même empreinte de référence, même liste de backends et, pour le combiné, mêmes pondérations. Sinon la cellule garde sa valeur et porte une raison (`Incomparable`).
+- Balisage rich : tout texte venu d'un fichier, du firmware ou d'un outil externe est affiché via `rich.text.Text` (ou une console `markup=False`, cas de `info`), jamais dans une chaîne interprétée : « [/x] » ferait planter rich (`MarkupError`), « [link=…] » injecterait un lien. Seuls les messages fixes du CLI utilisent du balisage.
+
 ## Architecture
 
 ```
@@ -95,7 +102,8 @@ src/hwbench/
 ├── machine_state.py    # governor, secteur, température : seul pont benchmarks -> collecteurs
 ├── scoring.py          # normalisation (référence = 1000), catégories, score combiné pondéré
 ├── privacy.py          # filtrage des identifiants
-├── export.py           # (phase 4) export/import JSON versionné
+├── export.py           # export JSON versionné et relecture en dataclasses
+├── compare.py          # comparaison d'exports (cellules, écarts, raisons de non-comparabilité)
 ├── reference.py        # contrôles et génération du fichier de référence
 ├── data/reference.json # référence du scoring (package data, générée)
 └── cli.py
