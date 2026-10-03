@@ -41,6 +41,10 @@ scripts/capture_tool_fixtures.sh     # bash : sorties réelles de sysbench/glmar
 Git : une branche par phase (ou lot de corrections) depuis `dev`, un commit par fonction
 ajoutée ou modifiée, merge dans `dev` à la fin. Ne pas réécrire l'historique déjà poussé.
 
+Commits : **conventional commits** depuis `3a07904` (`feat:`, `fix:`, `docs:`, `test:`, `ci:`, `refactor:`, `chore:`), en anglais. Pas de pied `BREAKING CHANGE` sans décision explicite (en 0.x, `major_on_zero = false` le garde en mineure, mais il change le message de release). `.github/workflows/commitlint.yml` vérifie les commits des PR depuis `max(base, CONVENTIONAL_SINCE)` (les commits antérieurs à la convention ne sont pas vérifiés).
+
+Release : `.github/workflows/release.yml`, python-semantic-release sur push de `main` (config `[tool.semantic_release]` du `pyproject.toml`) : version dans `pyproject.toml` et `src/hwbench/__init__.py`, `CHANGELOG.md` (mode `update`, insertion au marqueur `<!-- version list -->`, l'historique antérieur aux conventional commits reste dessous), commit `chore(release): X.Y.Z`, tag `vX.Y.Z`, GitHub Release + wheel/sdist. Après une release, fusionner `main` dans `dev` (le commit de release n'existe que sur `main`). Captures du README : `scripts/readme_screenshots.py`.
+
 CI (`.github/workflows/ci.yml`) : ruff + pytest sur Python 3.11 à 3.14 (ubuntu-latest). Pas d'installation de Python supplémentaire en local (pas de `uv python install`) : la compatibilité 3.11 est vérifiée par la CI.
 
 ## Conventions établies (phase 1)
