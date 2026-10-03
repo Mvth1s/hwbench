@@ -147,3 +147,35 @@ def test_export_without_reference_has_no_points() -> None:
     assert score_row(c, Category.CPU_SINGLE).cells[1].issue is Incomparable.NO_REFERENCE
     # les benchs bruts restent comparables, eux
     assert row(c, "native-cpu-single").cells[1].delta_percent == pytest.approx(100.0)
+
+
+def with_driver(results: list[Result], driver: str | None) -> list[Result]:
+    env = {"driver": driver} if driver else {}
+    return [replace(r, environment=env) if r.name == "glmark2" else r for r in results]
+
+
+def test_other_gpu_driver_is_flagged_but_still_compared() -> None:
+    a = with_driver(machine(1.0), "Mesa 26.2.3-arch1.1")
+    b = with_driver(machine(1.1), "Mesa 26.2.4-arch1.1")
+    c = compare([export(a), export(b)])
+    glmark2 = row(c, "glmark2")
+    assert glmark2.drivers == ["Mesa 26.2.3-arch1.1", "Mesa 26.2.4-arch1.1"]
+    assert glmark2.cells[1].delta_percent == pytest.approx(10.0)  # écart calculé quand même
+    assert [(w.code, w.subject, w.values) for w in c.warnings] == [
+        (
+            CompareWarning.DRIVER_DIFFERS,
+            "glmark2",
+            ["Mesa 26.2.3-arch1.1", "Mesa 26.2.4-arch1.1"],
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [("Mesa 26.2.3-arch1.1", "Mesa 26.2.3-arch1.1"), ("Mesa 26.2.3-arch1.1", None)],
+)
+def test_same_or_unknown_driver_is_not_flagged(first, second) -> None:
+    c = compare(
+        [export(with_driver(machine(1.0), first)), export(with_driver(machine(1.0), second))]
+    )
+    assert c.warnings == []
