@@ -291,8 +291,10 @@ def export(
     hot_start: HotStartOption = DEFAULTS.hot_start_c,
     weights: WeightsOption = None,
 ) -> None:
-    """Lance les benchmarks et exporte composants, résultats et scores en JSON (sans
-    identifiant), pour `hwbench compare`."""
+    """Lance les benchmarks et exporte le tout en JSON pour `hwbench compare`.
+
+    L'export contient les composants (sans aucun identifiant), les résultats et les scores.
+    """
     console = Console()
     settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start)
     results, scores = _bench_session(console, target, backend, settings, workers, weights)
@@ -333,8 +335,11 @@ def reference(
     workers: WorkersOption = None,
     max_warmup: MaxWarmupOption = None,
 ) -> None:
-    """Mesure la machine de référence (= 1000 points) : secteur, profil performance, régime
-    soutenu. Refuse d'écrire le fichier si une condition n'est pas remplie, sauf --force."""
+    """Mesure la machine de référence du scoring (= 1000 points).
+
+    Exige secteur, profil d'énergie « performance » et warm-up stabilisé ; sinon refuse
+    d'écrire le fichier, sauf --force (noté dans le fichier).
+    """
     console = Console()
     initial = capture_state()
     before = state_issues(initial)
