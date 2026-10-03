@@ -111,7 +111,7 @@ def render_scores(scores: Scores) -> Panel:
         )
     return Panel(
         Group(*parts),
-        title=f"Scores · référence {ref.machine} = 1000 pts",
+        title=Text(f"Scores · référence {ref.machine} = 1000 pts"),
         title_align="left",
     )
 

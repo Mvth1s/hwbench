@@ -6,6 +6,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.text import Text
 
 from hwbench import privacy
 from hwbench.benchmarks.base import BenchOptions, known_backends, select
@@ -155,7 +156,8 @@ def _run_all(
             console.print("[red]Interrompu.[/red]")
             raise typer.Exit(code=130) from None
         except RuntimeError as exc:
-            console.print(f"[red]{label} : échec, ignoré. {exc}[/red]")
+            # la fin de stderr d'un outil externe : jamais interprétée comme balisage rich
+            console.print(Text(f"{label} : échec, ignoré. {exc}", style="red"))
             continue
         console.print(render_result(result))
         results.append(result)

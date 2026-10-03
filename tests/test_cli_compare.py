@@ -105,3 +105,24 @@ def test_export_then_compare_end_to_end(fake_runs, monkeypatch, tmp_path) -> Non
     # mêmes valeurs simulées des deux côtés : écart nul
     assert has_row(result.output, "native-cpu-multi", "100,0 indice brut", "100,0 [^│]*0,0 %")
     assert has_row(result.output, "Score combiné", "500 pts", "500 pts  0,0 %")
+
+
+def test_markup_in_an_export_is_shown_literally(tmp_path) -> None:
+    """Un export vient peut-être d'ailleurs : son texte n'est jamais du balisage rich."""
+    evil = export(
+        [
+            replace(r, name="[/evil]", version="9") if r.name == "vkmark" else r
+            for r in machine(1.0)
+        ],
+        "[link=https://evil.example]Mon PC[/link]",
+    )
+    evil = replace(
+        evil, snapshot=replace(evil.snapshot, cpu=replace(evil.snapshot.cpu, model="[/oops]"))
+    )
+    base = export([replace(r, name="[/evil]") if r.name == "vkmark" else r for r in machine(1.0)])
+    result = invoke(write(tmp_path, "[bold]base", base), write(tmp_path, "evil", evil))
+    assert result.exit_code == 0, result.output
+    out = result.output
+    assert "[link=https://evil.example]Mon PC[/link]" in out
+    assert "[/oops]" in out and "[bold]base (base)" in out
+    assert "[/evil] : version du bench" in out  # nom de bench repris dans l'avertissement

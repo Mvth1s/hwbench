@@ -39,11 +39,16 @@ def _cell(cell: Cell, text: str) -> Text:
     return out
 
 
+# Les exports peuvent venir d'une autre machine : tout texte qui en est tiré (noms, modèles,
+# noms de fichiers) passe par Text, que rich n'interprète jamais comme du balisage
+# (« [link=…] », « [/x] » qui lèverait MarkupError).
+
+
 def _table(labels: list[str], first: str) -> Table:
     t = Table(header_style="bold", show_lines=False)
     t.add_column(first, style="bold cyan", no_wrap=True)
     for i, label in enumerate(labels):
-        t.add_column(f"{label}" + (" (base)" if i == 0 else ""))
+        t.add_column(Text(label + (" (base)" if i == 0 else "")))
     return t
 
 
@@ -78,7 +83,7 @@ def render_machines(comparison: Comparison, labels: list[str]) -> Table:
         ),
     ]
     for label, values in rows:
-        t.add_row(label, *values)
+        t.add_row(label, *(Text(v) for v in values))
     return t
 
 
@@ -94,7 +99,7 @@ def render_bench_rows(comparison: Comparison, labels: list[str]) -> Table:
     t = _table(labels, "Bench (valeur brute)")
     for row in comparison.benches:
         unit = UNIT_LABELS.get(row.unit, row.unit)
-        t.add_row(row.name, *(_cell(c, f"{measure(c.value or 0)} {unit}") for c in row.cells))
+        t.add_row(Text(row.name), *(_cell(c, f"{measure(c.value or 0)} {unit}") for c in row.cells))
     return t
 
 
