@@ -34,5 +34,5 @@ jobs:
             FROM="$CONVENTIONAL_SINCE"
           fi
           echo "Commits vérifiés : $FROM..$HEAD"
-          npx --yes -p @commitlint/cli@21 -p @commitlint/config-conventional@21 \
+          npx --yes -p @commitlint/cli@21.2.3 -p @commitlint/config-conventional@21.2.3 \
             commitlint --from "$FROM" --to "$HEAD" --verbose
