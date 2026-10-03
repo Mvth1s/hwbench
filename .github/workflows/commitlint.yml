@@ -1,0 +1,38 @@
+name: Commitlint
+
+# Conventional commits sur les PR uniquement (pas de hook local obligatoire).
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  # Adoption des conventional commits : les commits antérieurs (déjà dans dev) ne sont pas
+  # vérifiés. C'est le merge de la phase 4 dans dev, parent du premier commit conventionnel.
+  CONVENTIONAL_SINCE: 3a079048a8d1bfbf0e625be1abe123aab2a88ffd
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Vérifier les messages de commit de la PR
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # depuis la base de la PR, ou depuis l'adoption si la base est plus ancienne
+          if git merge-base --is-ancestor "$CONVENTIONAL_SINCE" "$BASE"; then
+            FROM="$BASE"
+          else
+            FROM="$CONVENTIONAL_SINCE"
+          fi
+          echo "Commits vérifiés : $FROM..$HEAD"
+          npx --yes -p @commitlint/cli@21 -p @commitlint/config-conventional@21 \
+            commitlint --from "$FROM" --to "$HEAD" --verbose
