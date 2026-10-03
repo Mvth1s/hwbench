@@ -205,8 +205,8 @@ unité. Les points viennent du scoring, ci-dessous.
 ## Scoring
 
 Chaque bench est normalisé par rapport à la machine de référence, qui vaut **1000 points** : un
-desktop ASRock B850 Riptide WiFi (AMD Ryzen 7 8700F, Radeon RX 9070 XT, EndeavourOS, Mesa
-26.2.3), mesuré en régime soutenu. Choisi parce que ses mesures sont stables (CV ≤ 1,3 %), qu'il
+desktop ASRock B850 Riptide WiFi (AMD Ryzen 7 8700F, Radeon RX 9070 XT, EndeavourOS), mesuré
+en régime soutenu (référence actuelle mesurée avec Mesa 26.2.3). Choisi parce que ses mesures sont stables (CV ≤ 1,3 %), qu'il
 n'a ni batterie ni profil d'énergie à surveiller, qu'il reste disponible pour régénérer la
 référence, et qu'il a le même environnement d'outils que les fixtures de test.
 
@@ -239,9 +239,15 @@ tournant :
 .venv/bin/hwbench reference -o src/hwbench/data/reference.json
 ```
 
-À refaire quand la version d'un bench change (un test l'impose) ou quand l'une de ses
-conditions change sur le desktop : version de sysbench, glmark2 ou vkmark, pilote Mesa.
-Un résultat mesuré avec une autre version d'outil que la référence est déclaré non comparable.
+À refaire seulement quand ce qui fait l'identité d'un bench change : version du protocole
+hwbench (un test l'impose) ou version de l'outil (sysbench, glmark2, vkmark) installée sur le
+desktop. Un résultat mesuré avec une autre version d'outil que la référence est déclaré non
+comparable.
+
+Le pilote GPU (Mesa, RADV…) n'en fait pas partie : il change trop souvent (à chaque mise à
+jour sur une distribution rolling comme Arch). Il reste relevé à titre d'information, et
+`hwbench bench` comme `hwbench compare` affichent un avertissement non bloquant quand il
+diffère, la mesure restant notée et comparée.
 
 La commande refuse d'écrire le fichier si la machine n'est pas sur secteur, si le profil
 d'énergie n'est pas « performance » (vérifié avant les mesures) ou si un warm-up ne se
