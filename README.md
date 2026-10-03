@@ -4,8 +4,8 @@ Outil en ligne de commande pour Linux qui inventorie les composants d'une machin
 benchmarks notés (CPU single-core, CPU multi-core, GPU et score combiné) pour comparer des
 machines entre elles.
 
-> État : phase 3. `hwbench info`, les benchmarks natifs et externes (sysbench, glmark2, vkmark),
-> `hwbench backends` et le scoring sont disponibles ; export JSON et `compare` arrivent ensuite.
+> État : phase 4. `hwbench info`, les benchmarks natifs et externes (sysbench, glmark2, vkmark),
+> `hwbench backends`, le scoring, l'export JSON et `hwbench compare` sont disponibles.
 
 ## Installation
 
@@ -234,6 +234,55 @@ d'énergie n'est pas « performance » (vérifié avant les mesures) ou si un wa
 stabilise pas (vérifié après). `--force` passe outre et l'inscrit dans le fichier
 (`forced_reasons`), ce que `hwbench bench` rappelle ensuite. Tant que le fichier n'existe pas,
 `hwbench bench` affiche les valeurs brutes, sans points.
+
+## Export et comparaison
+
+```sh
+hwbench export -o desktop.json                   # benchs + export (mêmes options que bench)
+hwbench export -o portable.json --backend native
+hwbench compare desktop.json portable.json [autre.json…]   # le premier fichier sert de base
+```
+
+`export` lance les benchmarks comme `bench` (mêmes options), affiche les mêmes résultats, puis
+écrit un fichier JSON versionné : `schema_version`, date ISO, modèle de la machine, composants
+(sans aucun identifiant, et passés par le filtre `privacy.py`), résultats complets (runs, burst,
+état machine, versions d'outils), scores et empreinte de la référence utilisée.
+
+`compare` affiche les fichiers côte à côte : machines, points par catégorie et combiné, valeurs
+brutes de chaque bench, avec l'écart en pourcentage par rapport au premier fichier (vert si
+meilleur, rouge si moins bon). Rien n'est comparé à peu près :
+
+- un bench n'a d'écart que si son identité est la même dans les deux fichiers (version du
+  protocole, version de l'outil, mode de présentation) ; sinon « non comparé (version
+  différente) » et un avertissement ;
+- un score de catégorie ou le combiné n'a d'écart que si les deux fichiers ont été notés contre
+  la même référence (même empreinte) avec la même liste de backends (et, pour le combiné, les
+  mêmes pondérations) ;
+- un export sans référence garde ses valeurs brutes comparables, mais pas de points.
+
+Les fichiers à comparer peuvent venir d'autres machines : leur texte est affiché tel quel, jamais
+interprété comme du balisage.
+
+Deux exports successifs du desktop de référence (backend natif seul) :
+
+```
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
+┃ Score (points)  ┃ run1 (base) ┃ run2            ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
+│ CPU single-core │ 965 pts     │ 976 pts  +1,2 % │
+│ CPU multi-core  │ 978 pts     │ 983 pts  +0,5 % │
+│ Score combiné   │ 971 pts     │ 980 pts  +0,9 % │
+└─────────────────┴─────────────┴─────────────────┘
+┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Bench (valeur brute) ┃ run1 (base)        ┃ run2                       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ native-cpu-single    │ 118,4 indice brut  │ 119,8 indice brut  +1,2 %  │
+│ native-cpu-multi     │ 1098,2 indice brut │ 1103,9 indice brut  +0,5 % │
+└──────────────────────┴────────────────────┴────────────────────────────┘
+```
+
+(Un premier tableau, non reproduit ici, liste les machines : modèle, CPU, GPU, RAM, date,
+version de hwbench et référence.)
 
 ## Dépendances système optionnelles
 
