@@ -82,6 +82,14 @@ def _combined_row(t: Table, c: CombinedScore) -> None:
     t.add_row("", Text(f"pondération : {weights}", style="dim"))
 
 
+def driver_notice(bench: str, driver: str | None, reference_driver: str | None) -> str:
+    """Pilote GPU différent : information, jamais bloquant (le pilote n'est pas dans BackendId)."""
+    return (
+        f"⚠ {bench} : pilote {driver} (référence : {reference_driver}). Score calculé quand "
+        "même ; un changement de pilote peut faire varier le résultat."
+    )
+
+
 def render_scores(scores: Scores) -> Panel:
     ref = scores.reference
     t = Table.grid(padding=(0, 2))
@@ -102,6 +110,11 @@ def render_scores(scores: Scores) -> Panel:
     parts: list[Table | Text] = [t]
     if scores.combined is not None and scores.combined.gpu_missing:
         parts.append(Text("⚠ Score combiné calculé sans GPU (non mesuré).", style="yellow"))
+    parts += [
+        Text(driver_notice(s.backend.name, s.driver, s.reference_driver), style="yellow")
+        for s in scores.backends
+        if s.driver_differs
+    ]
     if ref.forced:
         parts.append(
             Text(
