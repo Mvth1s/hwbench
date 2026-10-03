@@ -7,13 +7,25 @@ machines entre elles.
 > État : phase 4. `hwbench info`, les benchmarks natifs et externes (sysbench, glmark2, vkmark),
 > `hwbench backends`, le scoring, l'export JSON et `hwbench compare` sont disponibles.
 
+![hwbench info](docs/images/info.svg)
+
 ## Installation
 
-Python 3.11 ou plus récent.
+Python 3.11 ou plus récent, Linux. Avec [pipx](https://pipx.pypa.io/) (environnement isolé,
+commande `hwbench` dans le `PATH`) :
 
 ```sh
-pipx install .
+pipx install git+https://github.com/Mvth1s/hwbench              # dernière version de main
+pipx install git+https://github.com/Mvth1s/hwbench@v0.1.0       # une version publiée
+pipx upgrade hwbench
 ```
+
+Depuis un clone du dépôt : `pipx install .`. Les outils système optionnels (dmidecode, smartctl,
+sysbench, glmark2, vkmark…) sont listés plus bas ; aucun n'est obligatoire.
+
+Les versions publiées (tag, changelog, wheel et sdist) sont sur la page
+[Releases](https://github.com/Mvth1s/hwbench/releases) ; l'historique est dans
+[CHANGELOG.md](CHANGELOG.md).
 
 Pour développer :
 
@@ -87,6 +99,8 @@ hwbench bench --max-cv 3 --hot-start 60    # seuils des avertissements (défaut 
 hwbench bench --weights cpu-single=1,cpu-multi=2,gpu=1   # pondération du score combiné
 hwbench backends                       # backends disponibles et commande d'installation
 ```
+
+![hwbench bench --backend native](docs/images/bench.svg)
 
 ### Backend natif (CPU)
 
@@ -265,24 +279,10 @@ interprété comme du balisage.
 
 Deux exports successifs du desktop de référence (backend natif seul) :
 
-```
-┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
-┃ Score (points)  ┃ run1 (base) ┃ run2            ┃
-┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
-│ CPU single-core │ 965 pts     │ 976 pts  +1,2 % │
-│ CPU multi-core  │ 978 pts     │ 983 pts  +0,5 % │
-│ Score combiné   │ 971 pts     │ 980 pts  +0,9 % │
-└─────────────────┴─────────────┴─────────────────┘
-┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Bench (valeur brute) ┃ run1 (base)        ┃ run2                       ┃
-┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ native-cpu-single    │ 118,4 indice brut  │ 119,8 indice brut  +1,2 %  │
-│ native-cpu-multi     │ 1098,2 indice brut │ 1103,9 indice brut  +0,5 % │
-└──────────────────────┴────────────────────┴────────────────────────────┘
-```
+![hwbench compare](docs/images/compare.svg)
 
-(Un premier tableau, non reproduit ici, liste les machines : modèle, CPU, GPU, RAM, date,
-version de hwbench et référence.)
+Les captures sont générées à partir de la vraie sortie des commandes par
+`scripts/readme_screenshots.py` (`info`, `bench`, `compare A B`).
 
 ## Dépendances système optionnelles
 
@@ -301,6 +301,15 @@ Aucune n'est obligatoire : si un outil manque, le champ correspondant est affich
 | `sysbench` | bench CPU externe | `sudo dnf install sysbench` | `sudo apt install sysbench` |
 | `glmark2` | bench GPU OpenGL | `sudo dnf install glmark2` | `sudo apt install glmark2-wayland glmark2-x11` |
 | `vkmark` | bench GPU Vulkan | `sudo dnf install vkmark` | `sudo apt install vkmark` |
+
+## Contribuer et versions
+
+Les messages de commit suivent les [conventional commits](https://www.conventionalcommits.org/)
+(`feat: …`, `fix: …`, `docs: …`, `ci: …`), vérifiés par commitlint sur chaque pull request.
+Chaque push sur `main` lance [python-semantic-release](https://python-semantic-release.readthedocs.io/),
+qui déduit la version de ces messages (`fix` → correctif, `feat` → mineure), met à jour
+`pyproject.toml` et `CHANGELOG.md`, crée le tag `vX.Y.Z` et la GitHub Release avec la wheel
+et le sdist. Le développement se fait sur `dev`, les releases par pull request `dev` → `main`.
 
 ## Vie privée
 
