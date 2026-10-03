@@ -19,7 +19,8 @@ from hwbench.models import MachineSnapshot
 from hwbench.results import Result
 from hwbench.scoring import BackendScore, CategoryScore, CombinedScore, ReferenceInfo, Scores
 
-EXPORT_SCHEMA_VERSION = 1
+# 2 : empreinte de référence complète (sha256, 64 hex) au lieu de 12 caractères
+EXPORT_SCHEMA_VERSION = 2
 
 
 class ExportError(ValueError):
