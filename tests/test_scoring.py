@@ -5,8 +5,10 @@ from datetime import UTC, datetime
 
 import pytest
 from conftest import make_result
+from rich.console import Console
 
 from hwbench import privacy
+from hwbench.display.scores import render_scores
 from hwbench.models import (
     BoardData,
     CpuData,
@@ -251,3 +253,43 @@ def test_reference_digest_identifies_content_not_formatting() -> None:
     assert privacy.scrub(digest) == digest
     info = reference_from_dict(data).info()
     assert (info.machine, info.digest) == ("Dell Inc. Latitude 5420", digest)
+
+
+def _glmark2(value: float, driver: str | None) -> Result:
+    env = {"driver": driver} if driver else {}
+    return make_result("glmark2", value, version="2", environment=env, **GLMARK2)
+
+
+@pytest.mark.parametrize(
+    ("ours", "theirs", "differs"),
+    [
+        ("Mesa 26.2.4-arch1.1", "Mesa 26.2.3-arch1.1", True),
+        ("Mesa 26.2.3-arch1.1", "Mesa 26.2.3-arch1.1", False),
+        (None, "Mesa 26.2.3-arch1.1", False),  # pilote inconnu : rien à signaler
+        ("Mesa 26.2.4-arch1.1", None, False),
+    ],
+)
+def test_gpu_driver_is_information_not_identity(ours, theirs, differs) -> None:
+    reference = reference_from_dict(build_reference([_glmark2(2000.0, theirs)], snapshot(), []))
+    assert reference.find("glmark2").driver == theirs
+    score = normalize(_glmark2(3000.0, ours), reference)
+    # noté quel que soit le pilote : seul BackendId décide de la comparabilité
+    assert (score.points, score.issue) == (pytest.approx(1500), None)
+    assert (score.driver, score.reference_driver) == (ours, theirs)
+    assert score.driver_differs is differs
+
+
+def test_scores_panel_warns_about_another_driver() -> None:
+    reference = reference_from_dict(
+        build_reference([_glmark2(2000.0, "Mesa 26.2.3-arch1.1")], snapshot(), [])
+    )
+    scores = score_results([_glmark2(2000.0, "Mesa 26.2.4-arch1.1")], reference)
+    console = Console(width=200, record=True)
+    console.print(render_scores(scores))
+    out = console.export_text()
+    assert "1000 pts" in out
+    assert "glmark2 : pilote Mesa 26.2.4-arch1.1 (référence : Mesa 26.2.3-arch1.1)" in out
+    same = score_results([_glmark2(2000.0, "Mesa 26.2.3-arch1.1")], reference)
+    console = Console(width=200, record=True)
+    console.print(render_scores(same))
+    assert "pilote" not in console.export_text()

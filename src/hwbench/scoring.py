@@ -56,6 +56,8 @@ class ReferenceEntry:
     unit: str
     higher_is_better: bool
     value: float
+    # pilote GPU de la référence (« Mesa 26.2.3-arch1.1 ») : information, hors BackendId
+    driver: str | None = None
 
 
 @dataclass(frozen=True)
@@ -95,6 +97,19 @@ class BackendScore:
     points: float | None
     issue: ScoreIssue | None = None
     reference_backend: BackendId | None = None  # ce que contient la référence, si différent
+    # Pilote GPU mesuré / de la référence. Hors identité : un autre pilote n'empêche pas de
+    # noter (sinon chaque mise à jour de Mesa imposerait de régénérer la référence), il est
+    # seulement signalé.
+    driver: str | None = None
+    reference_driver: str | None = None
+
+    @property
+    def driver_differs(self) -> bool:
+        return (
+            self.driver is not None
+            and self.reference_driver is not None
+            and self.driver != self.reference_driver
+        )
 
 
 @dataclass(frozen=True)
@@ -147,6 +162,7 @@ def reference_from_dict(payload: Mapping[str, Any]) -> Reference:
                 unit=b["unit"],
                 higher_is_better=bool(b["higher_is_better"]),
                 value=float(b["value"]),
+                driver=(b.get("environment") or {}).get("driver"),
             )
             for b in payload["benchmarks"]
         ]
@@ -187,6 +203,7 @@ def normalize(result: Result, reference: Reference) -> BackendScore:
     entry = reference.find(ours.name)
     if entry is None:
         return BackendScore(ours, result.category, official, None, ScoreIssue.NOT_IN_REFERENCE)
+    drivers = {"driver": result.environment.get("driver"), "reference_driver": entry.driver}
     if entry.id.version != ours.version:
         issue = ScoreIssue.VERSION_MISMATCH
     elif entry.id.tool_version != ours.tool_version:
@@ -197,8 +214,8 @@ def normalize(result: Result, reference: Reference) -> BackendScore:
         ratio = (
             result.value / entry.value if result.higher_is_better else entry.value / result.value
         )
-        return BackendScore(ours, result.category, official, REFERENCE_POINTS * ratio)
-    return BackendScore(ours, result.category, official, None, issue, entry.id)
+        return BackendScore(ours, result.category, official, REFERENCE_POINTS * ratio, **drivers)
+    return BackendScore(ours, result.category, official, None, issue, entry.id, **drivers)
 
 
 def _geometric_mean(values: Iterable[float], weights: Iterable[float] | None = None) -> float:

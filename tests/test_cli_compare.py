@@ -126,3 +126,19 @@ def test_markup_in_an_export_is_shown_literally(tmp_path) -> None:
     assert "[link=https://evil.example]Mon PC[/link]" in out
     assert "[/oops]" in out and "[bold]base (base)" in out
     assert "[/evil] : version du bench" in out  # nom de bench repris dans l'avertissement
+
+
+def test_compare_shows_gpu_driver_notice(tmp_path) -> None:
+    def gpu(driver: str):
+        return [
+            replace(r, environment={"driver": driver}) if r.name == "glmark2" else r
+            for r in machine(1.0)
+        ]
+
+    a = write(tmp_path, "a", export(gpu("Mesa 26.2.3-arch1.1")))
+    b = write(tmp_path, "b", export(gpu("Mesa 26.2.4-arch1.1")))
+    out = invoke(a, b).output
+    assert (
+        "glmark2 : pilotes GPU différents (a : Mesa 26.2.3-arch1.1, b : Mesa 26.2.4-arch1.1)" in out
+    )
+    assert has_row(out, "glmark2", "2000,0", "2000,0 [^│]*0,0 %")  # toujours comparé

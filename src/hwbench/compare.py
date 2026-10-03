@@ -8,7 +8,7 @@ Rien n'est comparé « à peu près » :
   combiné, les mêmes pondérations).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from hwbench.export import MachineExport
@@ -32,6 +32,8 @@ class CompareWarning(StrEnum):
     BENCH_VERSION_DIFFERS = "bench_version_differs"
     REFERENCE_DIFFERS = "reference_differs"
     FORCED_REFERENCE = "forced_reference"
+    # information : le pilote n'est pas dans BackendId, l'écart reste calculé
+    DRIVER_DIFFERS = "driver_differs"
 
 
 @dataclass(frozen=True)
@@ -50,6 +52,7 @@ class BenchRow:
     unit: str
     identities: list[BackendId | None]
     cells: list[Cell]
+    drivers: list[str | None] = field(default_factory=list)  # pilote GPU par fichier
 
 
 @dataclass(frozen=True)
@@ -62,6 +65,7 @@ class ScoreRow:
 class Notice:
     code: CompareWarning
     subject: str  # nom du bench, ou fichier concerné
+    values: list[str | None] = field(default_factory=list)  # ex. pilote par fichier
 
 
 @dataclass(frozen=True)
@@ -116,6 +120,7 @@ def _bench_rows(exports: list[MachineExport]) -> list[BenchRow]:
                 ref.unit,
                 [r.backend_id if r else None for r in results],
                 cells,
+                [r.environment.get("driver") if r else None for r in results],
             )
         )
     return rows
@@ -177,6 +182,11 @@ def _warnings(exports: list[MachineExport], benches: list[BenchRow]) -> list[Not
         Notice(CompareWarning.BENCH_VERSION_DIFFERS, row.name)
         for row in benches
         if len({i for i in row.identities if i is not None}) > 1
+    ]
+    warnings += [
+        Notice(CompareWarning.DRIVER_DIFFERS, row.name, row.drivers)
+        for row in benches
+        if len({d for d in row.drivers if d is not None}) > 1
     ]
     digests = {e.reference.digest for e in exports if e.reference is not None}
     if len(digests) > 1:
