@@ -179,7 +179,39 @@ def test_compact() -> None:
     assert compact(8.5) == "8,5"
 
 
+def test_render_power_desktop_without_battery() -> None:
+    out = _render(render_power(PowerData(on_ac=True)))
+    assert re.search(r"Alimentation +secteur \(pas de batterie\)", out)
+
+
 def test_render_power_profile_only_when_present() -> None:
     assert "Profil plateforme" not in _render(render_power(PowerData(on_ac=True)))
     out = _render(render_power(PowerData(on_ac=True, platform_profile="performance")))
     assert re.search(r"Profil plateforme +performance", out)
+
+
+@pytest.mark.parametrize(
+    ("configured", "rated", "expected"),
+    [
+        (6000, 4800, "6000 MT/s (profil EXPO/XMP, nominal 4800)"),
+        (2667, 3200, "2667 MT/s (max 3200)"),
+        (3200, 3200, "3200 MT/s"),
+        (3200, None, "3200 MT/s"),
+    ],
+)
+def test_ram_speed_label(configured: int, rated: int | None, expected: str) -> None:
+    module = RamModule("DIMM 1", 16.0, "DDR5", configured, "G.Skill", "X", rated_speed_mts=rated)
+    out = _render(render_ram(RamData(total_gb=30.5, installed_gb=16.0, modules=[module])))
+    assert expected in out
+
+
+def test_firmware_strings_are_not_rich_markup(fake_system) -> None:
+    files = sysfs_fixture("sysfs_desktop.json") | {
+        "/sys/class/dmi/id/sys_vendor": "[/x] OEM",
+        "/sys/class/dmi/id/product_name": "[link=https://evil.example]PC[/link]",
+    }
+    fake_system(files=files, commands={}, tools=set())
+    result = runner.invoke(cli.app, ["info"], env={"COLUMNS": "200"})
+    assert result.exit_code == 0, result.output  # pas de MarkupError
+    assert "[/x] OEM" in result.output
+    assert "[link=https://evil.example]PC[/link]" in result.output

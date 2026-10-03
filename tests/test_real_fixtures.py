@@ -78,3 +78,13 @@ def test_board_and_bios_date(snapshot: MachineSnapshot) -> None:
 def test_sensors(snapshot: MachineSnapshot) -> None:
     for reading in snapshot.sensors.temperatures:
         assert reading.current_c is None or -60 <= reading.current_c <= 200
+
+
+def test_sensor_sources_are_unique(snapshot: MachineSnapshot) -> None:
+    pairs = [(t.source, t.label) for t in snapshot.sensors.temperatures]
+    assert len(pairs) == len(set(pairs)), "puces homonymes non distinguées"
+
+
+def test_power_is_known(snapshot: MachineSnapshot) -> None:
+    # portable : secteur ou batterie ; desktop : secteur (pas de batterie système)
+    assert snapshot.power.on_ac is not None

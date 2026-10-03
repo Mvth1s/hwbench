@@ -56,12 +56,13 @@ def read_power_supply() -> PowerData:
             if online is not None:
                 ac_states.append(online == 1)
 
-    if ac_states:
-        on_ac: bool | None = any(ac_states)
-    elif batteries:
-        on_ac = not any(b.status == "Discharging" for b in batteries)
+    if not batteries:
+        # aucune batterie système (desktop, serveur) : la machine ne peut tourner que sur secteur
+        on_ac: bool | None = True
+    elif ac_states:
+        on_ac = any(ac_states)
     else:
-        on_ac = None
+        on_ac = not any(b.status == "Discharging" for b in batteries)
     choices = _exec.read_sysfs(f"{PLATFORM_PROFILE}_choices")
     return PowerData(
         on_ac=on_ac,

@@ -56,6 +56,14 @@ def exists(path: str | Path) -> bool:
     return Path(path).exists()
 
 
+def link_name(path: str | Path) -> str | None:
+    """Nom de la cible d'un lien sysfs (ex. hwmonN/device -> « nvme0 »), None si absent."""
+    try:
+        return Path(path).resolve(strict=True).name
+    except OSError:
+        return None
+
+
 def list_dir(path: str | Path) -> list[str]:
     try:
         return sorted(os.listdir(path))

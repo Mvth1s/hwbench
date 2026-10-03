@@ -77,6 +77,7 @@ def build_reference(
                 "category": r.category.value,
                 "version": r.version,
                 "tool_version": r.tool_version,
+                "presentation": r.presentation,
                 "unit": r.unit,
                 "higher_is_better": r.higher_is_better,
                 "value": r.value,  # médiane en régime soutenu ; le burst n'est jamais noté

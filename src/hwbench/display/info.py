@@ -38,9 +38,10 @@ INSTALL_HINTS = {
 
 
 def _v(value: object, suffix: str = "", fmt: str = "{}") -> Text | str:
+    # Text : une chaîne du firmware (« [/x] OEM ») ne doit jamais être lue comme du balisage
     if value is None or value == "":
         return NA
-    return fmt.format(value) + suffix
+    return Text(fmt.format(value) + suffix)
 
 
 def _n(value: float | None, suffix: str = "", decimals: int = 1) -> Text | str:
@@ -129,7 +130,9 @@ def _mhz(value: float | None) -> str:
 def _ram_speed(configured: int | None, rated: int | None) -> Text | str:
     if configured is None:
         return NA
-    if rated is not None and rated != configured:
+    if rated is not None and configured > rated:
+        return f"{configured} MT/s (profil EXPO/XMP, nominal {rated})"
+    if rated is not None and configured < rated:
         return f"{configured} MT/s (max {rated})"
     return f"{configured} MT/s"
 
@@ -233,7 +236,7 @@ def render_sensors(sensors: SensorsData) -> Panel:
             t.add_column(col)
         for r in sensors.temperatures:
             t.add_row(
-                r.chip,
+                r.source,
                 r.label,
                 _n(r.current_c, " °C"),
                 _n(r.high_c, " °C", 0),
@@ -245,14 +248,19 @@ def render_sensors(sensors: SensorsData) -> Panel:
         for col in ("Puce", "Ventilateur", "Vitesse"):
             f.add_column(col)
         for fan in sensors.fans:
-            f.add_row(fan.chip, fan.label, _v(fan.rpm, " tr/min"))
+            f.add_row(fan.source, fan.label, _v(fan.rpm, " tr/min"))
         parts.append(f)
     return Panel(Group(*parts) if parts else NA, title="Capteurs", title_align="left")
 
 
 def render_power(power: PowerData) -> Panel:
     t = _kv_table()
-    ac = NA if power.on_ac is None else ("secteur" if power.on_ac else "batterie")
+    if power.on_ac is None:
+        ac: Text | str = NA
+    elif power.on_ac:
+        ac = "secteur" if power.batteries else "secteur (pas de batterie)"
+    else:
+        ac = "batterie"
     t.add_row("Alimentation", ac)
     if power.platform_profile is not None:
         t.add_row("Profil plateforme", power.platform_profile)

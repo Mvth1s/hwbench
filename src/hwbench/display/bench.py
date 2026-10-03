@@ -3,7 +3,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from hwbench.display.fmt import num
+from hwbench.display.fmt import measure, num
 from hwbench.results import BenchWarning, Category, MachineState, Result
 
 CATEGORY_LABELS = {
@@ -30,7 +30,6 @@ ENVIRONMENT_LABELS = {
     "binary": "binaire",
     "session": "session",
     "resolution": "résolution",
-    "presentation": "présentation",
     "renderer": "rendu",
     "driver": "pilote",
     "cpu-max-prime": "cpu-max-prime",
@@ -48,10 +47,6 @@ NA = Text("non disponible", style="dim")
 
 def _unit(unit: str) -> str:
     return UNIT_LABELS.get(unit, unit)
-
-
-def _value(value: float) -> str:
-    return num(value, 1 if value < 10_000 else 0)
 
 
 def warning_message(
@@ -107,6 +102,8 @@ def warning_message(
 def _power(state: MachineState) -> str:
     if state.on_ac is None:
         return "?"
+    if state.on_ac and state.has_battery is False:
+        return "secteur (pas de batterie)"
     return "secteur" if state.on_ac else "batterie"
 
 
@@ -133,23 +130,25 @@ def render_result(result: Result) -> Panel:
     t = Table.grid(padding=(0, 2))
     t.add_column(style="bold cyan", no_wrap=True)
     t.add_column()
-    score = Text(f"{_value(result.value)} {unit}", style="bold")
+    score = Text(f"{measure(result.value)} {unit}", style="bold")
     score.append(
-        f"  ± {_value(result.stdev)} (CV {num(result.cv_percent)} %)",
+        f"  ± {measure(result.stdev)} (CV {num(result.cv_percent)} %)",
         style="yellow" if BenchWarning.HIGH_VARIANCE in result.warnings else "dim",
     )
     t.add_row("Score (médiane)", score)
-    t.add_row("Runs", " · ".join(_value(v) for v in result.runs))
+    t.add_row("Runs", " · ".join(measure(v) for v in result.runs))
     t.add_row(
         "Warm-up",
         f"{result.warmup_runs} itérations, {num(result.warmup_s)} s"
         + ("" if result.warmup_stable else " (non stabilisé)")
         + f" · {num(result.duration_s)} s au total",
     )
-    t.add_row("Burst (à froid)", Text(f"{_value(result.burst)} {unit}  (hors score)", style="dim"))
+    t.add_row("Burst (à froid)", Text(f"{measure(result.burst)} {unit}  (hors score)", style="dim"))
     if result.workers is not None:
         # le natif lance des processus (GIL) ; les outils externes, des threads
         t.add_row("Processus" if result.backend == "native" else "Threads", str(result.workers))
+    if result.presentation is not None:
+        t.add_row("Présentation", PRESENTATION_LABELS.get(result.presentation, result.presentation))
     _state_rows(t, result)
 
     parts: list[Table | Text] = [t]
@@ -160,7 +159,7 @@ def render_result(result: Result) -> Panel:
         for key, value in result.details.items():
             details.add_row(
                 DETAIL_LABELS.get(key, key),
-                f"{_value(value)} {_unit(result.detail_units.get(key, ''))}".strip(),
+                f"{measure(value)} {_unit(result.detail_units.get(key, ''))}".strip(),
             )
         parts.append(details)
     if result.environment:
@@ -181,9 +180,7 @@ def render_result(result: Result) -> Panel:
 def _environment(env: dict[str, str]) -> list[str]:
     items: list[str] = []
     for key, value in env.items():
-        if key == "presentation":
-            items.append(f"présentation {PRESENTATION_LABELS.get(value, value)}")
-        elif key in ENVIRONMENT_LABELS:
+        if key in ENVIRONMENT_LABELS:
             items.append(f"{ENVIRONMENT_LABELS[key]} {value}")
         else:
             # « CPython 3.14.7 » / « OpenSSL 3.5.1 » se nomment déjà eux-mêmes

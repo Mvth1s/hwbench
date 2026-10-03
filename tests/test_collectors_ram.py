@@ -1,11 +1,12 @@
 import pytest
-from conftest import fixture_text, laptop_commands, laptop_sysfs
+from conftest import LAPTOP, fixture_text, laptop_commands, laptop_sysfs
 
 from hwbench.collectors.linux.ram import (
     LinuxRamCollector,
     _parse_size_gb,
     parse_dmidecode_memory,
     parse_meminfo_total_gb,
+    slot_labels,
 )
 from hwbench.models import Unavailable
 
@@ -132,3 +133,34 @@ def test_without_dmidecode(fake_system) -> None:
     fake_system(files=laptop_sysfs(), commands=commands, root=True)
     ram = LinuxRamCollector().collect().data
     assert ram.modules_unavailable is Unavailable.TOOL_MISSING
+
+
+# Capture réelle du desktop B850 (AM5) : deux barrettes « DIMM 1 » sur les canaux A et B, deux
+# slots « DIMM 0 » vides, profil EXPO 6000 MT/s sur des modules nominaux 4800.
+B850 = "asrock-b850-riptide-wifi"
+
+
+def test_duplicate_locators_use_bank_locator() -> None:
+    blocks = parse_dmidecode_memory(fixture_text(f"{B850}/dmidecode_memory.txt"))
+    assert slot_labels(blocks) == ["P0 CHANNEL A / DIMM 1", "P0 CHANNEL B / DIMM 1"]
+
+
+def test_unique_locators_stay_short() -> None:
+    blocks = parse_dmidecode_memory(fixture_text(f"{LAPTOP}/dmidecode_memory.txt"))
+    assert slot_labels(blocks) == ["DIMM B", "DIMM A"]
+
+
+def test_expo_profile_speed(fake_system) -> None:
+    text = fixture_text(f"{B850}/dmidecode_memory.txt")
+    fake_system(commands={("dmidecode", "-t", "memory"): text}, root=True)
+    result = LinuxRamCollector().collect(include_identifiers=True)
+    modules = result.data.modules
+    assert modules is not None
+    assert [(m.slot, m.speed_mts, m.rated_speed_mts) for m in modules] == [
+        ("P0 CHANNEL A / DIMM 1", 6000, 4800),
+        ("P0 CHANNEL B / DIMM 1", 6000, 4800),
+    ]
+    assert {m.manufacturer for m in modules} == {"Corsair"}  # Bank 3, Hex 0x9E
+    assert result.data.installed_gb == 32.0
+    assert result.identifiers is not None
+    assert [i.slot for i in result.identifiers] == [m.slot for m in modules]

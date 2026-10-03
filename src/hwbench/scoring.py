@@ -2,7 +2,7 @@
 
 Règles :
 - un backend n'est noté que si la référence contient le même bench, à la même version, avec la
-  même version d'outil (BackendId) ;
+  même version d'outil et le même mode de présentation (BackendId) ;
 - catégorie CPU (single, multi) : seul le natif compte ; les autres backends CPU sont notés à
   part, pour information ;
 - catégorie GPU : moyenne géométrique de tous les backends GPU mesurés. La liste doit être
@@ -12,6 +12,7 @@ Règles :
   lui et le signale ; un GPU mesuré mais non comparable rend le combiné non comparable.
 """
 
+import hashlib
 import json
 import math
 from collections.abc import Iterable, Mapping
@@ -37,6 +38,7 @@ class ScoreIssue(StrEnum):
     NOT_IN_REFERENCE = "not_in_reference"
     VERSION_MISMATCH = "version_mismatch"
     TOOL_VERSION_MISMATCH = "tool_version_mismatch"
+    PRESENTATION_MISMATCH = "presentation_mismatch"
     BACKENDS_DIFFER = "backends_differ"  # composition de la catégorie ≠ référence
     CATEGORY_NOT_COMPARABLE = "category_not_comparable"  # combiné : une catégorie ne l'est pas
     CPU_NOT_MEASURED = "cpu_not_measured"  # combiné : single ou multi manquant
@@ -57,12 +59,29 @@ class ReferenceEntry:
 
 
 @dataclass(frozen=True)
+class ReferenceInfo:
+    """Ce qu'un export retient de la référence : de quoi savoir si deux scores ont la même base."""
+
+    machine: str
+    created: str
+    forced: bool
+    forced_reasons: list[str]
+    digest: str  # empreinte du contenu : deux références différentes ne se comparent pas
+
+
+@dataclass(frozen=True)
 class Reference:
     machine: str
     created: str
     forced: bool
     forced_reasons: list[str]
     entries: list[ReferenceEntry]
+    digest: str = ""
+
+    def info(self) -> ReferenceInfo:
+        return ReferenceInfo(
+            self.machine, self.created, self.forced, list(self.forced_reasons), self.digest
+        )
 
     def find(self, name: str) -> ReferenceEntry | None:
         return next((e for e in self.entries if e.id.name == name), None)
@@ -107,6 +126,12 @@ class Scores:
 # --- Référence -------------------------------------------------------------------------
 
 
+def reference_digest(payload: Mapping[str, Any]) -> str:
+    """sha256 complet du JSON canonique ; la clé « digest » est autorisée par privacy.scrub."""
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
+
+
 def reference_from_dict(payload: Mapping[str, Any]) -> Reference:
     if payload.get("schema_version") != REFERENCE_SCHEMA_VERSION:
         raise ReferenceError(
@@ -116,7 +141,7 @@ def reference_from_dict(payload: Mapping[str, Any]) -> Reference:
     try:
         entries = [
             ReferenceEntry(
-                id=BackendId(b["name"], b["version"], b.get("tool_version")),
+                id=BackendId(b["name"], b["version"], b.get("tool_version"), b.get("presentation")),
                 backend=b["backend"],
                 category=Category(b["category"]),
                 unit=b["unit"],
@@ -131,6 +156,7 @@ def reference_from_dict(payload: Mapping[str, Any]) -> Reference:
             forced=bool(payload.get("forced", False)),
             forced_reasons=[str(r) for r in payload.get("forced_reasons", [])],
             entries=entries,
+            digest=reference_digest(payload),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ReferenceError(f"fichier de référence invalide : {exc}") from exc
@@ -165,6 +191,8 @@ def normalize(result: Result, reference: Reference) -> BackendScore:
         issue = ScoreIssue.VERSION_MISMATCH
     elif entry.id.tool_version != ours.tool_version:
         issue = ScoreIssue.TOOL_VERSION_MISMATCH
+    elif entry.id.presentation != ours.presentation:
+        issue = ScoreIssue.PRESENTATION_MISMATCH
     else:
         ratio = (
             result.value / entry.value if result.higher_is_better else entry.value / result.value

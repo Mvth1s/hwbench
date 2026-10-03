@@ -12,6 +12,7 @@ ISSUE_LABELS = {
     ScoreIssue.NOT_IN_REFERENCE: "absent de la référence",
     ScoreIssue.VERSION_MISMATCH: "version du bench différente de la référence",
     ScoreIssue.TOOL_VERSION_MISMATCH: "version de l'outil différente de la référence",
+    ScoreIssue.PRESENTATION_MISMATCH: "mode de présentation différent de la référence",
     ScoreIssue.BACKENDS_DIFFER: "backends différents de la référence",
     ScoreIssue.CATEGORY_NOT_COMPARABLE: "une catégorie n'est pas comparable",
     ScoreIssue.CPU_NOT_MEASURED: "CPU single-core et multi-core requis",
@@ -25,7 +26,8 @@ AVAILABILITY_LABELS = {
 
 INSTALL_HINTS = {
     "sysbench": "sudo dnf install sysbench  |  sudo apt install sysbench",
-    "glmark2": "sudo dnf install glmark2  |  sudo apt install glmark2",
+    # Debian/Ubuntu découpent glmark2 : glmark2-x11 fournit /usr/bin/glmark2
+    "glmark2": "sudo dnf install glmark2  |  sudo apt install glmark2-wayland glmark2-x11",
     "vkmark": "sudo dnf install vkmark  |  sudo apt install vkmark",
 }
 
@@ -109,7 +111,7 @@ def render_scores(scores: Scores) -> Panel:
         )
     return Panel(
         Group(*parts),
-        title=f"Scores · référence {ref.machine} = 1000 pts",
+        title=Text(f"Scores · référence {ref.machine} = 1000 pts"),
         title_align="left",
     )
 

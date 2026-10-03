@@ -23,6 +23,19 @@ SENSITIVE_VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 
+# Clés connues comme non sensibles, avec le format exact de leur valeur : seule une valeur
+# conforme échappe au filtrage (une clé autorisée ne doit pas devenir une fuite).
+NON_SENSITIVE_KEYS: dict[str, re.Pattern[str]] = {
+    # empreinte du fichier de référence du scoring (sha256 du JSON canonique)
+    "digest": re.compile(r"sha256:[0-9a-f]{64}"),
+}
+
+
+def is_allowed(key: str, value: Any) -> bool:
+    pattern = NON_SENSITIVE_KEYS.get(key)
+    return pattern is not None and isinstance(value, str) and pattern.fullmatch(value) is not None
+
+
 def is_sensitive_key(key: str) -> bool:
     return bool(SENSITIVE_KEY_RE.search(key))
 
@@ -33,12 +46,17 @@ def scrub_string(value: str) -> str:
     return value
 
 
+def _scrub_item(key: str, value: Any) -> Any:
+    if is_sensitive_key(key) and value is not None:
+        return REDACTED
+    if is_allowed(key, value):
+        return value
+    return scrub(value)
+
+
 def scrub(obj: Any) -> Any:
     if isinstance(obj, dict):
-        return {
-            k: (REDACTED if is_sensitive_key(str(k)) and v is not None else scrub(v))
-            for k, v in obj.items()
-        }
+        return {k: _scrub_item(str(k), v) for k, v in obj.items()}
     if isinstance(obj, list | tuple):
         return [scrub(v) for v in obj]
     if isinstance(obj, str):

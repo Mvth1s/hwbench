@@ -6,11 +6,14 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.text import Text
 
 from hwbench import privacy
 from hwbench.benchmarks.base import BenchOptions, known_backends, select
 from hwbench.collect import collect_snapshot
+from hwbench.compare import compare
 from hwbench.display.bench import CATEGORY_LABELS, render_result, warning_message
+from hwbench.display.compare import render_comparison
 from hwbench.display.fmt import num
 from hwbench.display.info import render_info
 from hwbench.display.scores import (
@@ -19,13 +22,21 @@ from hwbench.display.scores import (
     render_backends,
     render_scores,
 )
+from hwbench.export import ExportError, build_export, load_export, write_export
 from hwbench.machine_state import capture_state
-from hwbench.reference import ReferenceIssue, build_reference, results_issues, state_issues
+from hwbench.reference import (
+    ReferenceIssue,
+    build_reference,
+    machine_label,
+    results_issues,
+    state_issues,
+)
 from hwbench.results import Availability, Category, Result
 from hwbench.runner import MIN_RUNS, RunSettings, run_benchmark, start_warnings
 from hwbench.scoring import (
     DEFAULT_WEIGHTS,
     ReferenceError,
+    Scores,
     load_reference,
     parse_weights,
     score_results,
@@ -71,7 +82,8 @@ def info(
         typer.echo(json.dumps(privacy.scrub(asdict(snapshot)), indent=2, ensure_ascii=False))
         return
 
-    render_info(Console(), snapshot, identifiers)
+    # markup=False : les chaînes du firmware et des pilotes ne sont jamais du balisage rich
+    render_info(Console(markup=False), snapshot, identifiers)
 
 
 class Target(StrEnum):
@@ -145,49 +157,62 @@ def _run_all(
             console.print("[red]Interrompu.[/red]")
             raise typer.Exit(code=130) from None
         except RuntimeError as exc:
-            console.print(f"[red]{label} : échec, ignoré. {exc}[/red]")
+            # la fin de stderr d'un outil externe : jamais interprétée comme balisage rich
+            console.print(Text(f"{label} : échec, ignoré. {exc}", style="red"))
             continue
         console.print(render_result(result))
         results.append(result)
     return results
 
 
-@app.command()
-def bench(
-    target: Annotated[Target, typer.Argument(help="Catégorie à mesurer.")] = Target.ALL,
-    backend: Annotated[
-        str,
-        typer.Option("--backend", help="native, nom d'un outil, ou all (tous les disponibles)."),
-    ] = "all",
-    runs: RunsOption = MIN_RUNS,
-    workers: WorkersOption = None,
-    max_warmup: MaxWarmupOption = None,
-    warmup_tolerance: Annotated[
-        float,
-        typer.Option(
-            "--warmup-tolerance",
-            min=0,
-            help="Écart max (%) entre 2 itérations consécutives pour déclarer le warm-up stable.",
-        ),
-    ] = DEFAULTS.warmup_tolerance_percent,
-    max_cv: Annotated[
-        float,
-        typer.Option("--max-cv", min=0, help="Seuil (%) de l'avertissement « mesures instables »."),
-    ] = DEFAULTS.high_variance_cv_percent,
-    hot_start: Annotated[
-        float,
-        typer.Option("--hot-start", help="Température CPU (°C) de départ jugée trop chaude."),
-    ] = DEFAULTS.hot_start_c,
-    weights: Annotated[
-        str | None,
-        typer.Option(
-            "--weights",
-            help="Pondération du score combiné, ex. « cpu-single=1,cpu-multi=1,gpu=1 ».",
-        ),
-    ] = None,
-) -> None:
-    """Lance les benchmarks notés."""
-    console = Console()
+TargetArg = Annotated[Target, typer.Argument(help="Catégorie à mesurer.")]
+BackendOption = Annotated[
+    str, typer.Option("--backend", help="native, nom d'un outil, ou all (tous les disponibles).")
+]
+ToleranceOption = Annotated[
+    float,
+    typer.Option(
+        "--warmup-tolerance",
+        min=0,
+        help="Écart max (%) entre 2 itérations consécutives pour déclarer le warm-up stable.",
+    ),
+]
+MaxCvOption = Annotated[
+    float,
+    typer.Option("--max-cv", min=0, help="Seuil (%) de l'avertissement « mesures instables »."),
+]
+HotStartOption = Annotated[
+    float, typer.Option("--hot-start", help="Température CPU (°C) de départ jugée trop chaude.")
+]
+WeightsOption = Annotated[
+    str | None,
+    typer.Option(
+        "--weights", help="Pondération du score combiné, ex. « cpu-single=1,cpu-multi=1,gpu=1 »."
+    ),
+]
+
+
+def _settings(
+    runs: int, max_warmup: float | None, tolerance: float, max_cv: float, hot_start: float
+) -> RunSettings:
+    return RunSettings(
+        runs=runs,
+        max_warmup_s=max_warmup,
+        warmup_tolerance_percent=tolerance,
+        high_variance_cv_percent=max_cv,
+        hot_start_c=hot_start,
+    )
+
+
+def _bench_session(
+    console: Console,
+    target: Target,
+    backend: str,
+    settings: RunSettings,
+    workers: int | None,
+    weights: str | None,
+) -> tuple[list[Result], Scores | None]:
+    """Benchs + scores, partagé par `bench` et `export`."""
     backends = known_backends()
     if backend != "all" and backend not in backends:
         typer.echo(
@@ -213,13 +238,6 @@ def bench(
             )
             console.print(f"[yellow]{CATEGORY_LABELS[category]} : {reason}.[/yellow]")
 
-    settings = RunSettings(
-        runs=runs,
-        max_warmup_s=max_warmup,
-        warmup_tolerance_percent=warmup_tolerance,
-        high_variance_cv_percent=max_cv,
-        hot_start_c=hot_start,
-    )
     initial = capture_state()
     for warning in start_warnings(initial, settings):
         console.print(f"[yellow]⚠ {warning_message(warning, initial)}[/yellow]")
@@ -232,11 +250,57 @@ def bench(
         reference = load_reference()
     except ReferenceError as exc:
         console.print(f"[red]Référence illisible : {exc}[/red]")
-        return
+        return results, None
     if reference is None:
         console.print(NO_REFERENCE)
-        return
-    console.print(render_scores(score_results(results, reference, weight_map)))
+        return results, None
+    scores = score_results(results, reference, weight_map)
+    console.print(render_scores(scores))
+    return results, scores
+
+
+@app.command()
+def bench(
+    target: TargetArg = Target.ALL,
+    backend: BackendOption = "all",
+    runs: RunsOption = MIN_RUNS,
+    workers: WorkersOption = None,
+    max_warmup: MaxWarmupOption = None,
+    warmup_tolerance: ToleranceOption = DEFAULTS.warmup_tolerance_percent,
+    max_cv: MaxCvOption = DEFAULTS.high_variance_cv_percent,
+    hot_start: HotStartOption = DEFAULTS.hot_start_c,
+    weights: WeightsOption = None,
+) -> None:
+    """Lance les benchmarks notés."""
+    settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start)
+    _bench_session(Console(), target, backend, settings, workers, weights)
+
+
+@app.command()
+def export(
+    output: Annotated[
+        Path, typer.Option("--output", "-o", help="Fichier JSON à écrire (écrasé s'il existe).")
+    ],
+    target: TargetArg = Target.ALL,
+    backend: BackendOption = "all",
+    runs: RunsOption = MIN_RUNS,
+    workers: WorkersOption = None,
+    max_warmup: MaxWarmupOption = None,
+    warmup_tolerance: ToleranceOption = DEFAULTS.warmup_tolerance_percent,
+    max_cv: MaxCvOption = DEFAULTS.high_variance_cv_percent,
+    hot_start: HotStartOption = DEFAULTS.hot_start_c,
+    weights: WeightsOption = None,
+) -> None:
+    """Lance les benchmarks et exporte le tout en JSON pour `hwbench compare`.
+
+    L'export contient les composants (sans aucun identifiant), les résultats et les scores.
+    """
+    console = Console()
+    settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start)
+    results, scores = _bench_session(console, target, backend, settings, workers, weights)
+    snapshot, _ = collect_snapshot()
+    write_export(build_export(snapshot, machine_label(snapshot), results, scores), output)
+    console.print(f"Export écrit : {output} ({len(results)} benchs)")
 
 
 @app.command()
@@ -271,8 +335,11 @@ def reference(
     workers: WorkersOption = None,
     max_warmup: MaxWarmupOption = None,
 ) -> None:
-    """Mesure la machine de référence (= 1000 points) : secteur, profil performance, régime
-    soutenu. Refuse d'écrire le fichier si une condition n'est pas remplie, sauf --force."""
+    """Mesure la machine de référence du scoring (= 1000 points).
+
+    Exige secteur, profil d'énergie « performance » et warm-up stabilisé ; sinon refuse
+    d'écrire le fichier, sauf --force (noté dans le fichier).
+    """
     console = Console()
     initial = capture_state()
     before = state_issues(initial)
@@ -309,3 +376,22 @@ def reference(
     output.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     note = " [yellow](forcée : " + ", ".join(reasons) + ")[/yellow]" if reasons else ""
     console.print(f"Référence écrite : {output} ({len(results)} benchs){note}")
+
+
+@app.command("compare")
+def compare_cmd(
+    files: Annotated[
+        list[Path],
+        typer.Argument(help="Exports de `hwbench export` ; le premier sert de base."),
+    ],
+) -> None:
+    """Compare des exports côte à côte : écarts en pourcentage par rapport au premier."""
+    if len(files) < 2:
+        typer.echo("Erreur : au moins deux fichiers à comparer.", err=True)
+        raise typer.Exit(code=2)
+    try:
+        exports = [load_export(f) for f in files]
+    except ExportError as exc:
+        typer.echo(f"Erreur : {exc}", err=True)
+        raise typer.Exit(code=2) from None
+    Console().print(render_comparison(compare(exports), [f.stem for f in files]))

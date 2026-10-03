@@ -20,6 +20,8 @@ COOL_AC = MachineState(governors=["performance"], on_ac=True, cpu_temp_c=45.0)
 def fast_and_isolated(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cpu, "WORKLOADS", TINY)
     monkeypatch.setattr(cli, "capture_state", lambda: COOL_AC)
+    # indépendant de la référence du paquet (testée dans test_reference_file.py)
+    monkeypatch.setattr(cli, "load_reference", lambda: None)
     # charges minuscules et bruitées : plafond de warm-up court pour garder les tests rapides
     monkeypatch.setattr(bench_runner, "DEFAULT_MAX_WARMUP_S", dict.fromkeys(Category, 0.2))
 
@@ -79,6 +81,7 @@ def _result(**overrides) -> Result:
         backend="native",
         version="1",
         tool_version=None,
+        presentation=None,
         unit="index",
         higher_is_better=True,
         value=89.84,
@@ -134,6 +137,12 @@ def test_render_unstable_warmup() -> None:
     assert "Warm-up non stabilisé après 91 s" in out and "--max-warmup" in out
 
 
+def test_render_desktop_power() -> None:
+    desktop = MachineState(["performance"], on_ac=True, cpu_temp_c=40.0, has_battery=False)
+    out = _text(_result(state_before=desktop, state_after=desktop))
+    assert re.search(r"Alimentation +secteur \(pas de batterie\)", out)
+
+
 def test_render_power_profile_and_epp() -> None:
     state = MachineState(
         ["powersave"],
@@ -173,3 +182,10 @@ def test_upfront_hot_threshold_uses_option(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(cli, "capture_state", lambda: warm)
     result = runner.invoke(cli.app, ["bench", "cpu-single", "--hot-start", "60"], env=WIDE)
     assert "CPU déjà chaud au départ (65 °C)" in result.output
+
+
+def test_tool_error_text_is_not_rich_markup(fake_tools) -> None:
+    fake_tools(failing={"sysbench": "[/boom] FATAL: invalid option"})
+    result = runner.invoke(cli.app, ["bench", "cpu-single", "--backend", "sysbench"], env=WIDE)
+    assert result.exit_code == 1  # aucun résultat, mais pas de MarkupError
+    assert "[/boom] FATAL: invalid option" in result.output

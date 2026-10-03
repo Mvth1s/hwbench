@@ -1,0 +1,47 @@
+name: Release
+
+# À chaque push sur main : python-semantic-release calcule la version à partir des conventional
+# commits, met à jour pyproject.toml, src/hwbench/__init__.py et CHANGELOG.md, committe
+# « chore(release): X.Y.Z », tagge vX.Y.Z, puis crée la GitHub Release avec sdist et wheel.
+# Configuration : [tool.semantic_release] dans pyproject.toml.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      # semantic-release travaille sur la branche à jour, pas sur un HEAD détaché
+      - name: Se placer sur le commit qui a déclenché le workflow
+        env:
+          SHA: ${{ github.sha }}
+        run: git reset --hard "$SHA"
+
+      - name: Version, changelog, tag et GitHub Release
+        id: release
+        # actions tierces épinglées par SHA de commit (le jeton a contents: write)
+        uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278 # v10.7.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git_committer_name: github-actions[bot]
+          git_committer_email: 41898282+github-actions[bot]@users.noreply.github.com
+
+      - name: Joindre sdist et wheel à la GitHub Release
+        if: steps.release.outputs.released == 'true'
+        uses: python-semantic-release/publish-action@99d4062dd393b5a7a62c5fe9ed78fb364b5674f2 # v10.7.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.release.outputs.tag }}

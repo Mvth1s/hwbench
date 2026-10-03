@@ -1,12 +1,20 @@
-"""Conditions communes des benchs GPU : session graphique, résolution, pilote."""
+"""Conditions communes des benchs GPU : session graphique, résolution, scènes, pilote.
+
+Choix des scènes (étude du 2026-09-29, RX 9070 XT, Mesa 26.2.3, rendu hors écran) : une scène
+n'est gardée que si son FPS baisse d'au moins x1,8 entre 1080p et 4K (4 fois plus de pixels),
+c'est-à-dire si son coût suit le nombre de pixels : elle mesure le GPU, pas le CPU ni le pilote.
+Les scènes simples de glmark2 (build, texture, shading, bump) plafonnent vers 15 000 FPS en
+1080p quelle que soit la scène (x1,1 à x1,6) ; celles de vkmark vers 35 000 (x1,0 à x1,5).
+Détail des mesures dans le README (« Choix des scènes GPU »).
+"""
 
 import re
 
 from hwbench.benchmarks.external import _run
 
-# Résolution fixe : le score dépend du nombre de pixels, pas de l'écran de la machine.
-RESOLUTION = "1920x1080"
-SCENE_SECONDS = 2
+# Résolution fixe et élevée : le score dépend du GPU, pas de l'écran de la machine.
+RESOLUTION = "3840x2160"
+SCENE_SECONDS = 3
 TIMEOUT_S = 600
 
 _MESA_RE = re.compile(r"(Mesa \S+)")
@@ -51,8 +59,9 @@ def is_software_renderer(name: str | None) -> bool:
     return bool(name and _SOFTWARE_RE.search(name))
 
 
-def scene_args(scenes: tuple[str, ...], seconds: int = SCENE_SECONDS) -> list[str]:
+def scene_args(scenes: dict[str, str], seconds: int = SCENE_SECONDS) -> list[str]:
+    """scenes : clé courte -> description « scène(:option=valeur)* » de l'outil."""
     args: list[str] = []
-    for scene in scenes:
-        args += ["-b", f"{scene}:duration={seconds}"]
+    for spec in scenes.values():
+        args += ["-b", f"{spec}:duration={seconds}"]
     return args

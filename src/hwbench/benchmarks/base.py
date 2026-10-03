@@ -47,6 +47,10 @@ class Benchmark(ABC):
         """Version de l'outil externe ; appelée après les runs (peut venir de leur sortie)."""
         return None
 
+    def presentation(self) -> str | None:
+        """Mode de présentation d'un bench GPU ; fait partie de son identité (BackendId)."""
+        return None
+
     def environment(self) -> dict[str, str]:
         return {}
 

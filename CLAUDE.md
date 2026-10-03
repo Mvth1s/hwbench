@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `hwbench` est un outil en ligne de commande pour Linux (Windows plus tard) qui affiche les composants d'une machine avec leurs détails importants et lance des benchmarks notés : CPU single-core, CPU multi-core, GPU, et un score combiné. Trois usages visés : diagnostic perso, projet portfolio propre, comparaison de machines entre elles.
 
 Machines de dev (Python 3.11+, shell fish) :
-- Dell Latitude 5420 sous Fedora 44 : machine de référence du scoring.
-- Desktop B850 (Ryzen 7 8700F, Radeon RX 9070 XT) sous EndeavourOS : sysbench, glmark2 et vkmark installés, fixtures des outils externes capturées ici.
+- Desktop B850 (Ryzen 7 8700F, Radeon RX 9070 XT) sous EndeavourOS : **machine de référence du scoring** (mesures stables, CV ≤ 1,3 %, pas de batterie ni de profil d'énergie, toujours disponible), sysbench, glmark2 et vkmark installés, fixtures des outils externes capturées ici.
+- Dell Latitude 5420 sous Fedora 44 : portable de test (batterie, platform_profile, Intel).
 
 ## Méthode de travail
 
@@ -33,7 +33,17 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/hwbench info            # essai réel (sudo pour dmidecode/smartctl)
 .venv/bin/hwbench bench cpu-single   # ~7 s ; multi-cœur jusqu'à ~90 s de warm-up sur portable
+.venv/bin/hwbench bench gpu          # ~2 min 30 (glmark2 ~2 min, vkmark ~30 s)
+.venv/bin/hwbench backends
+scripts/capture_tool_fixtures.sh     # bash : sorties réelles de sysbench/glmark2/vkmark
 ```
+
+Git : une branche par phase (ou lot de corrections) depuis `dev`, un commit par fonction
+ajoutée ou modifiée, merge dans `dev` à la fin. Ne pas réécrire l'historique déjà poussé.
+
+Commits : **conventional commits** depuis `3a07904` (`feat:`, `fix:`, `docs:`, `test:`, `ci:`, `refactor:`, `chore:`), en anglais. Pas de pied `BREAKING CHANGE` sans décision explicite (en 0.x, `major_on_zero = false` le garde en mineure, mais il change le message de release). `.github/workflows/commitlint.yml` vérifie les commits des PR depuis `max(base, CONVENTIONAL_SINCE)` (les commits antérieurs à la convention ne sont pas vérifiés).
+
+Release : `.github/workflows/release.yml`, python-semantic-release sur push de `main` (config `[tool.semantic_release]` du `pyproject.toml`) : version dans `pyproject.toml` et `src/hwbench/__init__.py`, `CHANGELOG.md` (mode `update`, insertion au marqueur `<!-- version list -->`, l'historique antérieur aux conventional commits reste dessous), commit `chore(release): X.Y.Z`, tag `vX.Y.Z`, GitHub Release + wheel/sdist. Après une release, fusionner `main` dans `dev` (le commit de release n'existe que sur `main`). Captures du README : `scripts/readme_screenshots.py`.
 
 CI (`.github/workflows/ci.yml`) : ruff + pytest sur Python 3.11 à 3.14 (ubuntu-latest). Pas d'installation de Python supplémentaire en local (pas de `uv python install`) : la compatibilité 3.11 est vérifiée par la CI.
 
@@ -49,13 +59,31 @@ CI (`.github/workflows/ci.yml`) : ruff + pytest sur Python 3.11 à 3.14 (ubuntu-
 - Benchmarks (phase 2) : `Benchmark.run()` renvoie **une** `Measurement` ; `runner.run_benchmark(bench, RunSettings)` fait le warm-up adaptatif + runs (≥ 3), médiane, écart-type, avertissements, et relève l'état via `machine_state.capture_state` (seul pont vers les collecteurs). Modèles dans `results.py` ; avertissements stockés en codes (`BenchWarning`), traduits dans `display/bench.py`.
 - Warm-up adaptatif : itérations jusqu'à 2 consécutives à ≤ 3 % d'écart, plafond par catégorie (`DEFAULT_MAX_WARMUP_S` : 30 s single, 90 s multi), sinon `WARMUP_UNSTABLE`. Le 1er run à froid est `Result.burst` : affiché et exporté, **jamais** utilisé par le scoring. Tous les seuils (tolérance, plafond, CV 5 %, 70 °C) sont dans `RunSettings` et exposés en options de `hwbench bench`. Tests du runner : horloge simulée (`clock=`), jamais de vrai temps.
 - État machine : `MachineState` porte governor, secteur, température, `platform_profile` (+ choix) et l'EPP de cpu0. `MachineState.throttling_settings()` décide de `POWER_PROFILE` (« performance », ou le plus performant des choix de la machine ; `custom` et absent non jugés).
-- Unité du score natif : `"index"`, affichée « indice brut » tant que le scoring (phase 3) n'existe pas.
+- Unité du score natif : `"index"`, affichée « indice brut » ; les points viennent du scoring.
+- Alimentation : sans batterie système (`scope` ≠ Device), `on_ac = True` (desktop), affiché « secteur (pas de batterie) » ; `MachineState.has_battery`.
+- Capteurs : `chip` reste le nom brut hwmon (utilisé par `machine_state` pour la température CPU) ; `instance` distingue les homonymes (`nvme0` via la cible du lien `device`, sinon `spd5118 #1`…). Les captures stockent les liens sysfs sous la clé `<chemin>@link` (valeur = nom de la cible), lue par `_exec.link_name` / `FakeSystem.link_name`.
+- RAM : slot = `Bank Locator / Locator` quand le Locator seul n'est pas unique ; vitesse configurée > nominale = profil EXPO/XMP.
+
+## Conventions établies (phase 3)
+
+- Backends externes : `benchmarks/external/`, tout accès système via `benchmarks/external/_run.py` (`which`, `getenv`, `exists`, `run`, `output_or_raise` qui lève `ToolError`). Tests : fixture autouse `no_external_tools` (aucun vrai outil n'est jamais lancé), `fake_tools(outputs=, env=, files=, failing=)` pour en simuler.
+- Identité d'un backend (`BackendId`) : nom, version du protocole hwbench, version de l'outil, mode de présentation. Deux mesures ne sont comparables que si les quatre sont égaux. Changer scènes, durée, résolution ou paramètres = incrémenter `*_VERSION` du module.
+- GPU : 3840×2160, glmark2 `--off-screen`, vkmark `--winsys headless` (repli fenêtre + `--present-mode immediate` + `VSYNC_UNVERIFIED`). Scènes choisies par le critère ratio FPS 1080p/4K ≥ 1,8 (étude dans le README et `_gpu.py`). L'UUID GPU de vkmark n'est jamais parsé ; les fixtures le mettent à zéro.
+- Scoring (`scoring.py`) : CPU = natif seul ; GPU = moyenne géométrique des backends GPU mesurés, liste identique à la référence sinon `BACKENDS_DIFFER` ; combiné sans GPU mesuré = CPU seul + `gpu_missing`. Jamais de moyenne silencieuse.
+- Référence : `src/hwbench/data/reference.json` (package data), générée sur le desktop B850 par `.venv/bin/hwbench reference -o src/hwbench/data/reference.json` (session graphique, machine au repos) ; `reference.py` fait les contrôles (secteur, profil, warm-up) et `--force` les inscrit dans `forced_reasons`. `tests/test_reference_file.py` vérifie le vrai fichier (3 catégories, 6 benchs, versions de protocole à jour, aucun identifiant) : incrémenter la version d'un bench impose de régénérer la référence. Les tests CLI patchent `cli.load_reference` pour ne pas dépendre du fichier. Tests du scoring : `conftest.make_result`.
 - Bench natif : une classe par catégorie (`native-cpu-single`, `native-cpu-multi`), score = moyenne géométrique des débits des charges de `benchmarks/native/workloads.py`. Toute modification d'une charge change l'empreinte testée dans `tests/test_native_cpu.py` : incrémenter `NATIVE_CPU_VERSION` et mettre à jour l'empreinte. Multi-cœur : `multiprocessing` en `spawn`, barrière pour exclure démarrage et préparation du chrono, les charges passées en argument aux workers.
 - Tests des benchs : `conftest.TINY` (charges minuscules) ; patcher `cpu.WORKLOADS`, `cli.capture_state` et `runner.DEFAULT_MAX_WARMUP_S` (sinon le warm-up de charges bruitées court jusqu’à 90 s).
 - Donnée absente = `None`. Quand la cause compte pour l'utilisateur, le modèle porte un `Unavailable` (`NEEDS_ROOT`, `TOOL_MISSING`, `NO_DATA`) ; l'affichage traduit, il n'interroge jamais le système.
 - Tests : `tests/conftest.py` fournit `FakeSystem` (fixtures `fake_system`, `laptop`) qui remplace `_exec` à partir de `tests/fixtures/`. Les fichiers `sysfs_*.json` sont des arborescences `chemin -> contenu`.
 - Fixtures réelles : `scripts/capture_fixtures.sh` (lancé par l'utilisateur, sans sudo devant) écrit `tests/fixtures/<fabricant-modèle>/` anonymisé ; `tests/test_real_fixtures.py` rejoue les collecteurs sur chaque dossier avec des assertions génériques. Les fixtures écrites à la main à la racine de `tests/fixtures/` ne servent qu'aux cas limites (desktop, SATA en échec, smartctl < 7.0, dmidecode < 3.7 en « GB »).
 - Fixtures : repo public. Tout serial/UUID/asset tag doit contenir `FAKE`, valoir l'UUID nul, ou un id numérique à 0. `tests/test_fixtures_privacy.py` le vérifie, et vérifie aussi qu'aucun identifiant de la machine qui lance les tests n'apparaît dans les fixtures.
+
+## Conventions établies (phase 4)
+
+- Export (`export.py`) : `MachineExport` (schéma `EXPORT_SCHEMA_VERSION` = 1), écrit via `privacy.scrub`, relu en dataclasses par un désérialiseur générique (`_build` : dataclasses, listes, dicts à clés d'enum, unions, enums) avec erreurs explicites nommant le fichier. Changer la forme d'un modèle exporté = incrémenter `EXPORT_SCHEMA_VERSION`. `hwbench export` lance les benchs (même session que `bench`, `_bench_session`) puis écrit le fichier.
+- Référence dans l'export : `ReferenceInfo` avec `digest` (`sha256:` + 64 hex du JSON canonique). `privacy.NON_SENSITIVE_KEYS` autorise des clés connues comme non sensibles **avec le format exact de leur valeur** (`digest` : `sha256:` + 64 hex) ; une valeur non conforme sous une clé autorisée est filtrée normalement. Ajouter une clé à cette liste = ajouter son motif et un test.
+- Compare (`compare.py`, logique pure ; `display/compare.py`, rendu) : premier fichier = base. Écart d'un bench seulement si même `BackendId` ; écart d'un score seulement si même empreinte de référence, même liste de backends et, pour le combiné, mêmes pondérations. Sinon la cellule garde sa valeur et porte une raison (`Incomparable`).
+- Balisage rich : tout texte venu d'un fichier, du firmware ou d'un outil externe est affiché via `rich.text.Text` (ou une console `markup=False`, cas de `info`), jamais dans une chaîne interprétée : « [/x] » ferait planter rich (`MarkupError`), « [link=…] » injecterait un lien. Seuls les messages fixes du CLI utilisent du balisage.
 
 ## Architecture
 
@@ -72,18 +100,21 @@ src/hwbench/
 ├── benchmarks/
 │   ├── base.py         # Benchmark (name, category, backend, version, unit, is_available(), run() -> Measurement) + registre @register
 │   ├── native/          # tests maison
-│   └── external/        # wrappers d'outils existants via subprocess + parsing (phase 3)
+│   └── external/        # sysbench, glmark2, vkmark ; _run.py = seul accès système, _gpu.py = conditions GPU
 ├── results.py          # Category, BenchWarning, Measurement, MachineState, Result
 ├── runner.py           # warm-up, runs, médiane/écart-type, avertissements -> Result
 ├── machine_state.py    # governor, secteur, température : seul pont benchmarks -> collecteurs
-├── scoring.py          # (phase 3) normalisation + score combiné pondéré
+├── scoring.py          # normalisation (référence = 1000), catégories, score combiné pondéré
 ├── privacy.py          # filtrage des identifiants
-├── export.py           # (phase 4) export/import JSON versionné
+├── export.py           # export JSON versionné et relecture en dataclasses
+├── compare.py          # comparaison d'exports (cellules, écarts, raisons de non-comparabilité)
+├── reference.py        # contrôles et génération du fichier de référence
+├── data/reference.json # référence du scoring (package data, générée)
 └── cli.py
-tests/                  # hors de src/, fixtures dans tests/fixtures/
+tests/                  # hors de src/, fixtures dans tests/fixtures/ (tools/ = outils externes)
 ```
 
-`benchmarks.base.benchmark_classes()` n'importe que `hwbench.benchmarks.native` pour peupler le registre : un nouveau paquet de backends (ex. `external`) doit y être ajouté, sinon ses classes n'apparaissent pas.
+`benchmarks.base.benchmark_classes()` importe `hwbench.benchmarks.native` et `hwbench.benchmarks.external` pour peupler le registre : un nouveau module de backend doit être importé dans le `__init__.py` de son paquet, sinon ses classes n'apparaissent pas.
 
 Séparation stricte : collecte, benchmark, scoring et affichage ne dépendent pas les uns des autres. L'affichage consomme des dataclasses, jamais la sortie brute d'une commande. La future TUI et le futur support Windows ne doivent être qu'une couche en plus.
 
@@ -146,8 +177,9 @@ Fiabilité des mesures :
 
 ```
 hwbench info [--json] [--show-serials]
-hwbench bench [cpu-single|cpu-multi|gpu|all] [--backend ...] [--runs N]
+hwbench bench [cpu-single|cpu-multi|gpu|all] [--backend ...] [--runs N] [--weights ...]
 hwbench backends          # liste les backends et leur disponibilité
+hwbench reference -o FILE [--force]   # machine de référence uniquement
 hwbench export -o FILE
 hwbench compare FILES...
 ```
