@@ -38,9 +38,10 @@ INSTALL_HINTS = {
 
 
 def _v(value: object, suffix: str = "", fmt: str = "{}") -> Text | str:
+    # Text : une chaîne du firmware (« [/x] OEM ») ne doit jamais être lue comme du balisage
     if value is None or value == "":
         return NA
-    return fmt.format(value) + suffix
+    return Text(fmt.format(value) + suffix)
 
 
 def _n(value: float | None, suffix: str = "", decimals: int = 1) -> Text | str:

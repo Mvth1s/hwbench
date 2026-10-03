@@ -203,3 +203,15 @@ def test_ram_speed_label(configured: int, rated: int | None, expected: str) -> N
     module = RamModule("DIMM 1", 16.0, "DDR5", configured, "G.Skill", "X", rated_speed_mts=rated)
     out = _render(render_ram(RamData(total_gb=30.5, installed_gb=16.0, modules=[module])))
     assert expected in out
+
+
+def test_firmware_strings_are_not_rich_markup(fake_system) -> None:
+    files = sysfs_fixture("sysfs_desktop.json") | {
+        "/sys/class/dmi/id/sys_vendor": "[/x] OEM",
+        "/sys/class/dmi/id/product_name": "[link=https://evil.example]PC[/link]",
+    }
+    fake_system(files=files, commands={}, tools=set())
+    result = runner.invoke(cli.app, ["info"], env={"COLUMNS": "200"})
+    assert result.exit_code == 0, result.output  # pas de MarkupError
+    assert "[/x] OEM" in result.output
+    assert "[link=https://evil.example]PC[/link]" in result.output

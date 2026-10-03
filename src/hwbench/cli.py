@@ -82,7 +82,8 @@ def info(
         typer.echo(json.dumps(privacy.scrub(asdict(snapshot)), indent=2, ensure_ascii=False))
         return
 
-    render_info(Console(), snapshot, identifiers)
+    # markup=False : les chaînes du firmware et des pilotes ne sont jamais du balisage rich
+    render_info(Console(markup=False), snapshot, identifiers)
 
 
 class Target(StrEnum):
