@@ -77,7 +77,8 @@ def render_machines(comparison: Comparison, labels: list[str]) -> Table:
         (
             "Référence",
             [
-                f"{e.reference.machine} ({e.reference.digest})" if e.reference else "aucune"
+                # « sha256: » + 12 chiffres hexa : assez pour voir que deux références diffèrent
+                f"{e.reference.machine} ({e.reference.digest[:19]})" if e.reference else "aucune"
                 for e in exports
             ],
         ),

@@ -247,7 +247,7 @@ def test_reference_digest_identifies_content_not_formatting() -> None:
     assert reference_from_dict(data).digest == reference_from_dict(same).digest
     assert reference_from_dict(data).digest != reference_from_dict(other).digest
     digest = reference_from_dict(data).digest
-    assert re.fullmatch(r"sha256:[0-9a-f]{12}", digest)
+    assert re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
     assert privacy.scrub(digest) == digest
     info = reference_from_dict(data).info()
     assert (info.machine, info.digest) == ("Dell Inc. Latitude 5420", digest)

@@ -1,11 +1,18 @@
 import dataclasses
+import hashlib
 import json
 import typing
 from dataclasses import asdict
 
+import pytest
+from conftest import make_result
+from test_scoring import REFERENCE, snapshot
+
 from hwbench import privacy
 from hwbench.collect import collect_snapshot
+from hwbench.export import build_export, load_export, to_dict, write_export
 from hwbench.models import MachineSnapshot
+from hwbench.scoring import score_results
 
 FAKE_IDENTIFIER_VALUES = (
     "FAKE-SYS-SERIAL",
@@ -106,3 +113,45 @@ def test_scrub_keeps_ordinary_hardware_strings() -> None:
         "opengl": "4.6 (Compatibility Profile) Mesa 26.2.2",
     }
     assert privacy.scrub(values) == values
+
+
+SHA256 = "sha256:" + hashlib.sha256(b"reference").hexdigest()
+
+
+def test_digest_key_is_allowed() -> None:
+    assert len(SHA256) == 7 + 64
+    assert privacy.scrub({"digest": SHA256}) == {"digest": SHA256}
+    nested = {"reference": {"machine": "ASRock B850 Riptide WiFi", "digest": SHA256}}
+    assert privacy.scrub(nested) == nested
+
+
+def test_same_hash_under_a_sensitive_key_is_redacted() -> None:
+    assert privacy.scrub({"serial": SHA256}) == {"serial": privacy.REDACTED}
+    assert privacy.scrub({"board_serial": SHA256[7:]}) == {"board_serial": privacy.REDACTED}
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "aa:bb:cc:dd:ee:ff",  # adresse MAC
+        "123e4567-e89b-12d3-a456-426614174000",  # UUID
+        "sha256:" + "a" * 32,  # pas un sha256 complet : 32 hex = motif NGUID
+        SHA256 + " 0123456789abcdef",  # sha256 suivi d'autre chose
+    ],
+)
+def test_allowed_key_with_unexpected_value_is_still_scrubbed(value: str) -> None:
+    """L'allowlist porte sur la clé ET le format : « digest » n'est pas une porte ouverte."""
+    scrubbed = privacy.scrub({"digest": value})["digest"]
+    assert scrubbed != value
+    assert privacy.REDACTED in scrubbed
+
+
+def test_export_keeps_the_full_reference_digest(tmp_path) -> None:
+    results = [make_result("native-cpu-single", 100.0)]
+    export = build_export(snapshot(), "x", results, score_results(results, REFERENCE))
+    assert to_dict(export)["reference"]["digest"] == REFERENCE.digest
+    path = tmp_path / "e.json"
+    write_export(export, path)
+    loaded = load_export(path)
+    assert loaded.reference is not None and loaded.reference.digest == REFERENCE.digest
+    assert len(REFERENCE.digest) == len("sha256:") + 64

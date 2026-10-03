@@ -127,10 +127,9 @@ class Scores:
 
 
 def reference_digest(payload: Mapping[str, Any]) -> str:
-    """12 caractères hexadécimaux : assez pour distinguer deux références, et trop court pour
-    que privacy.scrub le prenne pour un EUI-64 (16 ou 32)."""
+    """sha256 complet du JSON canonique ; la clé « digest » est autorisée par privacy.scrub."""
     canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    return "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()[:12]
+    return "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def reference_from_dict(payload: Mapping[str, Any]) -> Reference:

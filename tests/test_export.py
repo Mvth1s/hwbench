@@ -51,7 +51,7 @@ def test_roundtrip_through_a_file(laptop_export, tmp_path) -> None:
 
 def test_schema_header(laptop_export) -> None:
     data = to_dict(laptop_export)
-    assert data["schema_version"] == EXPORT_SCHEMA_VERSION == 1
+    assert data["schema_version"] == EXPORT_SCHEMA_VERSION == 2
     assert data["created"] == "2026-09-30T08:00:00+00:00"
     assert data["reference"]["digest"] == REFERENCE.digest
     assert data["categories"][0]["category"] == "cpu_single"  # enums en chaînes
@@ -76,7 +76,7 @@ def test_export_without_reference(laptop_export) -> None:
 @pytest.mark.parametrize(
     ("mutate", "message"),
     [
-        (lambda d: d.update(schema_version=2), "schéma d'export 2 non pris en charge"),
+        (lambda d: d.update(schema_version=1), "schéma d'export 1 non pris en charge"),
         (lambda d: d.pop("results"), "export.results : champ manquant"),
         (
             lambda d: d["results"][0].update(value="vite"),
