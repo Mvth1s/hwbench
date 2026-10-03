@@ -10,7 +10,9 @@ from rich.console import Console
 from hwbench import privacy
 from hwbench.benchmarks.base import BenchOptions, known_backends, select
 from hwbench.collect import collect_snapshot
+from hwbench.compare import compare
 from hwbench.display.bench import CATEGORY_LABELS, render_result, warning_message
+from hwbench.display.compare import render_comparison
 from hwbench.display.fmt import num
 from hwbench.display.info import render_info
 from hwbench.display.scores import (
@@ -19,7 +21,7 @@ from hwbench.display.scores import (
     render_backends,
     render_scores,
 )
-from hwbench.export import build_export, write_export
+from hwbench.export import ExportError, build_export, load_export, write_export
 from hwbench.machine_state import capture_state
 from hwbench.reference import (
     ReferenceIssue,
@@ -366,3 +368,22 @@ def reference(
     output.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     note = " [yellow](forcée : " + ", ".join(reasons) + ")[/yellow]" if reasons else ""
     console.print(f"Référence écrite : {output} ({len(results)} benchs){note}")
+
+
+@app.command("compare")
+def compare_cmd(
+    files: Annotated[
+        list[Path],
+        typer.Argument(help="Exports de `hwbench export` ; le premier sert de base."),
+    ],
+) -> None:
+    """Compare des exports côte à côte : écarts en pourcentage par rapport au premier."""
+    if len(files) < 2:
+        typer.echo("Erreur : au moins deux fichiers à comparer.", err=True)
+        raise typer.Exit(code=2)
+    try:
+        exports = [load_export(f) for f in files]
+    except ExportError as exc:
+        typer.echo(f"Erreur : {exc}", err=True)
+        raise typer.Exit(code=2) from None
+    Console().print(render_comparison(compare(exports), [f.stem for f in files]))
