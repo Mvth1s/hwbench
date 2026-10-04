@@ -1,7 +1,7 @@
-# Garde à jour les actions épinglées par SHA (release.yml) : PR vers dev, messages
-# conventionnels (« ci(deps): … ») pour passer commitlint.
+# Dependabot : PR vers dev, messages conventionnels pour passer commitlint.
 version: 2
 updates:
+  # actions épinglées par SHA (release.yml…) : « ci(deps): … »
   - package-ecosystem: github-actions
     directory: /
     target-branch: dev
@@ -9,4 +9,15 @@ updates:
       interval: weekly
     commit-message:
       prefix: ci
+      include: scope
+
+  # dépendances Python du pyproject.toml : « build(deps): … », « build(deps-dev): … »
+  - package-ecosystem: pip
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      prefix-development: build
       include: scope

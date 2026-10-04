@@ -32,4 +32,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e '.[dev]'
-      - run: pytest
+      - run: pytest --cov --cov-report=term
+      - name: Couverture dans le résumé du job
+        if: always()
+        run: |
+          {
+            echo "### Couverture (Python ${{ matrix.python-version }})"
+            echo
+            coverage report --format=markdown
+          } >> "$GITHUB_STEP_SUMMARY"
