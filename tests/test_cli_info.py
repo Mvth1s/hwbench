@@ -221,3 +221,9 @@ def test_version_option() -> None:
     result = runner.invoke(cli.app, ["--version"])
     assert result.exit_code == 0
     assert result.output.strip() == f"hwbench {__version__}"
+
+
+def test_shell_completion_options() -> None:
+    result = runner.invoke(cli.app, ["--help"], env={"COLUMNS": "200"})
+    assert "--install-completion" in result.output
+    assert "--show-completion" in result.output

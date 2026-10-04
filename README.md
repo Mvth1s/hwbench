@@ -43,6 +43,27 @@ scripts/capture_fixtures.sh [nom]     # sans sudo : il le demande lui-même pour
 scripts/capture_tool_fixtures.sh      # sorties de sysbench, glmark2 et vkmark (protocole réel)
 ```
 
+### Autocomplétion du shell
+
+À lancer **depuis le shell visé** (il est détecté automatiquement) :
+
+```sh
+hwbench --install-completion        # installe la complétion pour le shell courant
+```
+
+Ou à la main :
+
+```sh
+# fish
+hwbench --show-completion > ~/.config/fish/completions/hwbench.fish
+
+# bash
+hwbench --show-completion > ~/.local/share/bash-completion/completions/hwbench
+```
+
+Sont complétés : les commandes, leurs options et les valeurs (`hwbench bench <Tab>` propose
+`cpu-single`, `cpu-multi`, `gpu`, `all`). Ouvrir un nouveau shell pour en profiter.
+
 ## Utilisation
 
 ```sh

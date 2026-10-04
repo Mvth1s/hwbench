@@ -45,7 +45,7 @@ from hwbench.scoring import (
 app = typer.Typer(
     help="Inventaire matériel et benchmarks notés.",
     no_args_is_help=True,
-    add_completion=False,
+    add_completion=True,
 )
 
 
