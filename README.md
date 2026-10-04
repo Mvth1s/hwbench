@@ -1,5 +1,9 @@
 # hwbench
 
+[![CI](https://github.com/Mvth1s/hwbench/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Mvth1s/hwbench/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Mvth1s/hwbench)](https://github.com/Mvth1s/hwbench/releases)
+[![Licence](https://img.shields.io/github/license/Mvth1s/hwbench)](LICENSE)
+
 Outil en ligne de commande pour Linux qui inventorie les composants d'une machine et lance des
 benchmarks notés (CPU single-core, CPU multi-core, GPU et score combiné) pour comparer des
 machines entre elles.
