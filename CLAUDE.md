@@ -99,6 +99,13 @@ CI (`.github/workflows/ci.yml`) : ruff + pytest sur Python 3.11 à 3.14 (ubuntu-
 - Compare (`compare.py`, logique pure ; `display/compare.py`, rendu) : premier fichier = base. Écart d'un bench seulement si même `BackendId` ; écart d'un score seulement si même empreinte de référence, même liste de backends et, pour le combiné, mêmes pondérations. Sinon la cellule garde sa valeur et porte une raison (`Incomparable`).
 - Balisage rich : tout texte venu d'un fichier, du firmware ou d'un outil externe est affiché via `rich.text.Text` (ou une console `markup=False`, cas de `info`), jamais dans une chaîne interprétée : « [/x] » ferait planter rich (`MarkupError`), « [link=…] » injecterait un lien. Seuls les messages fixes du CLI utilisent du balisage.
 
+## Conventions établies (phase B : classement)
+
+- Module `leaderboard/` (`python -m hwbench.leaderboard validate FICHIERS…` / `site --results --out`). Validation (`validate.py`) : nom `[a-z0-9][a-z0-9-]*.json` directement dans `results/`, dossier sans lien symbolique (`resolves_to_itself`), fichier ouvert avec `O_NOFOLLOW` et lu au plus `MAX_BYTES` (`read_bounded`), JSON strict (`strict_json` : clés dupliquées et NaN refusés), `privacy.scrub` idempotent (chaque champ fautif nommé), référence = empreinte de la référence du paquet et non forcée, benchs connus à leur version de protocole (`current_versions`), scores stockés identiques entrée par entrée à ceux recalculés.
+- Site (`site.py`) : HTML statique, CSS intégré, aucun JavaScript (onglets en CSS pur), points **recalculés** contre la référence du paquet (jamais repris de l'export), combiné classé seulement s'il porte sur les trois catégories, tout texte d'un export passé par `html.escape`.
+- CI : `results.yml` sur `pull_request` uniquement (jamais `pull_request_target`), validateur installé depuis la branche de base et lancé avec `python -I` (le checkout de la PR ne doit pas entrer dans le chemin d'import), noms de fichiers par `git diff -z | xargs -0`, seuls les fichiers ajoutés/modifiés sont validés, échec si `results/` n'est pas un vrai dossier. `pages.yml` sur push de `main` : build (`contents: read`) puis deploy (`pages: write`, `id-token: write`), actions Pages épinglées par SHA. Une PR qui change à la fois le code (version de bench, référence) et des résultats échoue à la validation : fusionner le code d'abord.
+- `results/` est public : tout export ajouté est vérifié sans identifiant (hostname, MAC, serials de la machine). `tests/test_results_dir.py` valide les vrais fichiers ; après un changement de version de bench ou de référence, re-exporter les exemples du dépôt.
+
 ## Architecture
 
 ```
@@ -123,6 +130,7 @@ src/hwbench/
 ├── export.py           # export JSON versionné et relecture en dataclasses
 ├── compare.py          # comparaison d'exports (cellules, écarts, raisons de non-comparabilité)
 ├── reference.py        # contrôles et génération du fichier de référence
+├── leaderboard/        # classement : validate.py (soumissions), site.py (site statique)
 ├── data/reference.json # référence du scoring (package data, générée)
 └── cli.py
 tests/                  # hors de src/, fixtures dans tests/fixtures/ (tools/ = outils externes)

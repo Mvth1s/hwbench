@@ -323,6 +323,22 @@ Deux exports successifs du desktop de référence (backend natif seul) :
 Les captures sont générées à partir de la vraie sortie des commandes par
 `scripts/readme_screenshots.py` (`info`, `bench`, `compare A B`).
 
+## Classement
+
+Le classement est un site statique (GitHub Pages) généré à partir des exports déposés dans
+`results/` par pull request. Pour y ajouter une machine : `hwbench export -o results/<nom>.json`
+puis une pull request, voir [CONTRIBUTING.md](https://github.com/Mvth1s/hwbench/blob/main/CONTRIBUTING.md).
+
+Chaque fichier soumis est validé en CI (schéma connu, aucun identifiant, référence actuelle,
+versions de bench à jour, points cohérents avec les résultats bruts). Le site recalcule les
+points à partir des résultats bruts ; le score combiné n'est classé que s'il porte sur les trois
+catégories, comme la référence. Les résultats sont déclaratifs.
+
+```sh
+python -m hwbench.leaderboard validate results/*.json      # validation locale
+python -m hwbench.leaderboard site --results results --out _site
+```
+
 ## Dépendances système optionnelles
 
 Aucune n'est obligatoire : si un outil manque, le champ correspondant est affiché
