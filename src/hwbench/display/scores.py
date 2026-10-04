@@ -83,11 +83,17 @@ def _combined_row(t: Table, c: CombinedScore) -> None:
 
 
 def driver_notice(bench: str, driver: str | None, reference_driver: str | None) -> str:
-    """Pilote GPU différent : information, jamais bloquant (le pilote n'est pas dans BackendId)."""
+    """Même GPU que la référence, autre pilote : avertissement, jamais bloquant."""
     return (
-        f"⚠ {bench} : pilote {driver} (référence : {reference_driver}). Score calculé quand "
-        "même ; un changement de pilote peut faire varier le résultat."
+        f"⚠ {bench} : pilote {driver} (référence : {reference_driver}, même GPU). Score "
+        "calculé quand même ; un changement de pilote peut faire varier le résultat."
     )
+
+
+def driver_info(bench: str, driver: str | None, reference_driver: str | None) -> str:
+    """Autre GPU que la référence : le pilote est une simple information."""
+    reference = f" (référence : {reference_driver}, autre GPU)" if reference_driver else ""
+    return f"{bench} : pilote {driver}{reference}"
 
 
 def render_scores(scores: Scores) -> Panel:
@@ -110,11 +116,15 @@ def render_scores(scores: Scores) -> Panel:
     parts: list[Table | Text] = [t]
     if scores.combined is not None and scores.combined.gpu_missing:
         parts.append(Text("⚠ Score combiné calculé sans GPU (non mesuré).", style="yellow"))
-    parts += [
-        Text(driver_notice(s.backend.name, s.driver, s.reference_driver), style="yellow")
-        for s in scores.backends
-        if s.driver_differs
-    ]
+    for s in scores.backends:
+        if s.driver_differs:
+            parts.append(
+                Text(driver_notice(s.backend.name, s.driver, s.reference_driver), style="yellow")
+            )
+        elif s.driver_info:
+            parts.append(
+                Text(driver_info(s.backend.name, s.driver, s.reference_driver), style="dim")
+            )
     if ref.forced:
         parts.append(
             Text(

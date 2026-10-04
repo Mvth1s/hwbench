@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from hwbench.export import MachineExport
-from hwbench.results import BackendId, Category, Result
+from hwbench.results import BackendId, Category, Result, driver_key, gpu_key
 from hwbench.scoring import CategoryScore, CombinedScore, ScoreIssue
 
 CATEGORY_ORDER = (Category.CPU_SINGLE, Category.CPU_MULTI, Category.GPU)
@@ -52,7 +52,8 @@ class BenchRow:
     unit: str
     identities: list[BackendId | None]
     cells: list[Cell]
-    drivers: list[str | None] = field(default_factory=list)  # pilote GPU par fichier
+    drivers: list[str | None] = field(default_factory=list)  # pilote GPU par fichier (brut)
+    gpus: list[str | None] = field(default_factory=list)  # renderer GPU par fichier (brut)
 
 
 @dataclass(frozen=True)
@@ -121,6 +122,7 @@ def _bench_rows(exports: list[MachineExport]) -> list[BenchRow]:
                 [r.backend_id if r else None for r in results],
                 cells,
                 [r.environment.get("driver") if r else None for r in results],
+                [r.environment.get("renderer") if r else None for r in results],
             )
         )
     return rows
@@ -177,17 +179,32 @@ def _score_rows(exports: list[MachineExport]) -> list[ScoreRow]:
     return rows
 
 
+def _driver_notices(row: BenchRow) -> list[Notice]:
+    """Pilotes amont différents entre fichiers qui ont le même GPU.
+
+    Entre GPU différents, un autre pilote est attendu : rien n'est signalé. Les valeurs de la
+    notice gardent les chaînes brutes, None pour les fichiers hors du groupe.
+    """
+    groups: dict[str, list[int]] = {}
+    for i, (gpu, driver) in enumerate(zip(row.gpus, row.drivers, strict=False)):
+        if gpu_key(gpu) is not None and driver_key(driver) is not None:
+            groups.setdefault(gpu_key(gpu) or "", []).append(i)
+    notices = []
+    for members in groups.values():
+        if len({driver_key(row.drivers[i]) for i in members}) > 1:
+            values = [row.drivers[i] if i in members else None for i in range(len(row.drivers))]
+            notices.append(Notice(CompareWarning.DRIVER_DIFFERS, row.name, values))
+    return notices
+
+
 def _warnings(exports: list[MachineExport], benches: list[BenchRow]) -> list[Notice]:
     warnings = [
         Notice(CompareWarning.BENCH_VERSION_DIFFERS, row.name)
         for row in benches
         if len({i for i in row.identities if i is not None}) > 1
     ]
-    warnings += [
-        Notice(CompareWarning.DRIVER_DIFFERS, row.name, row.drivers)
-        for row in benches
-        if len({d for d in row.drivers if d is not None}) > 1
-    ]
+    for row in benches:
+        warnings += _driver_notices(row)
     digests = {e.reference.digest for e in exports if e.reference is not None}
     if len(digests) > 1:
         warnings.append(Notice(CompareWarning.REFERENCE_DIFFERS, ""))

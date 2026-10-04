@@ -245,9 +245,14 @@ desktop. Un résultat mesuré avec une autre version d'outil que la référence 
 comparable.
 
 Le pilote GPU (Mesa, RADV…) n'en fait pas partie : il change trop souvent (à chaque mise à
-jour sur une distribution rolling comme Arch). Il reste relevé à titre d'information, et
-`hwbench bench` comme `hwbench compare` affichent un avertissement non bloquant quand il
-diffère, la mesure restant notée et comparée.
+jour sur une distribution rolling comme Arch). Il reste relevé à titre d'information. Un
+avertissement non bloquant n'apparaît que pour **le même GPU** avec une **autre version amont**
+du pilote : dans `hwbench bench`, quand on mesure le GPU de la référence (la machine de
+référence après une mise à jour de Mesa) ; dans `hwbench compare`, entre fichiers qui ont le
+même GPU. Sur un autre GPU, le pilote est affiché comme simple information. La révision du
+paquet est ignorée : « Mesa 26.2.4-arch1.1 », « Mesa 26.2.4-arch1.2 » et « Mesa 26.2.4 »
+(Fedora) sont le même pilote. Le GPU est reconnu par son nom, sans les détails du renderer qui
+changent avec le noyau.
 
 La commande refuse d'écrire le fichier si la machine n'est pas sur secteur, si le profil
 d'énergie n'est pas « performance » (vérifié avant les mesures) ou si un warm-up ne se

@@ -1,5 +1,6 @@
 """Modèles des résultats de benchmark, partagés par benchmarks, runner, scoring et affichage."""
 
+import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -24,6 +25,38 @@ class Availability(StrEnum):
     AVAILABLE = "available"
     TOOL_MISSING = "tool_missing"
     NO_DISPLAY = "no_display"  # outil graphique sans session Wayland/X11 ni variante DRM
+
+
+_UPSTREAM_VERSION_RE = re.compile(r"\d+(?:\.\d+)+")
+
+
+def driver_key(driver: str | None) -> tuple[str, str] | None:
+    """Pilote ramené à (nom, version amont), sans la révision du paquet de la distribution.
+
+    « Mesa 26.2.4-arch1.1 », « Mesa 26.2.4-arch1.2 », « Mesa 26.2.4 » (Fedora) et
+    « Mesa 26.2.4-1 » (Debian) -> ("mesa", "26.2.4") ; « NVIDIA 550.54.14 » ->
+    ("nvidia", "550.54.14"). La chaîne brute reste celle affichée.
+    """
+    if not driver or not driver.strip():
+        return None
+    match = _UPSTREAM_VERSION_RE.search(driver)
+    if match is None:
+        return driver.strip().lower(), ""
+    return driver[: match.start()].strip().lower(), match.group(0)
+
+
+def gpu_key(renderer: str | None) -> str | None:
+    """Nom du GPU sans les détails volatils du renderer (pilote, noyau, DRM, bus).
+
+    « AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.7-arch1-1) » et
+    « AMD Radeon RX 9070 XT (RADV GFX1201) » -> « amd radeon rx 9070 xt » ;
+    « NVIDIA GeForce RTX 3060/PCIe/SSE2 » -> « nvidia geforce rtx 3060 ».
+    """
+    if not renderer:
+        return None
+    # « (… » précédé d'une espace : détails du pilote ; « Intel(R) » (collé) fait partie du nom
+    name = re.split(r"\s+\(|/", renderer, maxsplit=1)[0].strip().lower()
+    return name or None
 
 
 @dataclass(frozen=True)
