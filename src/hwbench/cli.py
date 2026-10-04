@@ -8,7 +8,7 @@ import typer
 from rich.console import Console
 from rich.text import Text
 
-from hwbench import privacy
+from hwbench import __version__, privacy
 from hwbench.benchmarks.base import BenchOptions, known_backends, select
 from hwbench.collect import collect_snapshot
 from hwbench.compare import compare
@@ -49,8 +49,24 @@ app = typer.Typer(
 )
 
 
+def _print_version(value: bool) -> None:
+    if value:
+        typer.echo(f"hwbench {__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
-def main() -> None:
+def main(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            callback=_print_version,
+            is_eager=True,
+            help="Affiche la version et quitte.",
+        ),
+    ] = False,
+) -> None:
     pass
 
 
