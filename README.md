@@ -8,9 +8,6 @@ Outil en ligne de commande pour Linux qui inventorie les composants d'une machin
 benchmarks notés (CPU single-core, CPU multi-core, GPU et score combiné) pour comparer des
 machines entre elles.
 
-> État : phase 4. `hwbench info`, les benchmarks natifs et externes (sysbench, glmark2, vkmark),
-> `hwbench backends`, le scoring, l'export JSON et `hwbench compare` sont disponibles.
-
 ![hwbench info](https://raw.githubusercontent.com/Mvth1s/hwbench/main/docs/images/info.svg)
 
 ## Installation
