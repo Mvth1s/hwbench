@@ -6,7 +6,7 @@ from conftest import laptop_commands, laptop_sysfs, sysfs_fixture
 from rich.console import Console
 from typer.testing import CliRunner
 
-from hwbench import cli
+from hwbench import __version__, cli
 from hwbench.collect import collect_snapshot
 from hwbench.display.fmt import compact, num
 from hwbench.display.info import render_power, render_ram
@@ -215,3 +215,15 @@ def test_firmware_strings_are_not_rich_markup(fake_system) -> None:
     assert result.exit_code == 0, result.output  # pas de MarkupError
     assert "[/x] OEM" in result.output
     assert "[link=https://evil.example]PC[/link]" in result.output
+
+
+def test_version_option() -> None:
+    result = runner.invoke(cli.app, ["--version"])
+    assert result.exit_code == 0
+    assert result.output.strip() == f"hwbench {__version__}"
+
+
+def test_shell_completion_options() -> None:
+    result = runner.invoke(cli.app, ["--help"], env={"COLUMNS": "200"})
+    assert "--install-completion" in result.output
+    assert "--show-completion" in result.output

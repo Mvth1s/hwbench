@@ -1,13 +1,14 @@
 # hwbench
 
+[![CI](https://github.com/Mvth1s/hwbench/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Mvth1s/hwbench/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Mvth1s/hwbench)](https://github.com/Mvth1s/hwbench/releases)
+[![Licence](https://img.shields.io/github/license/Mvth1s/hwbench)](https://github.com/Mvth1s/hwbench/blob/main/LICENSE)
+
 Outil en ligne de commande pour Linux qui inventorie les composants d'une machine et lance des
 benchmarks notés (CPU single-core, CPU multi-core, GPU et score combiné) pour comparer des
 machines entre elles.
 
-> État : phase 4. `hwbench info`, les benchmarks natifs et externes (sysbench, glmark2, vkmark),
-> `hwbench backends`, le scoring, l'export JSON et `hwbench compare` sont disponibles.
-
-![hwbench info](docs/images/info.svg)
+![hwbench info](https://raw.githubusercontent.com/Mvth1s/hwbench/main/docs/images/info.svg)
 
 ## Installation
 
@@ -15,9 +16,15 @@ Python 3.11 ou plus récent, Linux. Avec [pipx](https://pipx.pypa.io/) (environn
 commande `hwbench` dans le `PATH`) :
 
 ```sh
-pipx install git+https://github.com/Mvth1s/hwbench              # dernière version de main
-pipx install git+https://github.com/Mvth1s/hwbench@v0.1.0       # une version publiée
+pipx install hwbench          # dernière version publiée sur PyPI
 pipx upgrade hwbench
+```
+
+En alternative, directement depuis GitHub (sans passer par PyPI) :
+
+```sh
+pipx install git+https://github.com/Mvth1s/hwbench           # dernière version de main
+pipx install git+https://github.com/Mvth1s/hwbench@v0.2.0    # une version taguée
 ```
 
 Depuis un clone du dépôt : `pipx install .`. Les outils système optionnels (dmidecode, smartctl,
@@ -25,7 +32,7 @@ sysbench, glmark2, vkmark…) sont listés plus bas ; aucun n'est obligatoire.
 
 Les versions publiées (tag, changelog, wheel et sdist) sont sur la page
 [Releases](https://github.com/Mvth1s/hwbench/releases) ; l'historique est dans
-[CHANGELOG.md](CHANGELOG.md).
+[CHANGELOG.md](https://github.com/Mvth1s/hwbench/blob/main/CHANGELOG.md).
 
 Pour développer :
 
@@ -42,6 +49,27 @@ Pour ajouter une machine aux fixtures de test (sorties réelles, identifiants an
 scripts/capture_fixtures.sh [nom]     # sans sudo : il le demande lui-même pour dmidecode/smartctl
 scripts/capture_tool_fixtures.sh      # sorties de sysbench, glmark2 et vkmark (protocole réel)
 ```
+
+### Autocomplétion du shell
+
+À lancer **depuis le shell visé** (il est détecté automatiquement) :
+
+```sh
+hwbench --install-completion        # installe la complétion pour le shell courant
+```
+
+Ou à la main :
+
+```sh
+# fish
+hwbench --show-completion > ~/.config/fish/completions/hwbench.fish
+
+# bash
+hwbench --show-completion > ~/.local/share/bash-completion/completions/hwbench
+```
+
+Sont complétés : les commandes, leurs options et les valeurs (`hwbench bench <Tab>` propose
+`cpu-single`, `cpu-multi`, `gpu`, `all`). Ouvrir un nouveau shell pour en profiter.
 
 ## Utilisation
 
@@ -100,7 +128,7 @@ hwbench bench --weights cpu-single=1,cpu-multi=2,gpu=1   # pondération du score
 hwbench backends                       # backends disponibles et commande d'installation
 ```
 
-![hwbench bench --backend native](docs/images/bench.svg)
+![hwbench bench --backend native](https://raw.githubusercontent.com/Mvth1s/hwbench/main/docs/images/bench.svg)
 
 ### Backend natif (CPU)
 
@@ -290,7 +318,7 @@ interprété comme du balisage.
 
 Deux exports successifs du desktop de référence (backend natif seul) :
 
-![hwbench compare](docs/images/compare.svg)
+![hwbench compare](https://raw.githubusercontent.com/Mvth1s/hwbench/main/docs/images/compare.svg)
 
 Les captures sont générées à partir de la vraie sortie des commandes par
 `scripts/readme_screenshots.py` (`info`, `bench`, `compare A B`).
@@ -321,6 +349,28 @@ Chaque push sur `main` lance [python-semantic-release](https://python-semantic-r
 qui déduit la version de ces messages (`fix` → correctif, `feat` → mineure), met à jour
 `pyproject.toml` et `CHANGELOG.md`, crée le tag `vX.Y.Z` et la GitHub Release avec la wheel
 et le sdist. Le développement se fait sur `dev`, les releases par pull request `dev` → `main`.
+
+### Vérifier la provenance d'une version
+
+Chaque wheel et chaque sdist publiés sont accompagnés d'une attestation de provenance (SLSA,
+signée par Sigstore) produite par le workflow de release : elle prouve que le fichier a été
+construit par ce dépôt, à partir du commit tagué. Ce sont les mêmes fichiers sur la page
+Releases et sur PyPI. Pour vérifier, avec la [CLI GitHub](https://cli.github.com/) :
+
+```sh
+# depuis la GitHub Release
+gh release download v0.3.0 --repo Mvth1s/hwbench --pattern '*.whl'
+gh attestation verify hwbench-0.3.0-py3-none-any.whl --repo Mvth1s/hwbench \
+  --signer-workflow Mvth1s/hwbench/.github/workflows/release.yml
+
+# ou depuis PyPI
+pip download hwbench==0.3.0 --no-deps
+gh attestation verify hwbench-0.3.0-py3-none-any.whl --repo Mvth1s/hwbench
+```
+
+La commande échoue si le fichier a été modifié ou s'il n'a pas été construit par le workflow
+de release de ce dépôt. Les versions antérieures à l'ajout de l'attestation (0.1.0, 0.2.0) n'en
+ont pas.
 
 ## Vie privée
 
