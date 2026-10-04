@@ -10,8 +10,9 @@ EndeavourOS), depuis la session graphique et sans autre charge :
 
 À régénérer seulement quand la version d'un bench est incrémentée (`tests/test_reference_file.py`
 échoue alors) ou quand sysbench, glmark2 ou vkmark changent de version sur le desktop. Une mise
-à jour du pilote GPU (Mesa) ne l'impose pas : le pilote est une information, signalée par un
-avertissement quand il diffère de celui de la référence.
+à jour du pilote GPU (Mesa) ne l'impose pas : le pilote est une information. `hwbench bench`
+avertit seulement quand le GPU mesuré est celui de la référence et que la version amont du
+pilote diffère (la révision du paquet, `-arch1.1` ou absente sous Fedora, est ignorée).
 
 La commande refuse d'écrire le fichier si la machine est sur batterie, si le profil d'énergie
 n'est pas « performance » ou si un warm-up ne se stabilise pas (`--force` pour passer outre ;
