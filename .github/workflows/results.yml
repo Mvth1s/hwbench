@@ -1,0 +1,49 @@
+name: Results
+
+# Validation des résultats soumis au classement (results/<nom>.json).
+# pull_request et JAMAIS pull_request_target : une PR de fork tourne avec un jeton en lecture
+# seule et sans aucun secret. Le validateur vient de la branche de base, pas de la PR : une PR
+# ne peut pas assouplir son propre contrôle.
+on:
+  pull_request:
+    paths:
+      - "results/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validateur (branche de base)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+
+      - name: Fichiers soumis (PR)
+        uses: actions/checkout@v7
+        with:
+          path: pr
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Installer hwbench depuis la branche de base
+        run: pip install ./base
+
+      # Noms de fichiers contrôlés par l'auteur de la PR : passés par -z / xargs -0, jamais
+      # interprétés par un shell. Seuls les fichiers ajoutés, modifiés ou renommés sont validés
+      # (les anciens résultats restent lisibles après un changement de version de bench).
+      - name: Valider les fichiers ajoutés ou modifiés
+        working-directory: pr
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git diff -z --name-only --diff-filter=AMR "$BASE" HEAD -- results/ \
+            | xargs -0 --no-run-if-empty python -m hwbench.leaderboard validate
