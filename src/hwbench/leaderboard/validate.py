@@ -158,10 +158,33 @@ def validate_file(path: Path, reference: Reference) -> list[str]:
     except SubmissionError as exc:
         return [*problems, str(exc)]
     try:
-        raw = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raw = strict_json(data)
+    except (UnicodeDecodeError, ValueError) as exc:
         return [*problems, f"JSON invalide : {exc}"]
     return problems + validate_payload(raw, reference)
+
+
+def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    keys = [k for k, _ in pairs]
+    duplicates = sorted({k for k in keys if keys.count(k) > 1})
+    if duplicates:
+        raise ValueError(f"clé(s) en double : {', '.join(duplicates)}")
+    return dict(pairs)
+
+
+def _no_constant(name: str) -> Any:
+    raise ValueError(f"valeur non standard en JSON : {name}")
+
+
+def strict_json(data: bytes) -> Any:
+    """JSON strict : clés dupliquées et NaN/Infinity refusés.
+
+    Python ne garde que la dernière occurrence d'une clé dupliquée : un identifiant placé dans
+    la première échapperait au contrôle tout en restant dans le fichier publié.
+    """
+    return json.loads(
+        data.decode("utf-8"), object_pairs_hook=_no_duplicate_keys, parse_constant=_no_constant
+    )
 
 
 def resolves_to_itself(directory: Path) -> bool:

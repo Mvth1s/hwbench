@@ -185,3 +185,17 @@ def test_path_traversal_is_refused(tmp_path) -> None:
     assert validate_file(sneaky, REFERENCE) == [
         "doit être placé directement dans results/, sans lien symbolique"
     ]
+
+
+def test_duplicate_keys_cannot_hide_an_identifier(tmp_path) -> None:
+    text = json.dumps(good_payload())
+    # Python garderait la seconde valeur : la première (une MAC) resterait dans le fichier publié
+    sneaky = text.replace('"machine": ', '"machine": "aa:bb:cc:dd:ee:ff", "machine": ', 1)
+    assert json.loads(sneaky)["machine"] != "aa:bb:cc:dd:ee:ff"
+    found = problems(tmp_path, sneaky)
+    assert found == ["JSON invalide : clé(s) en double : machine"]
+
+
+def test_non_standard_constants_are_refused(tmp_path) -> None:
+    text = json.dumps(good_payload()).replace('"stdev": 0.0', '"stdev": NaN', 1)
+    assert problems(tmp_path, text) == ["JSON invalide : valeur non standard en JSON : NaN"]
