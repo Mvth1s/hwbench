@@ -3,6 +3,7 @@ name: Release
 # À chaque push sur main : python-semantic-release calcule la version à partir des conventional
 # commits, met à jour pyproject.toml, src/hwbench/__init__.py et CHANGELOG.md, committe
 # « chore(release): X.Y.Z », tagge vX.Y.Z, puis crée la GitHub Release avec sdist et wheel.
+# Si une release a été créée : attestation de provenance des artefacts.
 # Configuration : [tool.semantic_release] dans pyproject.toml.
 on:
   push:
@@ -12,12 +13,16 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-permissions:
-  contents: write
+# Aucune permission par défaut : chaque job déclare le strict nécessaire.
+permissions: {}
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # commit de release, tag, GitHub Release
+      id-token: write # attestation de provenance (certificat Sigstore)
+      attestations: write # enregistrement de l'attestation sur le dépôt
     steps:
       - uses: actions/checkout@v7
         with:
@@ -30,14 +35,20 @@ jobs:
           SHA: ${{ github.sha }}
         run: git reset --hard "$SHA"
 
+      # actions tierces et actions de publication épinglées par SHA de commit
       - name: Version, changelog, tag et GitHub Release
         id: release
-        # actions tierces épinglées par SHA de commit (le jeton a contents: write)
         uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278 # v10.7.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           git_committer_name: github-actions[bot]
           git_committer_email: 41898282+github-actions[bot]@users.noreply.github.com
+
+      - name: Attester la provenance de sdist et wheel
+        if: steps.release.outputs.released == 'true'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
 
       - name: Joindre sdist et wheel à la GitHub Release
         if: steps.release.outputs.released == 'true'
