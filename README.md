@@ -353,6 +353,28 @@ qui déduit la version de ces messages (`fix` → correctif, `feat` → mineure)
 `pyproject.toml` et `CHANGELOG.md`, crée le tag `vX.Y.Z` et la GitHub Release avec la wheel
 et le sdist. Le développement se fait sur `dev`, les releases par pull request `dev` → `main`.
 
+### Vérifier la provenance d'une version
+
+Chaque wheel et chaque sdist publiés sont accompagnés d'une attestation de provenance (SLSA,
+signée par Sigstore) produite par le workflow de release : elle prouve que le fichier a été
+construit par ce dépôt, à partir du commit tagué. Ce sont les mêmes fichiers sur la page
+Releases et sur PyPI. Pour vérifier, avec la [CLI GitHub](https://cli.github.com/) :
+
+```sh
+# depuis la GitHub Release
+gh release download v0.3.0 --repo Mvth1s/hwbench --pattern '*.whl'
+gh attestation verify hwbench-0.3.0-py3-none-any.whl --repo Mvth1s/hwbench \
+  --signer-workflow Mvth1s/hwbench/.github/workflows/release.yml
+
+# ou depuis PyPI
+pip download hwbench==0.3.0 --no-deps
+gh attestation verify hwbench-0.3.0-py3-none-any.whl --repo Mvth1s/hwbench
+```
+
+La commande échoue si le fichier a été modifié ou s'il n'a pas été construit par le workflow
+de release de ce dépôt. Les versions antérieures à l'ajout de l'attestation (0.1.0, 0.2.0) n'en
+ont pas.
+
 ## Vie privée
 
 Numéros de série (disques, RAM, système, carte mère), UUID produit, EUI-64/NGUID/WWN des
