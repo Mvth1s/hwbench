@@ -92,10 +92,41 @@ def test_outdated_or_unknown_bench(tmp_path) -> None:
     assert "geekbench-cpu : bench inconnu" in found
 
 
-def test_tampered_points_are_refused(tmp_path) -> None:
+def _tamper(mutate) -> dict:
     data = good_payload()
-    data["backend_scores"][0]["points"] *= 2
-    assert any("points incohérents avec les résultats" in p for p in problems(tmp_path, data))
+    mutate(data)
+    return data
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected"),
+    [
+        (
+            lambda d: d["backend_scores"][0].update(points=d["backend_scores"][0]["points"] * 2),
+            "backend native-cpu-single : points incohérents",
+        ),
+        # échapper au contrôle en supprimant ou en annulant des entrées ne marche pas
+        (lambda d: d.update(backend_scores=[]), "backend native-cpu-single : points incohérents"),
+        (
+            lambda d: d["backend_scores"][0].update(points=None),
+            "backend native-cpu-single : points incohérents avec les résultats "
+            "(non comparable au lieu de",
+        ),
+        (lambda d: d["categories"][2].update(points=5000.0), "catégorie gpu : points incohérents"),
+        (
+            lambda d: d.update(categories=[]),
+            "catégorie cpu_single : points incohérents avec les résultats (absent",
+        ),
+        (lambda d: d["combined"].update(points=9999.0), "score combiné : points incohérents"),
+        (
+            lambda d: d.update(combined=None),
+            "score combiné : points incohérents avec les résultats (absent au lieu",
+        ),
+    ],
+)
+def test_tampered_points_are_refused(tmp_path, mutate, expected) -> None:
+    found = problems(tmp_path, _tamper(mutate))
+    assert any(p.startswith(expected) for p in found), found
 
 
 def test_size_and_json_errors(tmp_path) -> None:

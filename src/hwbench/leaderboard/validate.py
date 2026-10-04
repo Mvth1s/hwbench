@@ -22,7 +22,13 @@ from typing import Any
 from hwbench import privacy
 from hwbench.benchmarks.base import benchmark_classes
 from hwbench.export import ExportError, MachineExport, from_dict
-from hwbench.scoring import Reference, score_results
+from hwbench.scoring import (
+    BackendScore,
+    CategoryScore,
+    CombinedScore,
+    Reference,
+    score_results,
+)
 
 FILENAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}\.json$")
 MAX_BYTES = 512 * 1024
@@ -59,21 +65,46 @@ def identifier_problems(raw: Any) -> list[str]:
     return sorted(problems)
 
 
+_ABSENT = object()  # entrée absente, distincte de points à None
+
+
+def _score_map(
+    backends: list[BackendScore], categories: list[CategoryScore], combined: CombinedScore | None
+) -> dict[str, float | None]:
+    scores: dict[str, float | None] = {f"backend {b.backend.name}": b.points for b in backends}
+    scores |= {f"catégorie {c.category.value}": c.points for c in categories}
+    if combined is not None:
+        scores["score combiné"] = combined.points
+    return scores
+
+
+def _same(got: object, want: object) -> bool:
+    if got is _ABSENT or want is _ABSENT or got is None or want is None:
+        return got is want
+    return math.isclose(got, want, rel_tol=1e-9)  # type: ignore[arg-type]
+
+
+def _fmt(points: object) -> str:
+    if points is _ABSENT:
+        return "absent"
+    return "non comparable" if points is None else f"{points:.3f}"
+
+
 def _points_problems(export: MachineExport, reference: Reference) -> list[str]:
-    recomputed = {
-        s.backend.name: s.points for s in score_results(export.results, reference).backends
-    }
-    problems = []
-    for stored in export.backend_scores:
-        expected = recomputed.get(stored.backend.name)
-        if stored.points is None or expected is None:
-            continue
-        if not math.isclose(stored.points, expected, rel_tol=1e-9):
-            problems.append(
-                f"{stored.backend.name} : points incohérents avec les résultats "
-                f"({stored.points:.3f} au lieu de {expected:.3f})"
-            )
-    return problems
+    """Scores de l'export comparés, entrée par entrée, à ceux recalculés depuis les résultats.
+
+    Strict : mêmes backends, catégories et combiné, mêmes points (None compris). Supprimer une
+    entrée ou mettre des points à null n'échappe pas au contrôle.
+    """
+    exp = score_results(export.results, reference)
+    want = _score_map(exp.backends, exp.categories, exp.combined)
+    got = _score_map(export.backend_scores, export.categories, export.combined)
+    return [
+        f"{key} : points incohérents avec les résultats "
+        f"({_fmt(got.get(key, _ABSENT))} au lieu de {_fmt(want.get(key, _ABSENT))})"
+        for key in sorted(want.keys() | got.keys())
+        if not _same(got.get(key, _ABSENT), want.get(key, _ABSENT))
+    ]
 
 
 def validate_payload(raw: Any, reference: Reference) -> list[str]:
