@@ -2,6 +2,44 @@
 
 <!-- version list -->
 
+## v0.2.0 (2026-10-04)
+
+### Bug Fixes
+
+- **compare**: Flag GPU driver differences only between same-GPU files
+  ([`1a19258`](https://github.com/Mvth1s/hwbench/commit/1a19258304d2007c84d2addb9c9a537dadcb2a6c))
+
+- **scoring**: Warn about the GPU driver only on the reference GPU
+  ([`d6dba1c`](https://github.com/Mvth1s/hwbench/commit/d6dba1c06d3a114e62c99ac6ffb74f3fbf5b38b0))
+
+### Continuous Integration
+
+- **deps**: Bump actions/checkout from 4 to 7
+  ([`80ccb8a`](https://github.com/Mvth1s/hwbench/commit/80ccb8afc5692093b20a4f9f4df0672a94362f07))
+
+- **deps**: Bump actions/setup-node from 4 to 7
+  ([`3beba7a`](https://github.com/Mvth1s/hwbench/commit/3beba7a5c29e57be27da7a8a7a1a239d3e149917))
+
+- **deps**: Bump actions/setup-python from 5 to 7
+  ([`166c11c`](https://github.com/Mvth1s/hwbench/commit/166c11ce8cf2201e751d55878c171b6975a28ea0))
+
+### Documentation
+
+- Describe the same-GPU, upstream-version GPU driver notice
+  ([`102e055`](https://github.com/Mvth1s/hwbench/commit/102e055e1be514cd812e14a4cdfb666bb13141d6))
+
+- Regenerate the reference only on bench or tool version changes
+  ([`1c05142`](https://github.com/Mvth1s/hwbench/commit/1c05142ee8f9356b4b36dd71325f3fa3d27dfdf7))
+
+### Features
+
+- **compare**: Warn when the GPU driver differs between exports
+  ([`c10aa1b`](https://github.com/Mvth1s/hwbench/commit/c10aa1b4cabd3e46d5feeb21a82eab6b305805c0))
+
+- **scoring**: Warn when the GPU driver differs from the reference
+  ([`2150c74`](https://github.com/Mvth1s/hwbench/commit/2150c748abf73326639002b8444ffecb6a548ebc))
+
+
 ## v0.1.0 (2026-10-03)
 
 - Initial Release
