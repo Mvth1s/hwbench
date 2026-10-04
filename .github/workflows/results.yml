@@ -37,13 +37,25 @@ jobs:
       - name: Installer hwbench depuis la branche de base
         run: pip install ./base
 
+      # Un dossier results/ remplacé par un lien symbolique ne laisserait aucun fichier à valider.
+      - name: results/ doit rester un vrai dossier
+        working-directory: pr
+        run: |
+          if [ -L results ] || [ ! -d results ]; then
+            echo "::error::results/ doit être un dossier ordinaire, pas un lien symbolique"
+            exit 1
+          fi
+
       # Noms de fichiers contrôlés par l'auteur de la PR : passés par -z / xargs -0, jamais
-      # interprétés par un shell. Seuls les fichiers ajoutés, modifiés ou renommés sont validés
-      # (les anciens résultats restent lisibles après un changement de version de bench).
+      # interprétés par un shell. python -I (isolé) : le dossier courant, qui est le checkout de
+      # la PR, n'entre pas dans le chemin d'import ; sinon un dossier hwbench/ ajouté par la PR
+      # remplacerait le validateur de la branche de base. Seuls les fichiers ajoutés, modifiés
+      # ou renommés sont validés (les anciens résultats restent lisibles après un changement de
+      # version de bench).
       - name: Valider les fichiers ajoutés ou modifiés
         working-directory: pr
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           git diff -z --name-only --diff-filter=AMR "$BASE" HEAD -- results/ \
-            | xargs -0 --no-run-if-empty python -m hwbench.leaderboard validate
+            | xargs -0 --no-run-if-empty python -I -m hwbench.leaderboard validate
