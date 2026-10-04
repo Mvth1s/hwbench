@@ -2,6 +2,73 @@
 
 <!-- version list -->
 
+## v0.3.0 (2026-10-04)
+
+### Build System
+
+- Complete package metadata for PyPI
+  ([`a40f0d8`](https://github.com/Mvth1s/hwbench/commit/a40f0d85ec59ac2a43ed0d3fa364165598c1d389))
+
+### Continuous Integration
+
+- Add a script reproducing the CI locally
+  ([`abe28f3`](https://github.com/Mvth1s/hwbench/commit/abe28f3f4207493463c40e74fd589e414891fd2e))
+
+- Add Dependabot updates for Python dependencies
+  ([`a852677`](https://github.com/Mvth1s/hwbench/commit/a852677efffed4bbcce9783d6bb15f610c7f3f69))
+
+- Report test coverage in the job summary
+  ([`5573098`](https://github.com/Mvth1s/hwbench/commit/55730982bdf767f4170ebe7081e305ca9d85518c))
+
+- **release**: Attest build provenance of release artifacts
+  ([`3c9b3b0`](https://github.com/Mvth1s/hwbench/commit/3c9b3b0356729ff35d16ea73200231eca005d107))
+
+- **release**: Publish to PyPI with trusted publishing
+  ([`a9dec1a`](https://github.com/Mvth1s/hwbench/commit/a9dec1ab1ce2e4a223950124deae887d56e680d9))
+
+### Documentation
+
+- Add CI, release and license badges to the README
+  ([`2515e42`](https://github.com/Mvth1s/hwbench/commit/2515e42e61d885e2bd2fb27b307f047cc6f81448))
+
+- Add the MIT license text
+  ([`2c641f0`](https://github.com/Mvth1s/hwbench/commit/2c641f0b253dab5cf78ccb9a0a5c405a7fb22efb))
+
+- Commit subject case, commitlint before merge and zsh pitfalls in CLAUDE.md
+  ([`611c54a`](https://github.com/Mvth1s/hwbench/commit/611c54a7f8f1f7885fa54bb99ed058b3d9c5f18b))
+
+- Drop the stale phase status line from the README
+  ([`52087ac`](https://github.com/Mvth1s/hwbench/commit/52087aca573bc4059809802fc4d90fb2f4feac46))
+
+- Explain how to verify release provenance with gh attestation
+  ([`15355cb`](https://github.com/Mvth1s/hwbench/commit/15355cb78764a593175e40c0f62a7f683d128ab4))
+
+- Install from PyPI first, git URL as an alternative
+  ([`b464024`](https://github.com/Mvth1s/hwbench/commit/b4640247063e1c2ad99bbfa06827604473db3458))
+
+- Never gate a merge on a piped command (CLAUDE.md)
+  ([`05b6610`](https://github.com/Mvth1s/hwbench/commit/05b66109bbe39afc8d0876cffbe47755839e23dc))
+
+- Record phase A conventions in CLAUDE.md
+  ([`0b8c9d2`](https://github.com/Mvth1s/hwbench/commit/0b8c9d29564beb5bffcc2750d95a28cd0395ec1b))
+
+- Run scripts/ci-local.sh before every merge (CLAUDE.md)
+  ([`80e9ab0`](https://github.com/Mvth1s/hwbench/commit/80e9ab07239165fc2e0311b873a11ff6322fb9a3))
+
+### Features
+
+- **cli**: Add hwbench --version
+  ([`c7597b9`](https://github.com/Mvth1s/hwbench/commit/c7597b9e5c72f3b8b1b5781d85f72c9b955d7dfc))
+
+- **cli**: Shell completion for fish and bash
+  ([`cd64945`](https://github.com/Mvth1s/hwbench/commit/cd64945eac8301b0212d1e1aa923bb0f7fcb903b))
+
+### Testing
+
+- Check completion options without parsing the rendered help
+  ([`4eb307d`](https://github.com/Mvth1s/hwbench/commit/4eb307d0da6da10edd9f0a3122cb476a5d0d571f))
+
+
 ## v0.2.0 (2026-10-04)
 
 ### Bug Fixes
