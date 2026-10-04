@@ -2,6 +2,7 @@ import json
 import re
 
 import pytest
+import typer
 from conftest import laptop_commands, laptop_sysfs, sysfs_fixture
 from rich.console import Console
 from typer.testing import CliRunner
@@ -224,6 +225,7 @@ def test_version_option() -> None:
 
 
 def test_shell_completion_options() -> None:
-    result = runner.invoke(cli.app, ["--help"], env={"COLUMNS": "200"})
-    assert "--install-completion" in result.output
-    assert "--show-completion" in result.output
+    # Paramètres de la commande, pas l'aide rendue : sous GitHub Actions, Typer force un rendu
+    # de terminal où rich découpe « --install-completion » en segments colorés.
+    params = {p.name for p in typer.main.get_command(cli.app).params}
+    assert {"install_completion", "show_completion"} <= params
