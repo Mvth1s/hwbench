@@ -38,7 +38,7 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 scripts/capture_tool_fixtures.sh     # bash : sorties réelles de sysbench/glmark2/vkmark
 ```
 
-Outils (shell de l'agent) : le shell des commandes est **zsh**, qui ne découpe pas les variables non quotées (`for c in $LISTE` fait un seul tour, `-b $ARGS` passe un seul argument). Toute boucle sur une liste contenue dans une variable, et tout passage d'arguments construits, se fait dans `bash -c '…'` (ou avec des tableaux bash). Enchaîner par `&&` (jamais `;`) quand une étape conditionne la suivante, en particulier avant un merge. `git cherry-pick` n'a pas d'option `-q`.
+Outils (shell de l'agent) : le shell des commandes est **zsh**, qui ne découpe pas les variables non quotées (`for c in $LISTE` fait un seul tour, `-b $ARGS` passe un seul argument). Toute boucle sur une liste contenue dans une variable, et tout passage d'arguments construits, se fait dans `bash -c '…'` (ou avec des tableaux bash). Enchaîner par `&&` (jamais `;`) quand une étape conditionne la suivante, en particulier avant un merge. Ne jamais filtrer par un pipe (`… | grep`, `| tail`) une commande dont le code de retour conditionne la suite : le code d'un pipeline est celui de la dernière commande, l'échec serait masqué. Lancer `scripts/ci-local.sh` tel quel avant `&& git merge`. `git cherry-pick` n'a pas d'option `-q`.
 
 Git : une branche par phase (ou lot de corrections) depuis `dev`, un commit par fonction
 ajoutée ou modifiée, merge dans `dev` à la fin. Ne pas réécrire l'historique déjà poussé.
