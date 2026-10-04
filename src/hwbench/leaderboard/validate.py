@@ -144,9 +144,10 @@ def validate_payload(raw: Any, reference: Reference) -> list[str]:
 
 def validate_file(path: Path, reference: Reference) -> list[str]:
     """Liste des problèmes du fichier ; vide s'il est accepté."""
+    if path.parent.name != RESULTS_DIR or not resolves_to_itself(path.parent):
+        # rien n'est ouvert : un dossier results/ remplacé par un lien pointerait ailleurs
+        return [f"doit être placé directement dans {RESULTS_DIR}/, sans lien symbolique"]
     problems = []
-    if path.parent.name != RESULTS_DIR:
-        problems.append(f"doit être placé directement dans {RESULTS_DIR}/")
     if not FILENAME_RE.match(path.name):
         problems.append(
             "nom de fichier invalide : minuscules, chiffres et tirets, extension .json "
@@ -161,6 +162,15 @@ def validate_file(path: Path, reference: Reference) -> list[str]:
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         return [*problems, f"JSON invalide : {exc}"]
     return problems + validate_payload(raw, reference)
+
+
+def resolves_to_itself(directory: Path) -> bool:
+    """Vrai si aucun élément du chemin du dossier n'est un lien symbolique.
+
+    O_NOFOLLOW ne protège que le dernier élément : si la PR remplace le dossier results/ par
+    un lien, results/x.json serait lu ailleurs que dans le dépôt.
+    """
+    return os.path.realpath(directory) == os.path.abspath(directory)
 
 
 class SubmissionError(ValueError):

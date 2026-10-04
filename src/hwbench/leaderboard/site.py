@@ -14,7 +14,7 @@ from pathlib import Path
 
 from hwbench.display.fmt import compact, measure, num
 from hwbench.export import ExportError, MachineExport, from_dict
-from hwbench.leaderboard.validate import SubmissionError, read_bounded
+from hwbench.leaderboard.validate import SubmissionError, read_bounded, resolves_to_itself
 from hwbench.results import Category, Result
 from hwbench.scoring import Reference, Scores, score_results
 
@@ -41,6 +41,8 @@ def e(value: object) -> str:
 def load_entries(results_dir: Path, reference: Reference) -> tuple[list[Entry], list[str]]:
     """Exports lisibles du dossier, et la liste des fichiers ignorés (avec la raison)."""
     entries, skipped = [], []
+    if not resolves_to_itself(results_dir):
+        return [], [f"{results_dir} : lien symbolique refusé, aucun résultat lu"]
     for path in sorted(results_dir.glob("*.json")):
         try:
             export = from_dict(json.loads(read_bounded(path).decode("utf-8")))

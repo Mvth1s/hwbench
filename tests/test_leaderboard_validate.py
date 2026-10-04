@@ -165,3 +165,23 @@ def test_symlink_is_refused_without_being_read(tmp_path) -> None:
 def test_read_is_bounded(tmp_path) -> None:
     path = submit(tmp_path, " " * (MAX_BYTES * 4))
     assert any("fichier trop gros" in p for p in validate_file(path, REFERENCE))
+
+
+def test_results_dir_replaced_by_a_symlink_is_refused(tmp_path) -> None:
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "x.json").write_text(json.dumps(good_payload()))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "results").symlink_to(elsewhere)
+    assert validate_file(repo / "results" / "x.json", REFERENCE) == [
+        "doit être placé directement dans results/, sans lien symbolique"
+    ]
+
+
+def test_path_traversal_is_refused(tmp_path) -> None:
+    submit(tmp_path, good_payload())
+    sneaky = tmp_path / "results" / ".." / "mon-desktop.json"
+    assert validate_file(sneaky, REFERENCE) == [
+        "doit être placé directement dans results/, sans lien symbolique"
+    ]

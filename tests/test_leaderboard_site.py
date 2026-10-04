@@ -104,3 +104,10 @@ def test_site_skips_symlinks(tmp_path) -> None:
     entries, skipped = load_entries(d, REFERENCE)
     assert "lien" not in {e.slug for e in entries}
     assert any(s.startswith("lien.json : lien symbolique refusé") for s in skipped)
+
+
+def test_site_refuses_a_symlinked_results_dir(tmp_path) -> None:
+    real = results_dir(tmp_path)
+    (tmp_path / "lien").symlink_to(real)
+    entries, skipped = load_entries(tmp_path / "lien", REFERENCE)
+    assert entries == [] and "lien symbolique refusé" in skipped[0]
