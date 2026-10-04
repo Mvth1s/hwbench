@@ -6,13 +6,15 @@ texte venu d'un export passe par html.escape (un export peut venir de n'importe 
 """
 
 import html
+import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from hwbench.display.fmt import compact, measure, num
-from hwbench.export import ExportError, MachineExport, load_export
+from hwbench.export import ExportError, MachineExport, from_dict
+from hwbench.leaderboard.validate import SubmissionError, read_bounded
 from hwbench.results import Category, Result
 from hwbench.scoring import Reference, Scores, score_results
 
@@ -41,8 +43,8 @@ def load_entries(results_dir: Path, reference: Reference) -> tuple[list[Entry], 
     entries, skipped = [], []
     for path in sorted(results_dir.glob("*.json")):
         try:
-            export = load_export(path)
-        except ExportError as exc:
+            export = from_dict(json.loads(read_bounded(path).decode("utf-8")))
+        except (SubmissionError, ExportError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             skipped.append(f"{path.name} : {exc}")
             continue
         entries.append(Entry(path.stem, export, score_results(export.results, reference)))

@@ -113,3 +113,24 @@ def test_cli_reports_each_file_and_fails_on_any_problem(tmp_path, capsys, monkey
     assert f"✓ {good}" in out.out and f"✗ {bad}" in out.out
     assert "schéma d'export 1" in out.out
     assert "1 fichier(s) refusé(s) sur 2" in out.err
+
+
+def test_symlink_is_refused_without_being_read(tmp_path) -> None:
+    secret = tmp_path / "secret.json"
+    secret.write_text(json.dumps(good_payload()))
+    link = tmp_path / "results" / "lien.json"
+    link.parent.mkdir()
+    link.symlink_to(secret)
+    assert validate_file(link, REFERENCE) == [
+        "lien symbolique refusé : soumettre un fichier ordinaire"
+    ]
+    dev_zero = tmp_path / "results" / "zero.json"
+    dev_zero.symlink_to("/dev/zero")
+    assert validate_file(dev_zero, REFERENCE) == [
+        "lien symbolique refusé : soumettre un fichier ordinaire"
+    ]
+
+
+def test_read_is_bounded(tmp_path) -> None:
+    path = submit(tmp_path, " " * (MAX_BYTES * 4))
+    assert any("fichier trop gros" in p for p in validate_file(path, REFERENCE))

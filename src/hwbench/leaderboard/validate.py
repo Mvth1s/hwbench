@@ -10,9 +10,12 @@ Un fichier est accepté s'il :
 Les résultats restent déclaratifs : rien ne garantit qu'ils ont été mesurés honnêtement.
 """
 
+import errno
 import json
 import math
+import os
 import re
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -119,12 +122,38 @@ def validate_file(path: Path, reference: Reference) -> list[str]:
             "(ex. results/mon-desktop.json)"
         )
     try:
-        size = path.stat().st_size
-        if size > MAX_BYTES:
-            return [*problems, f"fichier trop gros ({size} octets, maximum {MAX_BYTES})"]
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        return [*problems, f"illisible : {exc.strerror or exc}"]
+        data = read_bounded(path)
+    except SubmissionError as exc:
+        return [*problems, str(exc)]
+    try:
+        raw = json.loads(data.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         return [*problems, f"JSON invalide : {exc}"]
     return problems + validate_payload(raw, reference)
+
+
+class SubmissionError(ValueError):
+    pass
+
+
+def read_bounded(path: Path, limit: int = MAX_BYTES) -> bytes:
+    """Contenu d'un fichier ordinaire, sans suivre de lien symbolique, au plus `limit` octets.
+
+    Une PR peut ajouter un lien symbolique (git le recrée tel quel) vers /dev/zero ou un fichier
+    du runner : O_NOFOLLOW le refuse, et la lecture est bornée quoi qu'il arrive.
+    """
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise SubmissionError(
+                "lien symbolique refusé : soumettre un fichier ordinaire"
+            ) from exc
+        raise SubmissionError(f"illisible : {exc.strerror or exc}") from exc
+    with os.fdopen(fd, "rb") as f:
+        if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+            raise SubmissionError("pas un fichier ordinaire")
+        data = f.read(limit + 1)
+    if len(data) > limit:
+        raise SubmissionError(f"fichier trop gros (maximum {limit} octets)")
+    return data

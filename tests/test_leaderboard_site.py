@@ -96,3 +96,11 @@ def test_cli_site(tmp_path, monkeypatch, capsys) -> None:
     assert cli.main(["site", "--results", str(results_dir(tmp_path)), "--out", str(out)]) == 0
     assert "4 machine(s)" in capsys.readouterr().out
     assert (out / "index.html").exists()
+
+
+def test_site_skips_symlinks(tmp_path) -> None:
+    d = results_dir(tmp_path)
+    (d / "lien.json").symlink_to(d / "rapide.json")
+    entries, skipped = load_entries(d, REFERENCE)
+    assert "lien" not in {e.slug for e in entries}
+    assert any(s.startswith("lien.json : lien symbolique refusé") for s in skipped)
