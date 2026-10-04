@@ -20,7 +20,7 @@ from hwbench.models import (
     SensorsData,
 )
 from hwbench.reference import build_reference
-from hwbench.results import BackendId, Category, Result
+from hwbench.results import BackendId, Category, Result, driver_key, gpu_key
 from hwbench.scoring import (
     ReferenceError,
     ScoreIssue,
@@ -255,41 +255,107 @@ def test_reference_digest_identifies_content_not_formatting() -> None:
     assert (info.machine, info.digest) == ("Dell Inc. Latitude 5420", digest)
 
 
-def _glmark2(value: float, driver: str | None) -> Result:
-    env = {"driver": driver} if driver else {}
+RX9070_GL = "AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.7-arch1-1)"
+IRIS_GL = "Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)"
+
+
+def _glmark2(value: float, driver: str | None, renderer: str | None = RX9070_GL) -> Result:
+    env = {k: v for k, v in (("driver", driver), ("renderer", renderer)) if v}
     return make_result("glmark2", value, version="2", environment=env, **GLMARK2)
+
+
+def _reference(driver: str | None, renderer: str | None = RX9070_GL):
+    return reference_from_dict(
+        build_reference([_glmark2(2000.0, driver, renderer)], snapshot(), [])
+    )
+
+
+@pytest.mark.parametrize(
+    ("ours", "theirs", "expected"),
+    [
+        # même version amont, autre révision de paquet : même pilote
+        ("Mesa 26.2.4-arch1.2", "Mesa 26.2.4-arch1.1", ("mesa", "26.2.4")),
+        ("Mesa 26.2.4", "Mesa 26.2.4-arch1.1", ("mesa", "26.2.4")),  # Fedora
+        ("Mesa 26.2.4-1", "Mesa 26.2.4", ("mesa", "26.2.4")),  # Debian
+        ("Mesa 25.0.7-0ubuntu0.24.04.1", "Mesa 25.0.7", ("mesa", "25.0.7")),  # Ubuntu
+        ("RADV 26.2.4", "RADV 26.2.4", ("radv", "26.2.4")),
+        ("NVIDIA 550.54.14", "NVIDIA 550.54.14", ("nvidia", "550.54.14")),
+    ],
+)
+def test_driver_key_ignores_distribution_packaging(ours, theirs, expected) -> None:
+    assert driver_key(ours) == driver_key(theirs) == expected
+
+
+def test_driver_key_keeps_upstream_differences() -> None:
+    assert driver_key("Mesa 26.2.4-arch1.1") != driver_key("Mesa 26.2.3-arch1.1")
+    assert driver_key("NVIDIA 550.54.14") != driver_key("NVIDIA 560.35.03")
+    assert driver_key("Mesa 26.2.4") != driver_key("NVIDIA 26.2.4")
+    assert driver_key(None) is None and driver_key("  ") is None
+
+
+@pytest.mark.parametrize(
+    ("renderer", "expected"),
+    [
+        (RX9070_GL, "amd radeon rx 9070 xt"),
+        # le noyau change le renderer OpenGL, pas le GPU
+        (RX9070_GL.replace("7.2.7-arch1-1", "7.2.8-arch1-2"), "amd radeon rx 9070 xt"),
+        ("AMD Radeon RX 9070 XT (RADV GFX1201)", "amd radeon rx 9070 xt"),
+        ("NVIDIA GeForce RTX 3060/PCIe/SSE2", "nvidia geforce rtx 3060"),
+        (IRIS_GL, "mesa intel(r) iris(r) xe graphics"),
+        (None, None),
+    ],
+)
+def test_gpu_key(renderer, expected) -> None:
+    assert gpu_key(renderer) == expected
 
 
 @pytest.mark.parametrize(
     ("ours", "theirs", "differs"),
     [
         ("Mesa 26.2.4-arch1.1", "Mesa 26.2.3-arch1.1", True),
-        ("Mesa 26.2.3-arch1.1", "Mesa 26.2.3-arch1.1", False),
-        (None, "Mesa 26.2.3-arch1.1", False),  # pilote inconnu : rien à signaler
+        ("Mesa 26.2.3-arch1.2", "Mesa 26.2.3-arch1.1", False),  # simple reconstruction du paquet
+        ("Mesa 26.2.3", "Mesa 26.2.3-arch1.1", False),  # même pilote, empaqueté par Fedora
+        (None, "Mesa 26.2.3-arch1.1", False),
         ("Mesa 26.2.4-arch1.1", None, False),
     ],
 )
-def test_gpu_driver_is_information_not_identity(ours, theirs, differs) -> None:
-    reference = reference_from_dict(build_reference([_glmark2(2000.0, theirs)], snapshot(), []))
-    assert reference.find("glmark2").driver == theirs
-    score = normalize(_glmark2(3000.0, ours), reference)
+def test_gpu_driver_on_the_reference_gpu(ours, theirs, differs) -> None:
+    newer_kernel = RX9070_GL.replace("7.2.7-arch1-1", "7.2.8-arch1-2")
+    score = normalize(_glmark2(3000.0, ours, newer_kernel), _reference(theirs))
     # noté quel que soit le pilote : seul BackendId décide de la comparabilité
     assert (score.points, score.issue) == (pytest.approx(1500), None)
-    assert (score.driver, score.reference_driver) == (ours, theirs)
+    assert score.same_gpu
     assert score.driver_differs is differs
+    assert score.driver_info is False
 
 
-def test_scores_panel_warns_about_another_driver() -> None:
-    reference = reference_from_dict(
-        build_reference([_glmark2(2000.0, "Mesa 26.2.3-arch1.1")], snapshot(), [])
-    )
-    scores = score_results([_glmark2(2000.0, "Mesa 26.2.4-arch1.1")], reference)
+def test_other_gpu_driver_is_neutral_information() -> None:
+    score = normalize(_glmark2(1000.0, "Mesa 25.0.7-1", IRIS_GL), _reference("Mesa 26.2.3-arch1.1"))
+    assert score.points == pytest.approx(500)
+    assert not score.same_gpu and not score.driver_differs
+    assert score.driver_info
+
+
+def _panel(scores) -> str:
     console = Console(width=200, record=True)
     console.print(render_scores(scores))
-    out = console.export_text()
+    return console.export_text()
+
+
+def test_scores_panel_warns_only_on_the_reference_gpu() -> None:
+    reference = _reference("Mesa 26.2.3-arch1.1")
+    out = _panel(score_results([_glmark2(2000.0, "Mesa 26.2.4-arch1.1")], reference))
     assert "1000 pts" in out
-    assert "glmark2 : pilote Mesa 26.2.4-arch1.1 (référence : Mesa 26.2.3-arch1.1)" in out
-    same = score_results([_glmark2(2000.0, "Mesa 26.2.3-arch1.1")], reference)
-    console = Console(width=200, record=True)
-    console.print(render_scores(same))
-    assert "pilote" not in console.export_text()
+    assert (
+        "⚠ glmark2 : pilote Mesa 26.2.4-arch1.1 (référence : Mesa 26.2.3-arch1.1, même GPU)" in out
+    )
+    # reconstruction du paquet seulement : rien
+    out = _panel(score_results([_glmark2(2000.0, "Mesa 26.2.3-arch1.2")], reference))
+    assert "pilote" not in out
+
+
+def test_scores_panel_other_gpu_shows_driver_without_warning() -> None:
+    reference = _reference("Mesa 26.2.3-arch1.1")
+    out = _panel(score_results([_glmark2(800.0, "Mesa 25.0.7-1", IRIS_GL)], reference))
+    assert "glmark2 : pilote Mesa 25.0.7-1 (référence : Mesa 26.2.3-arch1.1, autre GPU)" in out
+    assert "⚠ glmark2" not in out

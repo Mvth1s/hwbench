@@ -22,7 +22,7 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from hwbench.results import BackendId, Category, Result
+from hwbench.results import BackendId, Category, Result, driver_key, gpu_key
 
 REFERENCE_POINTS = 1000.0
 REFERENCE_SCHEMA_VERSION = 1
@@ -56,8 +56,9 @@ class ReferenceEntry:
     unit: str
     higher_is_better: bool
     value: float
-    # pilote GPU de la référence (« Mesa 26.2.3-arch1.1 ») : information, hors BackendId
+    # pilote et GPU (renderer) de la référence : information, hors BackendId
     driver: str | None = None
+    gpu: str | None = None
 
 
 @dataclass(frozen=True)
@@ -97,19 +98,29 @@ class BackendScore:
     points: float | None
     issue: ScoreIssue | None = None
     reference_backend: BackendId | None = None  # ce que contient la référence, si différent
-    # Pilote GPU mesuré / de la référence. Hors identité : un autre pilote n'empêche pas de
-    # noter (sinon chaque mise à jour de Mesa imposerait de régénérer la référence), il est
-    # seulement signalé.
+    # Pilote et GPU (renderer brut) mesurés / de la référence. Hors identité : un autre pilote
+    # n'empêche pas de noter (sinon chaque mise à jour de Mesa imposerait de régénérer la
+    # référence) ; il n'est signalé que sur le GPU de la référence.
     driver: str | None = None
     reference_driver: str | None = None
+    gpu: str | None = None
+    reference_gpu: str | None = None
+
+    @property
+    def same_gpu(self) -> bool:
+        ours, theirs = gpu_key(self.gpu), gpu_key(self.reference_gpu)
+        return ours is not None and ours == theirs
 
     @property
     def driver_differs(self) -> bool:
-        return (
-            self.driver is not None
-            and self.reference_driver is not None
-            and self.driver != self.reference_driver
-        )
+        """Même GPU que la référence, autre pilote amont : à signaler (⚠)."""
+        ours, theirs = driver_key(self.driver), driver_key(self.reference_driver)
+        return self.same_gpu and ours is not None and theirs is not None and ours != theirs
+
+    @property
+    def driver_info(self) -> bool:
+        """Autre GPU (ou GPU inconnu) : le pilote est une information neutre, sans ⚠."""
+        return self.driver is not None and not self.same_gpu
 
 
 @dataclass(frozen=True)
@@ -163,6 +174,7 @@ def reference_from_dict(payload: Mapping[str, Any]) -> Reference:
                 higher_is_better=bool(b["higher_is_better"]),
                 value=float(b["value"]),
                 driver=(b.get("environment") or {}).get("driver"),
+                gpu=(b.get("environment") or {}).get("renderer"),
             )
             for b in payload["benchmarks"]
         ]
@@ -203,7 +215,12 @@ def normalize(result: Result, reference: Reference) -> BackendScore:
     entry = reference.find(ours.name)
     if entry is None:
         return BackendScore(ours, result.category, official, None, ScoreIssue.NOT_IN_REFERENCE)
-    drivers = {"driver": result.environment.get("driver"), "reference_driver": entry.driver}
+    drivers = {
+        "driver": result.environment.get("driver"),
+        "reference_driver": entry.driver,
+        "gpu": result.environment.get("renderer"),
+        "reference_gpu": entry.gpu,
+    }
     if entry.id.version != ours.version:
         issue = ScoreIssue.VERSION_MISMATCH
     elif entry.id.tool_version != ours.tool_version:
