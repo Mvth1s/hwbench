@@ -21,6 +21,8 @@ SENSITIVE_VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
     # EUI-64 / NGUID / WWN en hexadécimal long (16 ou 32 chiffres, éventuellement séparés)
     re.compile(r"\b(?:eui\.|naa\.)?[0-9a-f]{16}(?:[0-9a-f]{16})?\b", re.IGNORECASE),
 )
+# Nom de chaque motif ci-dessus, dans le même ordre (messages d'erreur du classement).
+SENSITIVE_VALUE_NAMES: tuple[str, ...] = ("adresse MAC", "UUID", "identifiant EUI-64/NGUID/WWN")
 
 
 # Clés connues comme non sensibles, avec le format exact de leur valeur : seule une valeur
