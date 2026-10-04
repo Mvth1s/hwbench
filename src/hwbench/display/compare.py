@@ -123,8 +123,8 @@ def notice_message(notice: Notice, labels: list[str] | None = None) -> str:
                 if driver is not None
             )
             return (
-                f"{notice.subject} : pilotes GPU différents ({drivers}). Écart calculé quand "
-                "même ; une partie peut venir du pilote."
+                f"{notice.subject} : même GPU, pilotes différents ({drivers}). Écart calculé "
+                "quand même ; une partie peut venir du pilote."
             )
 
 
