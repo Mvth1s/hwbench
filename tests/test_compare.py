@@ -147,3 +147,59 @@ def test_export_without_reference_has_no_points() -> None:
     assert score_row(c, Category.CPU_SINGLE).cells[1].issue is Incomparable.NO_REFERENCE
     # les benchs bruts restent comparables, eux
     assert row(c, "native-cpu-single").cells[1].delta_percent == pytest.approx(100.0)
+
+
+RX9070 = "AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.7-arch1-1)"
+RX9070_NEW_KERNEL = RX9070.replace("7.2.7-arch1-1", "7.2.8-arch1-2")
+IRIS = "Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)"
+
+
+def with_driver(results: list[Result], driver: str | None, renderer: str | None = RX9070):
+    env = {k: v for k, v in (("driver", driver), ("renderer", renderer)) if v}
+    return [replace(r, environment=env) if r.name == "glmark2" else r for r in results]
+
+
+def driver_notices(c):
+    return [(w.subject, w.values) for w in c.warnings if w.code is CompareWarning.DRIVER_DIFFERS]
+
+
+def test_same_gpu_other_driver_is_flagged_but_still_compared() -> None:
+    a = with_driver(machine(1.0), "Mesa 26.2.3-arch1.1")
+    b = with_driver(machine(1.1), "Mesa 26.2.4-arch1.1", RX9070_NEW_KERNEL)  # noyau mis à jour
+    c = compare([export(a), export(b)])
+    assert row(c, "glmark2").cells[1].delta_percent == pytest.approx(10.0)
+    assert driver_notices(c) == [("glmark2", ["Mesa 26.2.3-arch1.1", "Mesa 26.2.4-arch1.1"])]
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("Mesa 26.2.3-arch1.1", "Mesa 26.2.3-arch1.1"),
+        ("Mesa 26.2.3-arch1.1", "Mesa 26.2.3-arch1.2"),  # reconstruction du paquet Arch
+        ("Mesa 26.2.3-arch1.1", "Mesa 26.2.3"),  # même pilote empaqueté par Fedora
+        ("Mesa 26.2.3-arch1.1", None),
+    ],
+)
+def test_same_upstream_or_unknown_driver_is_not_flagged(first, second) -> None:
+    c = compare(
+        [export(with_driver(machine(1.0), first)), export(with_driver(machine(1.0), second))]
+    )
+    assert c.warnings == []
+
+
+def test_other_gpu_other_driver_is_expected_not_flagged() -> None:
+    desktop = with_driver(machine(1.0), "Mesa 26.2.4-arch1.1")
+    laptop = with_driver(machine(0.3), "Mesa 25.0.7-1", IRIS)
+    nvidia = with_driver(machine(1.2), "NVIDIA 550.54.14", "NVIDIA GeForce RTX 3060/PCIe/SSE2")
+    assert compare([export(desktop), export(laptop), export(nvidia)]).warnings == []
+
+
+def test_only_files_sharing_the_gpu_are_listed() -> None:
+    c = compare(
+        [
+            export(with_driver(machine(1.0), "Mesa 26.2.3-arch1.1")),
+            export(with_driver(machine(0.3), "Mesa 25.0.7-1", IRIS)),
+            export(with_driver(machine(1.0), "Mesa 26.2.4-arch1.1")),
+        ]
+    )
+    assert driver_notices(c) == [("glmark2", ["Mesa 26.2.3-arch1.1", None, "Mesa 26.2.4-arch1.1"])]

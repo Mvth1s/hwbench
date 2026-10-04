@@ -104,7 +104,7 @@ def render_bench_rows(comparison: Comparison, labels: list[str]) -> Table:
     return t
 
 
-def notice_message(notice: Notice) -> str:
+def notice_message(notice: Notice, labels: list[str] | None = None) -> str:
     match notice.code:
         case CompareWarning.BENCH_VERSION_DIFFERS:
             return (
@@ -115,6 +115,17 @@ def notice_message(notice: Notice) -> str:
             return "Fichiers notés contre des références différentes : points non comparés."
         case CompareWarning.FORCED_REFERENCE:
             return f"{notice.subject} : noté contre une référence générée avec --force."
+        case CompareWarning.DRIVER_DIFFERS:
+            names = labels or [f"fichier {i + 1}" for i in range(len(notice.values))]
+            drivers = ", ".join(
+                f"{name} : {driver}"
+                for name, driver in zip(names, notice.values, strict=False)
+                if driver is not None
+            )
+            return (
+                f"{notice.subject} : même GPU, pilotes différents ({drivers}). Écart calculé "
+                "quand même ; une partie peut venir du pilote."
+            )
 
 
 def render_comparison(comparison: Comparison, labels: list[str]) -> Group:
@@ -122,5 +133,5 @@ def render_comparison(comparison: Comparison, labels: list[str]) -> Group:
     if comparison.scores:
         parts.append(render_score_rows(comparison, labels))
     parts.append(render_bench_rows(comparison, labels))
-    parts += [Text(f"⚠ {notice_message(n)}", style="yellow") for n in comparison.warnings]
+    parts += [Text(f"⚠ {notice_message(n, labels)}", style="yellow") for n in comparison.warnings]
     return Group(*parts)
