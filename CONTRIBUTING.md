@@ -5,6 +5,12 @@
 Le classement (site GitHub Pages du dépôt) est généré à partir des fichiers de `results/`.
 Chaque machine y entre par une pull request qui ajoute **un** fichier `results/<nom>.json`.
 
+**Licence des résultats : CC0-1.0.** Un fichier de `results/` est une donnée (mesures et
+description du matériel), pas du code : il est publié sous
+[CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/deed.fr) (domaine public, réutilisable
+sans condition), et non sous la licence AGPL du logiciel. En ouvrant la pull request, vous
+acceptez de publier votre fichier sous CC0-1.0.
+
 1. **Installer la dernière version** de hwbench : la validation exige un export noté contre la
    référence actuelle et des benchs à leur version courante.
 
@@ -82,6 +88,8 @@ cas.
 
 ## Contribuer au code
 
-Développement sur `dev`, pull requests vers `dev`, messages de commit conventionnels. Avant
+Le code de hwbench est sous licence AGPL-3.0-or-later : une contribution de code est acceptée
+sous cette même licence. Développement sur `dev`, pull requests vers `dev`, messages de commit
+conventionnels. Avant
 d'ouvrir une pull request, `scripts/ci-local.sh` reproduit la CI (venv neuf, ruff, pytest,
 commitlint). Voir aussi le README pour l'installation de développement.
