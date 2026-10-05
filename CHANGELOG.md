@@ -2,6 +2,67 @@
 
 <!-- version list -->
 
+## v0.4.0 (2026-10-05)
+
+### Bug Fixes
+
+- **ci**: Keep the leaderboard validator out of the PR's reach
+  ([`1633309`](https://github.com/Mvth1s/hwbench/commit/1633309e40849b40057a5f63cd90174a295643c8))
+
+- **leaderboard**: Compare every stored score with the recomputed one
+  ([`b011cfb`](https://github.com/Mvth1s/hwbench/commit/b011cfbd97a8e97f87d1ddcc8c663f18a2ad3ccd))
+
+- **leaderboard**: Parse submitted JSON strictly
+  ([`c885b93`](https://github.com/Mvth1s/hwbench/commit/c885b93526dbef46830b9a02014fbc6b834c9e6e))
+
+- **leaderboard**: Refuse a symlinked results directory and path traversal
+  ([`8da781f`](https://github.com/Mvth1s/hwbench/commit/8da781f51591496a93966fac826483f1721601de))
+
+- **leaderboard**: Refuse symlinks and bound reads of submitted files
+  ([`9b718af`](https://github.com/Mvth1s/hwbench/commit/9b718afac90fd02bb3a7881d7e8dc23a306d7f4a))
+
+### Chores
+
+- **results**: Add the B850 desktop as the first leaderboard entry
+  ([`9039d56`](https://github.com/Mvth1s/hwbench/commit/9039d568f4a1eefdfc3caf65d2b6a8b1e9b3127b))
+
+### Continuous Integration
+
+- Deploy the leaderboard to GitHub Pages on push to main
+  ([`5b200d8`](https://github.com/Mvth1s/hwbench/commit/5b200d852ee0f4c8636d8dff547933b3177c6c9a))
+
+- Validate leaderboard submissions on pull requests
+  ([`cd895af`](https://github.com/Mvth1s/hwbench/commit/cd895af7ee8447f09fc8ef3262658d7b1dc6c288))
+
+### Documentation
+
+- Add a license section and an explicit AGPL badge to the README
+  ([`e61e0ae`](https://github.com/Mvth1s/hwbench/commit/e61e0ae5eaf7e22b1b014adacca6e1b357ec0b3c))
+
+- Add CONTRIBUTING.md for leaderboard submissions
+  ([`d067751`](https://github.com/Mvth1s/hwbench/commit/d06775168d902792d14129541d37ad9245ad988b))
+
+- Document the leaderboard in the README and CLAUDE.md
+  ([`fd3d215`](https://github.com/Mvth1s/hwbench/commit/fd3d215a8a2f6c1086d7ffa5dd86c0c726a509f5))
+
+- Publish leaderboard results under CC0-1.0 (CONTRIBUTING)
+  ([`ef9b8b6`](https://github.com/Mvth1s/hwbench/commit/ef9b8b65d4fc7612f9cfe3a337a5a308aa575c45))
+
+- Record the AGPL-3.0-or-later license rules in CLAUDE.md
+  ([`9101c99`](https://github.com/Mvth1s/hwbench/commit/9101c995506787218eaee8251a3fc2869ef3023c))
+
+### Features
+
+- **leaderboard**: Generate the static leaderboard site
+  ([`29dd170`](https://github.com/Mvth1s/hwbench/commit/29dd17040f640fa12fa27001e670daa35bf84992))
+
+- **leaderboard**: Validate exports submitted to the leaderboard
+  ([`381c1ed`](https://github.com/Mvth1s/hwbench/commit/381c1ed1ae83b12dc4cf5db4493935c40584f961))
+
+- **license**: Relicense under AGPL-3.0-or-later, versions up to 0.3.0 remain MIT
+  ([`632e32d`](https://github.com/Mvth1s/hwbench/commit/632e32d529c52fd86b28480cee9e374ac109e113))
+
+
 ## v0.3.0 (2026-10-04)
 
 ### Build System
