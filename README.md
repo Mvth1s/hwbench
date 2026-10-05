@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Mvth1s/hwbench/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Mvth1s/hwbench/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Mvth1s/hwbench)](https://github.com/Mvth1s/hwbench/releases)
-[![Licence](https://img.shields.io/github/license/Mvth1s/hwbench)](https://github.com/Mvth1s/hwbench/blob/main/LICENSE)
+[![Licence : AGPL-3.0-or-later](https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue)](https://github.com/Mvth1s/hwbench/blob/main/LICENSE)
 
 Outil en ligne de commande pour Linux qui inventorie les composants d'une machine et lance des
 benchmarks notés (CPU single-core, CPU multi-core, GPU et score combiné) pour comparer des
@@ -395,3 +395,13 @@ disques, asset tags et hostname ne sont pas lus par défaut et ne font jamais pa
 collectées. Seul `--show-serials` les lit, dans une structure séparée, pour l'affichage local.
 Toute sortie JSON passe en plus par un filtre de sécurité (`privacy.py`). L'UUID du GPU que
 vkmark affiche n'est jamais relevé.
+
+## Licence
+
+hwbench est distribué sous licence **GNU AGPL v3 ou ultérieure** (`AGPL-3.0-or-later`), à partir
+de la version qui suit la 0.3.0 : texte complet dans
+[LICENSE](https://github.com/Mvth1s/hwbench/blob/main/LICENSE). Les versions **0.1.0 à 0.3.0**
+ont été publiées sous licence MIT et le restent.
+
+Les résultats soumis au classement (`results/`) sont des données, publiées sous **CC0-1.0** :
+voir [CONTRIBUTING.md](https://github.com/Mvth1s/hwbench/blob/main/CONTRIBUTING.md).
