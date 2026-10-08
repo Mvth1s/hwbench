@@ -18,7 +18,14 @@ def measure(value: float) -> str:
 
 
 def fr_date(iso: str | None) -> str | None:
-    """« 2024-12-18 » ou « 2026-10-05T12:00:00+00:00 » -> « 18/12/2024 », « 05/10/2026 »."""
+    """« 2024-12-18 » ou « 2026-10-05T12:00:00+00:00 » -> « 18/12/2024 », « 05/10/2026 ».
+
+    Ne lève jamais : une date illisible (export soumis au classement, par exemple) est rendue
+    telle quelle plutôt que de faire échouer tout l'affichage.
+    """
     if not iso:
         return None
-    return date.fromisoformat(iso[:10]).strftime("%d/%m/%Y")
+    try:
+        return date.fromisoformat(iso[:10]).strftime("%d/%m/%Y")
+    except ValueError:
+        return iso

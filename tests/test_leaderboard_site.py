@@ -125,3 +125,12 @@ def test_gpu_column_and_dates(tmp_path) -> None:
     page = (out / "machines" / "rapide.html").read_text()
     assert "<td>03/10/2026</td>" in page  # « Exporté le »
     assert "Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)" in page  # détail : renderer complet
+
+
+def test_unreadable_date_does_not_break_the_site(tmp_path) -> None:
+    d = results_dir(tmp_path)
+    data = json.loads((d / "rapide.json").read_text()) | {"created": "<b>jamais</b>"}
+    (d / "rapide.json").write_text(json.dumps(data))
+    out = tmp_path / "_site"
+    build_site(d, out, REFERENCE, generated=NOW)
+    assert "&lt;b&gt;jamais&lt;/b&gt;" in (out / "index.html").read_text()  # brut, échappé

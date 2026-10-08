@@ -242,3 +242,8 @@ def test_shell_completion_options() -> None:
 )
 def test_fr_date(iso, expected) -> None:
     assert fr_date(iso) == expected
+
+
+def test_fr_date_never_raises() -> None:
+    assert fr_date("garbage") == "garbage"
+    assert fr_date("2026-13-45T00:00:00") == "2026-13-45T00:00:00"
