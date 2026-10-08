@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from hwbench.display.fmt import compact, measure, num
+from hwbench.display.fmt import compact, fr_date, measure, num
 from hwbench.export import ExportError, MachineExport, from_dict
 from hwbench.leaderboard.validate import (
     SubmissionError,
@@ -19,7 +19,7 @@ from hwbench.leaderboard.validate import (
     resolves_to_itself,
     strict_json,
 )
-from hwbench.results import Category, Result
+from hwbench.results import Category, Result, gpu_name
 from hwbench.scoring import Reference, Scores, score_results
 
 CATEGORY_LABELS = {
@@ -129,7 +129,7 @@ def _page(title: str, body: str, generated: datetime) -> str:
 </head>
 <body>
 {body}
-<p class="muted small">Généré le {e(generated.strftime("%Y-%m-%d %H:%M"))} UTC par hwbench.
+<p class="muted small">Généré le {e(generated.strftime("%d/%m/%Y %H:%M"))} UTC par hwbench.
 Résultats déclaratifs, soumis par pull request.
 <a href="https://github.com/Mvth1s/hwbench">Dépôt</a> ·
 <a href="https://github.com/Mvth1s/hwbench/blob/main/CONTRIBUTING.md">Soumettre un résultat</a></p>
@@ -147,7 +147,7 @@ def _reference_block(reference: Reference) -> str:
     )
     return f"""<h2>Référence et versions</h2>
 <p>Chaque bench vaut <strong>1000 points</strong> sur la machine de référence
-<strong>{e(reference.machine)}</strong> (mesurée le {e(reference.created[:10])},
+<strong>{e(reference.machine)}</strong> (mesurée le {e(fr_date(reference.created))},
 empreinte <code>{e(reference.digest[:19])}</code>). Seuls les résultats obtenus avec les mêmes
 versions de protocole, d'outil et le même mode de présentation sont notés.</p>
 <table><thead><tr><th>Bench</th><th>Protocole</th><th>Outil</th><th>Présentation</th>
@@ -163,9 +163,10 @@ def _ranking_table(ranked: list[tuple[Entry, float]]) -> str:
         rows.append(
             f'<tr><td class="num">{rank}</td>'
             f'<td><a href="machines/{e(entry.slug)}.html">{e(ex.machine)}</a></td>'
-            f"<td>{e(ex.snapshot.cpu.model or '?')}</td><td>{e(_gpu(ex) or '?')}</td>"
+            # nom normalisé (sans pilote, noyau ni DRM), casse d'origine
+            f"<td>{e(ex.snapshot.cpu.model or '?')}</td><td>{e(gpu_name(_gpu(ex)) or '?')}</td>"
             f'<td class="num"><strong>{e(num(points, 0))}</strong></td>'
-            f'<td class="small muted">{e(ex.created[:10])}</td></tr>'
+            f'<td class="small muted">{e(fr_date(ex.created))}</td></tr>'
         )
     return (
         '<table><thead><tr><th class="num">#</th><th>Machine</th><th>CPU</th><th>GPU</th>'
@@ -285,7 +286,7 @@ def render_machine(entry: Entry, reference: Reference, generated: datetime) -> s
     state = ex.results[0].state_before if ex.results else None
     conditions = _kv(
         [
-            ("Exporté le", ex.created[:10]),
+            ("Exporté le", fr_date(ex.created)),
             ("Version de hwbench", ex.hwbench_version),
             ("Governor", ", ".join(state.governors) if state else None),
             ("EPP", state.energy_performance_preference if state else None),

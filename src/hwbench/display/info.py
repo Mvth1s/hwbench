@@ -1,5 +1,4 @@
 from collections.abc import Iterable
-from datetime import date
 from statistics import mean
 
 from rich.console import Console, Group
@@ -7,7 +6,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from hwbench.display.fmt import compact, num
+from hwbench.display.fmt import compact, fr_date, num
 from hwbench.models import (
     BoardData,
     CpuData,
@@ -213,14 +212,8 @@ def render_board(board: BoardData) -> Panel:
     t = _kv_table()
     t.add_row("Machine", _join(board.system_vendor, board.product_name, board.product_version))
     t.add_row("Carte mère", _join(board.board_vendor, board.board_name))
-    t.add_row("BIOS", _join(board.bios_vendor, board.bios_version, _fr_date(board.bios_date)))
+    t.add_row("BIOS", _join(board.bios_vendor, board.bios_version, fr_date(board.bios_date)))
     return Panel(t, title="Machine / carte mère", title_align="left")
-
-
-def _fr_date(iso: str | None) -> str | None:
-    if iso is None:
-        return None
-    return date.fromisoformat(iso).strftime("%d/%m/%Y")
 
 
 def _join(*values: str | None) -> Text | str:

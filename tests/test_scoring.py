@@ -20,7 +20,7 @@ from hwbench.models import (
     SensorsData,
 )
 from hwbench.reference import build_reference
-from hwbench.results import BackendId, Category, Result, driver_key, gpu_key
+from hwbench.results import BackendId, Category, Result, driver_key, gpu_key, gpu_name
 from hwbench.scoring import (
     ReferenceError,
     ScoreIssue,
@@ -359,3 +359,17 @@ def test_scores_panel_other_gpu_shows_driver_without_warning() -> None:
     out = _panel(score_results([_glmark2(800.0, "Mesa 25.0.7-1", IRIS_GL)], reference))
     assert "glmark2 : pilote Mesa 25.0.7-1 (référence : Mesa 26.2.3-arch1.1, autre GPU)" in out
     assert "⚠ glmark2" not in out
+
+
+@pytest.mark.parametrize(
+    ("renderer", "expected"),
+    [
+        (RX9070_GL, "AMD Radeon RX 9070 XT"),
+        ("NVIDIA GeForce RTX 3060/PCIe/SSE2", "NVIDIA GeForce RTX 3060"),
+        (IRIS_GL, "Mesa Intel(R) Iris(R) Xe Graphics"),
+        (None, None),
+    ],
+)
+def test_gpu_name_keeps_original_case(renderer, expected) -> None:
+    assert gpu_name(renderer) == expected
+    assert gpu_key(renderer) == (expected.lower() if expected else None)
