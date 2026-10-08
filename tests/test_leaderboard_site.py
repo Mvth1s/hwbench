@@ -64,7 +64,7 @@ def test_site_files_and_escaping(tmp_path) -> None:
         assert re.search(r'(src|href)="https?://(?!github\.com/Mvth1s/hwbench)', page) is None
     assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &lt;img" in index
     assert 'href="machines/rapide.html">Desktop rapide</a>' in index
-    assert "Généré le 2026-10-05 12:00 UTC" in index
+    assert "Généré le 05/10/2026 12:00 UTC" in index
     assert "1 machine(s) non classée(s) ici" in index  # le portable, dans le combiné
 
 
@@ -111,3 +111,17 @@ def test_site_refuses_a_symlinked_results_dir(tmp_path) -> None:
     (tmp_path / "lien").symlink_to(real)
     entries, skipped = load_entries(tmp_path / "lien", REFERENCE)
     assert entries == [] and "lien symbolique refusé" in skipped[0]
+
+
+def test_gpu_column_and_dates(tmp_path) -> None:
+    out = tmp_path / "_site"
+    build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW)
+    index = (out / "index.html").read_text()
+    # renderer brut « Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2) » : nom seul, casse d'origine
+    assert "<td>Mesa Intel(R) Iris(R) Xe Graphics</td>" in index
+    assert "(TGL GT2)" not in index
+    assert '<td class="small muted">03/10/2026</td>' in index  # date d'export
+    assert "(mesurée le 29/09/2026," in index  # date de la référence
+    page = (out / "machines" / "rapide.html").read_text()
+    assert "<td>03/10/2026</td>" in page  # « Exporté le »
+    assert "Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)" in page  # détail : renderer complet
