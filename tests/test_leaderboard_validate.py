@@ -199,3 +199,9 @@ def test_duplicate_keys_cannot_hide_an_identifier(tmp_path) -> None:
 def test_non_standard_constants_are_refused(tmp_path) -> None:
     text = json.dumps(good_payload()).replace('"stdev": 0.0', '"stdev": NaN', 1)
     assert problems(tmp_path, text) == ["JSON invalide : valeur non standard en JSON : NaN"]
+
+
+@pytest.mark.parametrize("created", ["garbage", "", "2026-13-45"])
+def test_invalid_export_date_is_refused(tmp_path, created) -> None:
+    data = good_payload() | {"created": created}
+    assert "created : date d'export invalide (ISO 8601 attendu)" in problems(tmp_path, data)

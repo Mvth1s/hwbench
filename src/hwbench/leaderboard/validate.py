@@ -16,6 +16,7 @@ import math
 import os
 import re
 import stat
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -117,6 +118,10 @@ def validate_payload(raw: Any, reference: Reference) -> list[str]:
     except ExportError as exc:
         return [*problems, str(exc)]
 
+    try:
+        datetime.fromisoformat(export.created)
+    except ValueError:
+        problems.append("created : date d'export invalide (ISO 8601 attendu)")
     if export.reference is None:
         problems.append("exporté sans référence : relancer hwbench export avec la version actuelle")
     else:
