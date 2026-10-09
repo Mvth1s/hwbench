@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "hwbench_version": "0.1.0",
-  "created": "2026-09-29T19:35:45+00:00",
+  "hwbench_version": "0.5.0",
+  "created": "2026-10-09T19:15:36+00:00",
   "machine": "ASRock B850 Riptide WiFi",
   "cpu": "AMD Ryzen 7 8700F 8-Core Processor",
-  "gpu": "AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.7-arch1-1)",
+  "gpu": "AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.8-arch1-2)",
   "forced": false,
   "forced_reasons": [],
   "benchmarks": [
@@ -17,18 +17,18 @@
       "presentation": null,
       "unit": "index",
       "higher_is_better": true,
-      "value": 122.71186332032842,
-      "stdev": 0.9762131019529644,
+      "value": 126.65796547952489,
+      "stdev": 0.2757254903675015,
       "runs": [
-        122.71186332032842,
-        121.75570858230833,
-        123.70799833391295
+        126.29309192951108,
+        126.65796547952489,
+        126.8336126436865
       ],
-      "burst": 125.51631560157054,
+      "burst": 125.72287941411189,
       "warmup_stable": true,
       "environment": {
         "python": "CPython 3.14.7",
-        "openssl": "OpenSSL 3.6.4 25 Aug 2026",
+        "openssl": "OpenSSL 3.6.5 29 Sep 2026",
         "zlib": "1.3.2",
         "liblzma": "5.8.4"
       },
@@ -37,7 +37,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 42.875,
+        "cpu_temp_c": 34.375,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -48,7 +48,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 65.125,
+        "cpu_temp_c": 56.75,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -64,14 +64,14 @@
       "presentation": null,
       "unit": "events/s",
       "higher_is_better": true,
-      "value": 5553.99,
-      "stdev": 8.553110545292764,
+      "value": 5659.29,
+      "stdev": 7.1965639949446825,
       "runs": [
-        5568.49,
-        5553.38,
-        5553.99
+        5667.53,
+        5653.19,
+        5659.29
       ],
-      "burst": 5650.8,
+      "burst": 5665.31,
       "warmup_stable": true,
       "environment": {
         "cpu-max-prime": "10000",
@@ -82,7 +82,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 65.0,
+        "cpu_temp_c": 56.5,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -93,7 +93,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 47.75,
+        "cpu_temp_c": 41.75,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -109,18 +109,18 @@
       "presentation": null,
       "unit": "index",
       "higher_is_better": true,
-      "value": 1122.8346418349486,
-      "stdev": 15.104755817888334,
+      "value": 1143.5530095515737,
+      "stdev": 4.505374414999269,
       "runs": [
-        1098.5532404427906,
-        1126.259001523551,
-        1122.8346418349486
+        1140.9723555886023,
+        1143.5530095515737,
+        1149.7393372164215
       ],
-      "burst": 1146.722118305626,
+      "burst": 1139.5896449884772,
       "warmup_stable": true,
       "environment": {
         "python": "CPython 3.14.7",
-        "openssl": "OpenSSL 3.6.4 25 Aug 2026",
+        "openssl": "OpenSSL 3.6.5 29 Sep 2026",
         "zlib": "1.3.2",
         "liblzma": "5.8.4"
       },
@@ -129,7 +129,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 47.625,
+        "cpu_temp_c": 41.625,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -140,7 +140,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 70.625,
+        "cpu_temp_c": 69.0,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -156,14 +156,14 @@
       "presentation": null,
       "unit": "events/s",
       "higher_is_better": true,
-      "value": 45103.71,
-      "stdev": 100.26260386272374,
+      "value": 45641.58,
+      "stdev": 14.76749132385215,
       "runs": [
-        45178.87,
-        44980.29,
-        45103.71
+        45641.58,
+        45625.28,
+        45654.76
       ],
-      "burst": 45195.57,
+      "burst": 45680.83,
       "warmup_stable": true,
       "environment": {
         "cpu-max-prime": "10000",
@@ -174,7 +174,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 70.125,
+        "cpu_temp_c": 68.625,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -185,7 +185,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 61.125,
+        "cpu_temp_c": 54.875,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -201,28 +201,28 @@
       "presentation": "offscreen",
       "unit": "fps",
       "higher_is_better": true,
-      "value": 3650.0,
-      "stdev": 5.686240703077327,
+      "value": 3664.0,
+      "stdev": 5.291502622129181,
       "runs": [
-        3647.0,
-        3650.0,
-        3658.0
+        3662.0,
+        3672.0,
+        3664.0
       ],
-      "burst": 3641.0,
+      "burst": 3703.0,
       "warmup_stable": true,
       "environment": {
         "resolution": "3840x2160",
         "binary": "glmark2-wayland",
         "session": "wayland",
-        "renderer": "AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.7-arch1-1)",
-        "driver": "Mesa 26.2.3-arch1.1"
+        "renderer": "AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.8-arch1-2)",
+        "driver": "Mesa 26.2.4-arch1.1"
       },
       "state_before": {
         "governors": [
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 60.75,
+        "cpu_temp_c": 54.625,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -233,7 +233,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 40.875,
+        "cpu_temp_c": 41.375,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -249,28 +249,28 @@
       "presentation": "headless",
       "unit": "fps",
       "higher_is_better": true,
-      "value": 10690.0,
-      "stdev": 4.358898943540674,
+      "value": 10733.0,
+      "stdev": 12.013880860626733,
       "runs": [
-        10691.0,
-        10683.0,
-        10690.0
+        10746.0,
+        10733.0,
+        10722.0
       ],
-      "burst": 10478.0,
+      "burst": 10431.0,
       "warmup_stable": true,
       "environment": {
         "binary": "vkmark",
         "session": "headless",
         "resolution": "3840x2160",
         "renderer": "AMD Radeon RX 9070 XT (RADV GFX1201)",
-        "driver": "RADV 26.2.3"
+        "driver": "RADV 26.2.4"
       },
       "state_before": {
         "governors": [
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 40.875,
+        "cpu_temp_c": 41.375,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -281,7 +281,234 @@
           "performance"
         ],
         "on_ac": true,
+        "cpu_temp_c": 43.625,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      }
+    },
+    {
+      "name": "native-memory-single",
+      "backend": "native",
+      "category": "memory",
+      "version": "1",
+      "tool_version": null,
+      "presentation": null,
+      "unit": "MiB/s",
+      "higher_is_better": true,
+      "value": 23428.15176134215,
+      "stdev": 40.60339222383659,
+      "runs": [
+        23478.841619704443,
+        23398.552991388126,
+        23428.15176134215
+      ],
+      "burst": 23250.946244061113,
+      "warmup_stable": true,
+      "environment": {
+        "python": "CPython 3.14.7"
+      },
+      "state_before": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
         "cpu_temp_c": 43.5,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "state_after": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 47.25,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      }
+    },
+    {
+      "name": "native-memory-multi",
+      "backend": "native",
+      "category": "memory",
+      "version": "1",
+      "tool_version": null,
+      "presentation": null,
+      "unit": "MiB/s",
+      "higher_is_better": true,
+      "value": 30035.811865259166,
+      "stdev": 492.64250239566724,
+      "runs": [
+        30035.811865259166,
+        30087.649982308143,
+        29209.63086351162
+      ],
+      "burst": 30065.9480310119,
+      "warmup_stable": true,
+      "environment": {
+        "python": "CPython 3.14.7"
+      },
+      "state_before": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 47.125,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "state_after": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 56.75,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      }
+    },
+    {
+      "name": "sysbench-memory-single",
+      "backend": "sysbench",
+      "category": "memory",
+      "version": "1",
+      "tool_version": "1.0.20",
+      "presentation": null,
+      "unit": "MiB/s",
+      "higher_is_better": true,
+      "value": 51349.18,
+      "stdev": 82.00130324167621,
+      "runs": [
+        51389.46,
+        51231.64,
+        51349.18
+      ],
+      "burst": 51160.26,
+      "warmup_stable": true,
+      "environment": {
+        "block-size": "128M",
+        "operation": "read, seq",
+        "time": "5 s"
+      },
+      "state_before": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 56.75,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "state_after": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 55.875,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      }
+    },
+    {
+      "name": "sysbench-memory-multi",
+      "backend": "sysbench",
+      "category": "memory",
+      "version": "1",
+      "tool_version": "1.0.20",
+      "presentation": null,
+      "unit": "MiB/s",
+      "higher_is_better": true,
+      "value": 56191.9,
+      "stdev": 166.41724079353472,
+      "runs": [
+        56094.35,
+        56191.9,
+        56418.71
+      ],
+      "burst": 56374.85,
+      "warmup_stable": true,
+      "environment": {
+        "block-size": "32M",
+        "operation": "read, seq",
+        "time": "5 s"
+      },
+      "state_before": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 55.625,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "state_after": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 46.875,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      }
+    },
+    {
+      "name": "fio-disk",
+      "backend": "fio",
+      "category": "disk",
+      "version": "1",
+      "tool_version": "3.42",
+      "presentation": "1GiB",
+      "unit": "index",
+      "higher_is_better": true,
+      "value": 39392.69243949885,
+      "stdev": 101.45226812462535,
+      "runs": [
+        39392.69243949885,
+        39564.84936361065,
+        39385.76991643542
+      ],
+      "burst": 40974.80987528988,
+      "warmup_stable": true,
+      "environment": {
+        "ioengine": "libaio",
+        "time": "2 s par test",
+        "filesystem": "ext4",
+        "device": "Lexar SSD NM1090 PRO 1TB"
+      },
+      "state_before": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 46.875,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "state_after": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 45.875,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",

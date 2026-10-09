@@ -5,8 +5,8 @@
 [![Licence : AGPL-3.0-or-later](https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue)](https://github.com/Mvth1s/hwbench/blob/main/LICENSE)
 
 Outil en ligne de commande pour Linux qui inventorie les composants d'une machine et lance des
-benchmarks notés (CPU single-core, CPU multi-core, GPU et score combiné) pour comparer des
-machines entre elles.
+benchmarks notés (CPU single-core, CPU multi-core, GPU et score combiné, plus mémoire et disque
+pour information) pour comparer des machines entre elles.
 
 ![hwbench info](https://raw.githubusercontent.com/Mvth1s/hwbench/main/docs/images/info.svg)
 
@@ -183,6 +183,20 @@ bench : une autre taille que 1 Gio n'est comparable ni à la référence ni à u
 (moyenne géométrique des quatre tests) ; les quatre valeurs sont affichées. Seuls le type de
 système de fichiers et le modèle du disque sont relevés, jamais le chemin.
 
+**Ce que mesure le score disque.** fio mesure un fichier dans un système de fichiers, pas le
+disque nu. Le même SSD peut donner des scores différents selon :
+
+- le système de fichiers : ext4, btrfs (copie sur écriture, sommes de contrôle, compression
+  éventuelle), xfs… n'empruntent pas le même chemin pour les E/S directes ;
+- le cache du SSD : beaucoup de SSD écrivent d'abord dans un cache rapide (SLC, parfois DRAM)
+  avant de ralentir quand il est plein ; avec 1 Gio et des tests de 2 s, on mesure surtout le
+  disque dans son cache, pas son débit soutenu sur de gros volumes. Le remplissage du disque,
+  son firmware et le noyau jouent aussi.
+
+Le score disque ne se compare donc qu'à système de fichiers et taille de fichier égaux, ce que
+le rapport HTML rappelle. La référence est mesurée en **ext4**, avec un fichier de **1 Gio**,
+sur un Lexar SSD NM1090 PRO 1TB.
+
 #### Choix des scènes GPU
 
 Une scène n'est gardée que si son FPS baisse d'au moins ×1,8 entre 1080p et 4K (4 fois plus de
@@ -257,18 +271,26 @@ unité. Les points viennent du scoring, ci-dessous.
 
 Chaque bench est normalisé par rapport à la machine de référence, qui vaut **1000 points** : un
 desktop ASRock B850 Riptide WiFi (AMD Ryzen 7 8700F, Radeon RX 9070 XT, EndeavourOS), mesuré
-en régime soutenu (référence actuelle mesurée avec Mesa 26.2.3). Choisi parce que ses mesures sont stables (CV ≤ 1,3 %), qu'il
+en régime soutenu (référence actuelle mesurée avec Mesa 26.2.4). Choisi parce que ses mesures sont stables (CV ≤ 0,4 % en CPU et GPU, 1,64 % au plus en mémoire), qu'il
 n'a ni batterie ni profil d'énergie à surveiller, qu'il reste disponible pour régénérer la
 référence, et qu'il a le même environnement d'outils que les fixtures de test.
 
 | Bench | Valeur de référence | CV |
 |---|---:|---:|
-| native-cpu-single v1 | 122,7 (indice) | 0,8 % |
-| native-cpu-multi v1 | 1 122,8 (indice) | 1,35 % |
-| sysbench-cpu-single v1 (sysbench 1.0.20) | 5 554 events/s | 0,15 % |
-| sysbench-cpu-multi v1 (sysbench 1.0.20) | 45 104 events/s | 0,22 % |
-| glmark2 v2 (2023.01, hors écran) | 3 650 fps | 0,16 % |
-| vkmark v2 (2025.01, headless) | 10 690 fps | 0,04 % |
+| native-cpu-single v1 | 126,7 (indice) | 0,22 % |
+| native-cpu-multi v1 | 1 143,6 (indice) | 0,39 % |
+| sysbench-cpu-single v1 (sysbench 1.0.20) | 5 659 events/s | 0,13 % |
+| sysbench-cpu-multi v1 (sysbench 1.0.20) | 45 642 events/s | 0,03 % |
+| glmark2 v2 (2023.01, hors écran) | 3 664 fps | 0,14 % |
+| vkmark v2 (2025.01, headless) | 10 733 fps | 0,11 % |
+| native-memory-single v1 | 23 428 Mio/s | 0,17 % |
+| native-memory-multi v1 | 30 036 Mio/s | 1,64 % |
+| sysbench-memory-single v1 (sysbench 1.0.20) | 51 349 Mio/s | 0,16 % |
+| sysbench-memory-multi v1 (sysbench 1.0.20) | 56 192 Mio/s | 0,30 % |
+| fio-disk v1 (fio 3.42, fichier de 1 Gio, ext4) | 39 393 (indice) | 0,26 % |
+
+Mémoire et disque sont notés (1000 points sur la référence) mais restent hors du score combiné
+et du classement.
 
 - Un backend n'est noté que s'il a la même identité que dans la référence : même bench, même
   version du protocole, même version de l'outil, même mode de présentation. Sinon il est
