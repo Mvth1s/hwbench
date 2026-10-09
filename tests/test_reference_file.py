@@ -16,7 +16,7 @@ from hwbench.benchmarks.external.vkmark import VKMARK_VERSION
 from hwbench.benchmarks.native.cpu import NATIVE_CPU_VERSION
 from hwbench.benchmarks.native.memory import NATIVE_MEMORY_VERSION
 from hwbench.reference import build_reference
-from hwbench.results import COMBINED_CATEGORIES, Category
+from hwbench.results import Category
 from hwbench.scoring import load_reference
 
 EXPECTED = {
@@ -26,13 +26,7 @@ EXPECTED = {
     "sysbench-cpu-multi": (Category.CPU_MULTI, SYSBENCH_VERSION, None),
     "glmark2": (Category.GPU, GLMARK2_VERSION, "offscreen"),
     "vkmark": (Category.GPU, VKMARK_VERSION, "headless"),
-}
-
-
-# Mémoire et disque : ajoutés à la référence à sa prochaine régénération sur le desktop B850.
-# Tant qu'ils n'y sont pas, ces catégories restent en valeurs brutes ; une fois présents, ils
-# doivent être à la version actuelle de leur protocole.
-OPTIONAL: dict[str, tuple[Category, str, str | None]] = {
+    # catégories d'information (hors score combiné), notées contre la référence
     "native-memory-single": (Category.MEMORY, NATIVE_MEMORY_VERSION, None),
     "native-memory-multi": (Category.MEMORY, NATIVE_MEMORY_VERSION, None),
     "sysbench-memory-single": (Category.MEMORY, SYSBENCH_MEMORY_VERSION, None),
@@ -51,20 +45,16 @@ def test_reference_loads_with_all_categories_and_benches() -> None:
     assert reference is not None
     assert reference.machine == "ASRock B850 Riptide WiFi"
     assert not reference.forced and reference.forced_reasons == []
-    assert {e.category for e in reference.entries} >= set(COMBINED_CATEGORIES)
-    names = {e.id.name for e in reference.entries}
-    assert names >= set(EXPECTED)
-    assert names <= set(EXPECTED) | set(OPTIONAL), names - set(EXPECTED) - set(OPTIONAL)
+    assert {e.category for e in reference.entries} == set(Category)
+    assert {e.id.name for e in reference.entries} == set(EXPECTED)
 
 
 def test_reference_matches_current_protocol_versions() -> None:
     """Incrémenter la version d'un bench impose de régénérer la référence."""
     reference = load_reference()
     assert reference is not None
-    for name, (category, version, presentation) in (EXPECTED | OPTIONAL).items():
+    for name, (category, version, presentation) in EXPECTED.items():
         entry = reference.find(name)
-        if name in OPTIONAL and entry is None:
-            continue
         assert entry is not None
         assert (entry.category, entry.id.version, entry.id.presentation) == (
             category,
@@ -118,3 +108,13 @@ def test_build_reference_scrubs_identifiers() -> None:
     bench = build_reference([leaky], snapshot(), [])["benchmarks"][0]
     assert bench["environment"]["serial"] == privacy.REDACTED
     assert "aa:bb:cc:dd:ee:ff" not in bench["environment"]["note"]
+
+
+def test_disk_reference_records_the_disk_and_filesystem() -> None:
+    """La règle de version de fio (même disque) a besoin du modèle du disque de la référence."""
+    reference = load_reference()
+    assert reference is not None
+    entry = reference.find("fio-disk")
+    assert entry is not None and entry.device and entry.tool_version
+    bench = next(b for b in json.loads(raw_reference())["benchmarks"] if b["name"] == "fio-disk")
+    assert bench["environment"]["filesystem"]
