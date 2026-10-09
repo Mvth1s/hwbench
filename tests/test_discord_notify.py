@@ -520,3 +520,75 @@ def test_hebdo_stats_survive_a_failing_source(tmp_path, capsys) -> None:
     assert values["Étoiles"] == "1 234"
     assert values["Issues ouvertes"] == "0"
     assert "main : [réussie](https://g/ci)" in values["Dernière CI"]
+
+
+# --- secrets -----------------------------------------------------------------------------------
+
+
+def _redirected(request):
+    import urllib.request
+
+    return urllib.request.HTTPRedirectHandler().redirect_request(
+        request, io.BytesIO(), 302, "Found", Message(), "https://storage.example/blob"
+    )
+
+
+def test_github_token_is_never_forwarded_on_redirect() -> None:
+    request = dn.authorized("https://api.github.com/repos/x/y/actions/artifacts/1/zip", "TOKEN")
+    assert request.unredirected_hdrs["Authorization"] == "Bearer TOKEN"
+    assert request.has_header("Authorization")
+    assert not _redirected(request).has_header("Authorization")
+
+
+def test_github_api_sends_the_token_unredirected(monkeypatch) -> None:
+    seen = []
+
+    def opener(request, timeout):
+        seen.append(request)
+        return io.BytesIO(b"{}")
+
+    monkeypatch.setattr(dn, "urlopen", opener)
+    monkeypatch.setenv("GITHUB_TOKEN", "ghs_SECRETTOKEN")
+    assert dn.github_api("/repos/x/y") == {}
+    (request,) = seen
+    assert request.unredirected_hdrs["Authorization"] == "Bearer ghs_SECRETTOKEN"
+    assert "Authorization" not in request.headers  # en-têtes recopiés lors d'une redirection
+    assert not _redirected(request).has_header("Authorization")
+
+
+def test_fetch_json_without_token_has_no_authorization(monkeypatch) -> None:
+    seen = []
+    monkeypatch.setattr(
+        dn, "urlopen", lambda request, timeout: seen.append(request) or io.BytesIO(b"[]")
+    )
+    assert dn.fetch_json("https://endoflife.date/api/v1/products/python") == []
+    assert not seen[0].has_header("Authorization")
+
+
+def _failing_build(message: str):
+    def build(args):
+        raise RuntimeError(message)
+
+    return build
+
+
+def test_main_redacts_secrets_from_errors(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("GITHUB_TOKEN", "ghs_SECRETTOKEN")
+    monkeypatch.setenv("DISCORD_WEBHOOK_HEBDO", WEBHOOK)
+    monkeypatch.setattr(dn, "build", _failing_build(f"échec {WEBHOOK} ghs_SECRETTOKEN"))
+    assert dn.main(["hebdo"]) == 0
+    out = capsys.readouterr().out
+    assert "SECRET-TOKEN" not in out and "ghs_SECRETTOKEN" not in out
+    assert out.count("<secret>") == 2
+
+
+def test_redaction_ignores_empty_and_short_values(monkeypatch, capsys) -> None:
+    # une valeur vide ferait insérer <secret> entre chaque caractère (str.replace)
+    monkeypatch.setenv("DISCORD_WEBHOOK_CI", "")
+    monkeypatch.setenv("DISCORD_WEBHOOK_VEILLE", "   ")
+    monkeypatch.setenv("GITHUB_TOKEN", "abc")
+    assert dn.redact_secrets("abc introuvable") == "abc introuvable"
+    monkeypatch.setattr(dn, "build", _failing_build("abc introuvable"))
+    assert dn.main(["hebdo"]) == 0
+    out = capsys.readouterr().out
+    assert "abc introuvable" in out and "<secret>" not in out

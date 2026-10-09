@@ -16,6 +16,8 @@ DEFAULT_MAX_WARMUP_S = {
     Category.CPU_SINGLE: 30.0,
     Category.CPU_MULTI: 90.0,
     Category.GPU: 90.0,
+    Category.MEMORY: 30.0,
+    Category.DISK: 60.0,  # un run fio dure ~10 s (4 tests de 2 s)
 }
 
 
@@ -26,6 +28,7 @@ class RunSettings:
     warmup_tolerance_percent: float = 3.0
     high_variance_cv_percent: float = 5.0
     hot_start_c: float = 70.0
+    reliable_cv_percent: float = 1.0  # rapport : « très reproductible » sous ce CV
 
     def __post_init__(self) -> None:
         if self.runs < MIN_RUNS:
@@ -96,13 +99,17 @@ def run_benchmark(
     settings = settings or RunSettings()
     before = probe()
     start = clock()
-    burst, warmup_runs, stable = _warmup(bench, settings, progress, clock)
-    warmup_s = clock() - start
-    measurements = []
-    for i in range(settings.runs):
-        if progress:
-            progress("run", i + 1, settings.runs)
-        measurements.append(bench.run())
+    # cleanup() quoi qu'il arrive (erreur, Ctrl+C) : le bench disque supprime son fichier
+    try:
+        burst, warmup_runs, stable = _warmup(bench, settings, progress, clock)
+        warmup_s = clock() - start
+        measurements = []
+        for i in range(settings.runs):
+            if progress:
+                progress("run", i + 1, settings.runs)
+            measurements.append(bench.run())
+    finally:
+        bench.cleanup()
     duration = clock() - start
     after = probe()
 

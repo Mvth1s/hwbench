@@ -8,8 +8,12 @@ Règles :
 - catégorie GPU : moyenne géométrique de tous les backends GPU mesurés. La liste doit être
   exactement celle de la référence, sinon « non comparable » (jamais de moyenne silencieuse sur
   ce qui se trouve installé) ;
-- combiné : moyenne géométrique pondérée des catégories. Sans GPU mesuré, il est calculé sans
-  lui et le signale ; un GPU mesuré mais non comparable rend le combiné non comparable.
+- mémoire : seul le natif compte (single et multi, moyenne géométrique), sysbench pour
+  information ; disque : fio. Ces deux catégories sont notées si la référence contient leurs
+  benchs, sinon elles restent en valeurs brutes ; elles ne comptent jamais dans le combiné ;
+- combiné : moyenne géométrique pondérée des catégories CPU et GPU (COMBINED_CATEGORIES). Sans
+  GPU mesuré, il est calculé sans lui et le signale ; un GPU mesuré mais non comparable rend le
+  combiné non comparable.
 """
 
 import hashlib
@@ -22,7 +26,17 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from hwbench.results import BackendId, Category, Result, driver_key, gpu_key
+from hwbench.results import (
+    COMBINED_CATEGORIES,
+    TOOL_VERSION_NOT_IN_IDENTITY,
+    BackendId,
+    Category,
+    Result,
+    disk_key,
+    driver_key,
+    gpu_key,
+    identity_tool_version,
+)
 
 REFERENCE_POINTS = 1000.0
 REFERENCE_SCHEMA_VERSION = 1
@@ -59,6 +73,10 @@ class ReferenceEntry:
     # pilote et GPU (renderer) de la référence : information, hors BackendId
     driver: str | None = None
     gpu: str | None = None
+    # version de l'outil telle que relevée (dans id seulement si elle fait partie de l'identité)
+    # et modèle du disque mesuré (fio)
+    tool_version: str | None = None
+    device: str | None = None
 
 
 @dataclass(frozen=True)
@@ -105,6 +123,37 @@ class BackendScore:
     reference_driver: str | None = None
     gpu: str | None = None
     reference_gpu: str | None = None
+    # Version de l'outil hors identité (TOOL_VERSION_NOT_IN_IDENTITY, fio) et modèle du disque,
+    # mesurés / de la référence : même règle que le pilote, signalée sur le disque de la référence.
+    tool_version: str | None = None
+    reference_tool_version: str | None = None
+    device: str | None = None
+    reference_device: str | None = None
+
+    @property
+    def same_device(self) -> bool:
+        ours, theirs = disk_key(self.device), disk_key(self.reference_device)
+        return ours is not None and ours == theirs
+
+    @property
+    def tool_differs(self) -> bool:
+        """Même disque que la référence, autre version d'un outil hors identité : à signaler."""
+        return (
+            self.backend.name in TOOL_VERSION_NOT_IN_IDENTITY
+            and self.same_device
+            and self.tool_version is not None
+            and self.reference_tool_version is not None
+            and self.tool_version != self.reference_tool_version
+        )
+
+    @property
+    def tool_info(self) -> bool:
+        """Autre disque (ou inconnu) : la version de l'outil est une information neutre."""
+        return (
+            self.backend.name in TOOL_VERSION_NOT_IN_IDENTITY
+            and self.tool_version is not None
+            and not self.same_device
+        )
 
     @property
     def same_gpu(self) -> bool:
@@ -167,7 +216,12 @@ def reference_from_dict(payload: Mapping[str, Any]) -> Reference:
     try:
         entries = [
             ReferenceEntry(
-                id=BackendId(b["name"], b["version"], b.get("tool_version"), b.get("presentation")),
+                id=BackendId(
+                    b["name"],
+                    b["version"],
+                    identity_tool_version(b["name"], b.get("tool_version")),
+                    b.get("presentation"),
+                ),
                 backend=b["backend"],
                 category=Category(b["category"]),
                 unit=b["unit"],
@@ -175,6 +229,8 @@ def reference_from_dict(payload: Mapping[str, Any]) -> Reference:
                 value=float(b["value"]),
                 driver=(b.get("environment") or {}).get("driver"),
                 gpu=(b.get("environment") or {}).get("renderer"),
+                tool_version=b.get("tool_version"),
+                device=(b.get("environment") or {}).get("device"),
             )
             for b in payload["benchmarks"]
         ]
@@ -206,7 +262,10 @@ def load_reference(path: Path | None = None) -> Reference | None:
 
 
 def is_official(result_backend: str, category: Category) -> bool:
-    return category is Category.GPU or result_backend == OFFICIAL_CPU_BACKEND
+    """Compte dans le score de sa catégorie : tous les backends GPU et disque, le natif ailleurs."""
+    if category in (Category.GPU, Category.DISK):
+        return True
+    return result_backend == OFFICIAL_CPU_BACKEND
 
 
 def normalize(result: Result, reference: Reference) -> BackendScore:
@@ -221,6 +280,13 @@ def normalize(result: Result, reference: Reference) -> BackendScore:
         "gpu": result.environment.get("renderer"),
         "reference_gpu": entry.gpu,
     }
+    if ours.name in TOOL_VERSION_NOT_IN_IDENTITY:
+        drivers |= {
+            "tool_version": result.tool_version,
+            "reference_tool_version": entry.tool_version,
+            "device": result.environment.get("device"),
+            "reference_device": entry.device,
+        }
     if entry.id.version != ours.version:
         issue = ScoreIssue.VERSION_MISMATCH
     elif entry.id.tool_version != ours.tool_version:
@@ -266,11 +332,12 @@ def _category_score(
 def combine(
     categories: list[CategoryScore], weights: Mapping[Category, float] = DEFAULT_WEIGHTS
 ) -> CombinedScore | None:
-    by_cat = {c.category: c for c in categories}
+    # mémoire et disque : jamais dans le combiné
+    by_cat = {c.category: c for c in categories if c.category in COMBINED_CATEGORIES}
     if not by_cat:
         return None
     gpu_missing = Category.GPU not in by_cat
-    used = [c for c in (Category.CPU_SINGLE, Category.CPU_MULTI, Category.GPU) if c in by_cat]
+    used = [c for c in COMBINED_CATEGORIES if c in by_cat]
     used = [c for c in used if weights.get(c, 0) > 0]
     total = sum(weights[c] for c in used)
     effective = {c: weights[c] / total for c in used} if total else {}
@@ -292,9 +359,7 @@ def score_results(
 ) -> Scores:
     scored = [normalize(r, reference) for r in results]
     categories = [
-        c
-        for cat in (Category.CPU_SINGLE, Category.CPU_MULTI, Category.GPU)
-        if (c := _category_score(cat, scored, reference)) is not None
+        c for cat in Category if (c := _category_score(cat, scored, reference)) is not None
     ]
     return Scores(reference, scored, categories, combine(categories, weights))
 
@@ -309,6 +374,8 @@ def parse_weights(text: str) -> dict[Category, float]:
             weight = float(value)
         except ValueError as exc:
             raise ValueError(f"pondération invalide : « {part} »") from exc
+        if category not in COMBINED_CATEGORIES:
+            raise ValueError(f"« {key.strip()} » ne fait pas partie du score combiné")
         if not sep or weight < 0 or not math.isfinite(weight):
             raise ValueError(f"pondération invalide : « {part} »")
         weights[category] = weight

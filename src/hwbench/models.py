@@ -132,10 +132,30 @@ class FanReading:
         return self.instance or self.chip
 
 
+# Capteur de la température CPU : (puce hwmon, libellés par ordre de préférence) ;
+# "*" = n'importe quel capteur de la puce
+CPU_SENSORS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("coretemp", ("Package id 0", "Package id 1")),
+    ("k10temp", ("Tdie", "Tctl")),
+    ("zenpower", ("Tdie", "Tctl")),
+    ("cpu_thermal", ("*",)),
+)
+
+
 @dataclass(frozen=True)
 class SensorsData:
     temperatures: list[TemperatureReading] = field(default_factory=list)
     fans: list[FanReading] = field(default_factory=list)
+
+    def cpu_sensor(self) -> TemperatureReading | None:
+        """Capteur de la température CPU (le plus chaud du libellé préféré), avec ses seuils."""
+        for chip, labels in CPU_SENSORS:
+            readings = [t for t in self.temperatures if t.chip == chip and t.current_c is not None]
+            for label in labels:
+                matching = [t for t in readings if label in ("*", t.label)]
+                if matching:
+                    return max(matching, key=lambda t: t.current_c or 0.0)
+        return None
 
 
 @dataclass(frozen=True)

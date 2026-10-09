@@ -1,0 +1,170 @@
+"""Rapport HTML : snapshot, aller-retour JSON, hors ligne, vie privée, sections partielles.
+
+Snapshot : tests/fixtures/report/session.html, rendu de session.json. Dans cette session, CPU,
+GPU, composants et états machine sont réels (export du Dell, results/dell-latitude-5420.json,
+passé au schéma 3) ; les résultats mémoire et disque sont synthétiques, des valeurs construites
+pour couvrir ces sections (voir tests/fixtures/report/README.md).
+
+Pour accepter le snapshot après un changement voulu du gabarit :
+HWBENCH_UPDATE_SNAPSHOTS=1 .venv/bin/pytest tests/test_report.py
+"""
+
+import json
+import os
+import re
+from dataclasses import replace
+from html import escape as html_escape
+from pathlib import Path
+
+import pytest
+from conftest import make_result
+from test_fixtures_privacy import _live_identifiers
+from test_leaderboard_site import EVIL
+from test_scoring import REFERENCE, snapshot
+
+from hwbench import __version__, privacy
+from hwbench.export import build_export, load_export, to_dict, write_export
+from hwbench.report import DEFAULT_SETTINGS_NOTE, render_report
+from hwbench.scoring import score_results
+
+FIXTURES = Path(__file__).parent / "fixtures" / "report"
+SESSION = FIXTURES / "session.json"
+EXPECTED = FIXTURES / "session.html"
+RESULTS = Path(__file__).parents[1] / "results"
+VERSION_MARK = "@@HWBENCH_VERSION@@"
+
+
+def rendered() -> str:
+    return render_report(load_export(SESSION))
+
+
+def embedded(html: str) -> dict:
+    match = re.search(
+        r'<script type="application/json" id="hwbench-session">(.*?)</script>', html, re.S
+    )
+    assert match is not None
+    return json.loads(match.group(1))
+
+
+def test_snapshot() -> None:
+    # la version de hwbench (pied de page) change à chaque release : neutralisée
+    footer = "Rapport généré par hwbench "
+    html = rendered().replace(footer + __version__, footer + VERSION_MARK)
+    if os.environ.get("HWBENCH_UPDATE_SNAPSHOTS"):
+        EXPECTED.write_text(html, encoding="utf-8")
+    assert html == EXPECTED.read_text(encoding="utf-8")
+
+
+def test_deterministic_and_roundtrip(tmp_path) -> None:
+    session = load_export(SESSION)
+    direct = render_report(session)
+    assert render_report(session) == direct
+    path = tmp_path / "session.json"
+    write_export(session, path)
+    assert render_report(load_export(path)) == direct
+
+
+def test_every_section_of_a_full_session() -> None:
+    html = rendered()
+    for key in (
+        "synthese",
+        "conditions",
+        "cpu",
+        "gpu",
+        "memoire",
+        "disque",
+        "temperatures",
+        "fiabilite",
+        "composants",
+        "recommandations",
+        "lexique",
+        "annexe",
+    ):
+        assert f'<section id="{key}">' in html, key
+    assert 'class="tiles"' in html
+    assert "Température CPU maximale relevée avant et après chaque test" in html
+    assert "pas pendant" in html  # légende de la frise
+    assert "cache des SSD" in html and "btrfs" in html
+    assert "sudo &quot;$(command -v hwbench)&quot; info" in html
+    assert "sudo hwbench" not in html
+
+
+def test_offline_single_file() -> None:
+    html = rendered()
+    assert re.search(r'(src|href)\s*=\s*"\s*https?:', html) is None
+    assert "@import" not in html and "url(" not in html
+    assert re.search(r"<script(?![^>]*application/json)", html) is None
+    assert '<link rel="stylesheet"' not in html
+
+
+def test_embedded_json_is_the_scrubbed_session() -> None:
+    session = load_export(SESSION)
+    data = embedded(render_report(session))
+    assert data == to_dict(session)
+    assert privacy.scrub(data) == data
+
+
+def test_no_identifier() -> None:
+    html = rendered()
+    assert "FAKE" not in html and privacy.REDACTED not in html
+    for value in _live_identifiers():
+        assert value.lower() not in html.lower()
+
+
+def test_text_from_the_session_is_escaped() -> None:
+    session = build_export(snapshot(), EVIL, [make_result("native-cpu-single", 100.0)], None)
+    html = render_report(session)
+    assert "<img" not in html and re.search(r"<script(?![^>]*application/json)", html) is None
+    assert "&lt;script&gt;" in html
+    # « </script> » d'un export ne ferme pas le bloc JSON
+    assert embedded(html)["machine"] == EVIL
+
+
+def test_partial_session_has_only_measured_sections() -> None:
+    results = [make_result("native-cpu-single", 100.0)]
+    html = render_report(build_export(snapshot(), "m", results, score_results(results, REFERENCE)))
+    assert '<section id="cpu">' in html
+    for absent in ("gpu", "memoire", "disque"):
+        assert f'<section id="{absent}">' not in html
+
+
+def test_schema_2_uses_default_thresholds_and_says_so() -> None:
+    html = render_report(load_export(RESULTS / "dell-latitude-5420.json"))
+    note = html_escape(DEFAULT_SETTINGS_NOTE)
+    assert note in html
+    assert note not in rendered()
+
+
+@pytest.mark.parametrize("name", ["dell-latitude-5420", "asrock-b850-riptide-wifi"])
+def test_real_results_render(name: str) -> None:
+    html = render_report(load_export(RESULTS / f"{name}.json"))
+    assert html.startswith("<!doctype html>") and html.endswith("</html>\n")
+    assert '<section id="synthese">' in html
+
+
+def test_settings_of_the_session_are_cited() -> None:
+    session = load_export(SESSION)
+    strict = replace(session, settings=replace(session.settings, high_variance_cv_percent=2.0))
+    assert "au-delà du seuil de 2 %" in render_report(strict)
+
+
+def test_conditions_tile_says_why() -> None:
+    html = render_report(load_export(RESULTS / "dell-latitude-5420.json"))
+    assert (
+        '<div class="label">Conditions de mesure</div><div class="value"><span class="status '
+        'status-check">À vérifier</span></div><div class="small muted">4 départs chauds</div>'
+    ) in html
+    b850 = render_report(load_export(RESULTS / "asrock-b850-riptide-wifi.json"))
+    assert 'Fiable</span></div><div class="small muted">secteur, meilleur réglage' in b850
+
+
+def test_start_temperature_row_gives_the_range() -> None:
+    html = render_report(load_export(RESULTS / "dell-latitude-5420.json"))
+    assert "<td>51 à 72 °C</td>" in html
+    assert "4 tests ont démarré à 70 °C ou plus (seuil de départ chaud)." in html
+
+
+@pytest.mark.parametrize("path", [SESSION, *sorted(RESULTS.glob("*.json"))])
+def test_no_ambiguous_plural_or_strict_threshold_wording(path: Path) -> None:
+    html = render_report(load_export(path))
+    assert "(s)" not in html and "au-dessus du seuil" not in html

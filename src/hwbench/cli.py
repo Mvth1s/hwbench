@@ -1,5 +1,7 @@
 import json
+import os
 from dataclasses import asdict
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -10,6 +12,7 @@ from rich.text import Text
 
 from hwbench import __version__, privacy
 from hwbench.benchmarks.base import BenchOptions, known_backends, select
+from hwbench.benchmarks.external.fio import parse_size
 from hwbench.collect import collect_snapshot
 from hwbench.compare import compare
 from hwbench.display.bench import CATEGORY_LABELS, render_result, warning_message
@@ -22,7 +25,7 @@ from hwbench.display.scores import (
     render_backends,
     render_scores,
 )
-from hwbench.export import ExportError, build_export, load_export, write_export
+from hwbench.export import ExportError, MachineExport, build_export, load_export, write_export
 from hwbench.machine_state import capture_state
 from hwbench.reference import (
     ReferenceIssue,
@@ -31,6 +34,7 @@ from hwbench.reference import (
     results_issues,
     state_issues,
 )
+from hwbench.report import render_report
 from hwbench.results import Availability, Category, Result
 from hwbench.runner import MIN_RUNS, RunSettings, run_benchmark, start_warnings
 from hwbench.scoring import (
@@ -106,6 +110,8 @@ class Target(StrEnum):
     CPU_SINGLE = "cpu-single"
     CPU_MULTI = "cpu-multi"
     GPU = "gpu"
+    MEMORY = "memory"
+    DISK = "disk"
     ALL = "all"
 
 
@@ -113,6 +119,8 @@ TARGET_CATEGORIES = {
     Target.CPU_SINGLE: [Category.CPU_SINGLE],
     Target.CPU_MULTI: [Category.CPU_MULTI],
     Target.GPU: [Category.GPU],
+    Target.MEMORY: [Category.MEMORY],
+    Target.DISK: [Category.DISK],
     Target.ALL: list(Category),
 }
 
@@ -131,16 +139,94 @@ RunsOption = Annotated[
 ]
 WorkersOption = Annotated[
     int | None,
-    typer.Option("--workers", min=1, help="Parallélisme du multi-cœur (défaut : CPU logiques)."),
+    typer.Option(
+        "--workers",
+        min=1,
+        help="Parallélisme du CPU multi-core et de la mémoire (défaut : CPU logiques).",
+    ),
 ]
 MaxWarmupOption = Annotated[
     float | None,
     typer.Option(
         "--max-warmup",
         min=0,
-        help="Plafond du warm-up en secondes (défaut : 30 single-core, 90 multi-cœur et GPU).",
+        help=(
+            "Plafond du warm-up en secondes (défaut : 30 single-core et mémoire, "
+            "90 CPU multi-core et GPU, 60 disque)."
+        ),
     ),
 ]
+DiskSizeOption = Annotated[
+    str,
+    typer.Option(
+        "--disk-size",
+        help="Taille du fichier de test du bench disque (ex. 1G, 512M ; minimum 64M). Une "
+        "autre taille que 1G n'est pas comparable à la référence.",
+    ),
+]
+DiskPathOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--disk-path",
+        file_okay=False,
+        help="Dossier du fichier de test du bench disque (défaut : ~/.cache/hwbench).",
+    ),
+]
+
+
+ReportOption = Annotated[
+    bool,
+    typer.Option(
+        "--report",
+        help="Écrit aussi la session en JSON et son rapport HTML (dossier des rapports).",
+    ),
+]
+ReportDirOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--report-dir",
+        file_okay=False,
+        help="Dossier des rapports (défaut : ~/.local/share/hwbench/reports).",
+    ),
+]
+
+
+def reports_dir() -> Path:
+    """$XDG_DATA_HOME/hwbench/reports, soit ~/.local/share/hwbench/reports par défaut."""
+    base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
+    return Path(base) / "hwbench" / "reports"
+
+
+def write_report(session: MachineExport, directory: Path, now: datetime) -> tuple[Path, Path]:
+    """Session en JSON puis rapport HTML rendu depuis ce JSON relu (sa seule source).
+
+    Nom = horodatage local à la seconde ; un suffixe -2, -3… évite d'écraser un rapport.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    stamp = now.strftime("%Y-%m-%d_%H%M%S")
+    name, n = stamp, 1
+    while (directory / f"{name}.json").exists() or (directory / f"{name}.html").exists():
+        n += 1
+        name = f"{stamp}-{n}"
+    json_path, html_path = directory / f"{name}.json", directory / f"{name}.html"
+    write_export(session, json_path)
+    html_path.write_text(render_report(load_export(json_path)), encoding="utf-8")
+    return json_path, html_path
+
+
+def _print_report(console: Console, paths: tuple[Path, Path]) -> None:
+    console.print("Rapport enregistré :")
+    console.print(Text(f"  JSON  {paths[0]}"))
+    console.print(Text(f"  HTML  {paths[1]}"))
+
+
+def _bench_options(workers: int | None, disk_size: str, disk_path: Path | None) -> BenchOptions:
+    try:
+        size = parse_size(disk_size)
+    except ValueError as exc:
+        typer.echo(f"Erreur : --disk-size : {exc}.", err=True)
+        raise typer.Exit(code=2) from None
+    return BenchOptions(workers=workers, disk_size=size, disk_path=disk_path)
 
 
 def _run_all(
@@ -156,6 +242,9 @@ def _run_all(
             reason = AVAILABILITY_LABELS[availability].plain
             console.print(f"[yellow]{label} : indisponible ({reason}), ignoré.[/yellow]")
             continue
+        if (notice := instance.notice()) is not None:
+            # le chemin vient de l'utilisateur : jamais interprété comme balisage rich
+            console.print(Text(f"{label} : {notice}.", style="dim"))
         try:
             with console.status(f"{label} : préparation…") as status:
                 cap = settings.warmup_cap(cls.category)
@@ -197,6 +286,14 @@ MaxCvOption = Annotated[
     float,
     typer.Option("--max-cv", min=0, help="Seuil (%) de l'avertissement « mesures instables »."),
 ]
+ReliableCvOption = Annotated[
+    float,
+    typer.Option(
+        "--reliable-cv",
+        min=0,
+        help="Seuil (%) sous lequel le rapport juge les mesures très reproductibles.",
+    ),
+]
 HotStartOption = Annotated[
     float, typer.Option("--hot-start", help="Température CPU (°C) de départ jugée trop chaude.")
 ]
@@ -209,7 +306,12 @@ WeightsOption = Annotated[
 
 
 def _settings(
-    runs: int, max_warmup: float | None, tolerance: float, max_cv: float, hot_start: float
+    runs: int,
+    max_warmup: float | None,
+    tolerance: float,
+    max_cv: float,
+    hot_start: float,
+    reliable_cv: float = DEFAULTS.reliable_cv_percent,
 ) -> RunSettings:
     return RunSettings(
         runs=runs,
@@ -217,6 +319,7 @@ def _settings(
         warmup_tolerance_percent=tolerance,
         high_variance_cv_percent=max_cv,
         hot_start_c=hot_start,
+        reliable_cv_percent=reliable_cv,
     )
 
 
@@ -225,7 +328,7 @@ def _bench_session(
     target: Target,
     backend: str,
     settings: RunSettings,
-    workers: int | None,
+    options: BenchOptions,
     weights: str | None,
 ) -> tuple[list[Result], Scores | None]:
     """Benchs + scores, partagé par `bench` et `export`."""
@@ -258,7 +361,7 @@ def _bench_session(
     for warning in start_warnings(initial, settings):
         console.print(f"[yellow]⚠ {warning_message(warning, initial)}[/yellow]")
 
-    results = _run_all(console, classes, settings, BenchOptions(workers=workers))
+    results = _run_all(console, classes, settings, options)
     if not results:
         raise typer.Exit(code=1)
 
@@ -285,11 +388,28 @@ def bench(
     warmup_tolerance: ToleranceOption = DEFAULTS.warmup_tolerance_percent,
     max_cv: MaxCvOption = DEFAULTS.high_variance_cv_percent,
     hot_start: HotStartOption = DEFAULTS.hot_start_c,
+    reliable_cv: ReliableCvOption = DEFAULTS.reliable_cv_percent,
     weights: WeightsOption = None,
+    disk_size: DiskSizeOption = "1G",
+    disk_path: DiskPathOption = None,
+    report: ReportOption = False,
+    report_dir: ReportDirOption = None,
 ) -> None:
-    """Lance les benchmarks notés."""
-    settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start)
-    _bench_session(Console(), target, backend, settings, workers, weights)
+    """Lance les benchmarks notés.
+
+    Avec --report : session en JSON et rapport HTML dans le dossier des rapports. Bench
+    interrompu ou sans résultat : aucun fichier.
+    """
+    console = Console()
+    settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start, reliable_cv)
+    options = _bench_options(workers, disk_size, disk_path)
+    results, scores = _bench_session(console, target, backend, settings, options, weights)
+    if report:
+        snapshot, _ = collect_snapshot()
+        session = build_export(
+            snapshot, machine_label(snapshot), results, scores, settings=settings
+        )
+        _print_report(console, write_report(session, report_dir or reports_dir(), datetime.now()))
 
 
 @app.command()
@@ -305,18 +425,53 @@ def export(
     warmup_tolerance: ToleranceOption = DEFAULTS.warmup_tolerance_percent,
     max_cv: MaxCvOption = DEFAULTS.high_variance_cv_percent,
     hot_start: HotStartOption = DEFAULTS.hot_start_c,
+    reliable_cv: ReliableCvOption = DEFAULTS.reliable_cv_percent,
     weights: WeightsOption = None,
+    disk_size: DiskSizeOption = "1G",
+    disk_path: DiskPathOption = None,
+    report: ReportOption = False,
+    report_dir: ReportDirOption = None,
 ) -> None:
     """Lance les benchmarks et exporte le tout en JSON pour `hwbench compare`.
 
     L'export contient les composants (sans aucun identifiant), les résultats et les scores.
     """
     console = Console()
-    settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start)
-    results, scores = _bench_session(console, target, backend, settings, workers, weights)
+    settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start, reliable_cv)
+    options = _bench_options(workers, disk_size, disk_path)
+    results, scores = _bench_session(console, target, backend, settings, options, weights)
     snapshot, _ = collect_snapshot()
-    write_export(build_export(snapshot, machine_label(snapshot), results, scores), output)
-    console.print(f"Export écrit : {output} ({len(results)} benchs)")
+    session = build_export(snapshot, machine_label(snapshot), results, scores, settings=settings)
+    write_export(session, output)
+    console.print(Text(f"Export écrit : {output} ({len(results)} benchs)"))
+    if report:
+        _print_report(console, write_report(session, report_dir or reports_dir(), datetime.now()))
+
+
+@app.command("report")
+def report_cmd(
+    file: Annotated[
+        Path, typer.Argument(help="Session ou export JSON (hwbench export, --report).")
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Fichier HTML (défaut : même nom, extension .html)."),
+    ] = None,
+) -> None:
+    """Rapport HTML autonome (hors ligne, imprimable) à partir d'un fichier JSON."""
+    out = output or file.with_suffix(".html")
+    if out.resolve() == file.resolve():
+        typer.echo(
+            "Erreur : le rapport écraserait le fichier JSON (-o pour un autre nom).", err=True
+        )
+        raise typer.Exit(code=2)
+    try:
+        session = load_export(file)
+    except ExportError as exc:
+        typer.echo(f"Erreur : {exc}", err=True)
+        raise typer.Exit(code=2) from None
+    out.write_text(render_report(session), encoding="utf-8")
+    Console().print(Text(f"Rapport écrit : {out}"))
 
 
 @app.command()

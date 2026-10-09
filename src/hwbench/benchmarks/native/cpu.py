@@ -43,7 +43,7 @@ def native_environment() -> dict[str, str]:
     return env
 
 
-def run_workloads(workloads: tuple[Workload, ...], inputs: list[Any]) -> dict[str, float]:
+def run_workloads(workloads: tuple[Any, ...], inputs: list[Any]) -> dict[str, float]:
     rates: dict[str, float] = {}
     for workload, data in zip(workloads, inputs, strict=True):
         start = perf_counter()
@@ -89,7 +89,7 @@ class NativeCpuSingle(_NativeCpu):
         )
 
 
-def _worker(workloads: tuple[Workload, ...], barrier: Barrier, queue: Any) -> None:
+def _worker(workloads: tuple[Any, ...], barrier: Barrier, queue: Any) -> None:
     try:
         inputs = [w.prepare() for w in workloads]
         barrier.wait(BARRIER_TIMEOUT_S)
@@ -97,6 +97,47 @@ def _worker(workloads: tuple[Workload, ...], barrier: Barrier, queue: Any) -> No
     except BaseException as exc:  # noqa: BLE001 - remonté tel quel au parent
         barrier.abort()  # débloque le parent immédiatement plutôt qu'au timeout
         queue.put(("error", repr(exc)))
+
+
+def run_parallel(
+    workloads: tuple[Any, ...], n: int, what: str = "CPU multi-core"
+) -> tuple[dict[str, float], float]:
+    """Les mêmes charges sur n processus (spawn), démarrage et préparation hors chrono.
+
+    Renvoie le débit agrégé (somme des débits de chaque processus, charge par charge) et la
+    durée mesurée. Une charge expose key, prepare() et execute() (Workload, MemoryCopy).
+    """
+    # spawn : processus neufs, indépendants de la méthode par défaut (fork/forkserver)
+    ctx = mp.get_context("spawn")
+    barrier = ctx.Barrier(n + 1)
+    queue = ctx.Queue()
+    procs = [
+        ctx.Process(target=_worker, args=(workloads, barrier, queue), daemon=True) for _ in range(n)
+    ]
+    try:
+        for proc in procs:
+            proc.start()
+        barrier.wait(BARRIER_TIMEOUT_S)
+        start = perf_counter()
+        outcomes = [queue.get(timeout=WORKER_TIMEOUT_S) for _ in range(n)]
+        wall = perf_counter() - start
+    except (Empty, threading.BrokenBarrierError) as exc:
+        try:
+            detail = queue.get(timeout=1)[1]
+        except Empty:
+            detail = "pas de réponse"
+        raise RuntimeError(f"échec d'un processus du bench {what} : {detail}") from exc
+    finally:
+        for proc in procs:
+            proc.join(timeout=5)
+            if proc.is_alive():
+                proc.terminate()
+
+    errors = [payload for status, payload in outcomes if status == "error"]
+    if errors:
+        raise RuntimeError(f"échec d'un processus du bench {what} : {errors[0]}")
+    rates = {w.key: sum(payload[w.key] for _, payload in outcomes) for w in workloads}
+    return rates, wall
 
 
 @register
@@ -111,37 +152,5 @@ class NativeCpuMulti(_NativeCpu):
         return self.options.workers or logical_cpus()
 
     def run(self) -> Measurement:
-        n = self.workers
-        # spawn : processus neufs, indépendants de la méthode par défaut (fork/forkserver)
-        ctx = mp.get_context("spawn")
-        barrier = ctx.Barrier(n + 1)
-        queue = ctx.Queue()
-        procs = [
-            ctx.Process(target=_worker, args=(self.workloads, barrier, queue), daemon=True)
-            for _ in range(n)
-        ]
-        try:
-            for proc in procs:
-                proc.start()
-            barrier.wait(BARRIER_TIMEOUT_S)
-            start = perf_counter()
-            outcomes = [queue.get(timeout=WORKER_TIMEOUT_S) for _ in range(n)]
-            wall = perf_counter() - start
-        except (Empty, threading.BrokenBarrierError) as exc:
-            try:
-                detail = queue.get(timeout=1)[1]
-            except Empty:
-                detail = "pas de réponse"
-            raise RuntimeError(f"échec d'un processus du bench multi-cœur : {detail}") from exc
-        finally:
-            for proc in procs:
-                proc.join(timeout=5)
-                if proc.is_alive():
-                    proc.terminate()
-
-        errors = [payload for status, payload in outcomes if status == "error"]
-        if errors:
-            raise RuntimeError(f"échec d'un processus du bench multi-cœur : {errors[0]}")
-        # débit agrégé : somme des débits de chaque processus, charge par charge
-        rates = {w.key: sum(payload[w.key] for _, payload in outcomes) for w in self.workloads}
+        rates, wall = run_parallel(self.workloads, self.workers)
         return Measurement(value=geometric_mean(rates.values()), duration_s=wall, details=rates)

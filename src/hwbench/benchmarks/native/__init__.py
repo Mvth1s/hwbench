@@ -1,3 +1,3 @@
-from hwbench.benchmarks.native import cpu
+from hwbench.benchmarks.native import cpu, memory
 
-__all__ = ["cpu"]
+__all__ = ["cpu", "memory"]

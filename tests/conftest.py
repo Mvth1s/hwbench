@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from hwbench.benchmarks.external import _run
+from hwbench.benchmarks.native.memory import MemoryCopy
 from hwbench.benchmarks.native.workloads import Workload
 from hwbench.collectors.linux import _exec
 from hwbench.results import Category, MachineState, Result
@@ -169,6 +170,9 @@ def laptop(fake_system: Callable[..., FakeSystem]) -> Callable[..., FakeSystem]:
 
 TOOLS = FIXTURES / "tools"
 
+# Copies mémoire réduites (1 Mio) : à patcher dans memory.SINGLE et memory.MULTI.
+TINY_MEMORY = (MemoryCopy("copy", "MiB/s", size=1024 * 1024, repeat=2),)
+
 
 def tool_output(name: str) -> str:
     return (TOOLS / name).read_text()
@@ -179,6 +183,7 @@ class FakeTools:
 
     outputs : binaire -> sortie (ou liste de sorties rendues tour à tour, la dernière répétée).
     failing : binaire -> stderr d'un échec (code 1).
+    free_bytes : espace libre simulé ; fichiers temporaires et suppressions sont enregistrés.
     """
 
     def __init__(
@@ -187,12 +192,18 @@ class FakeTools:
         env: dict[str, str] | None = None,
         files: set[str] | None = None,
         failing: dict[str, str] | None = None,
+        free_bytes: int = 500 * 1024**3,
     ) -> None:
         self.outputs = outputs or {}
         self.env = env or {}
         self.files = files or set()
         self.failing = failing or {}
         self.calls: list[list[str]] = []
+        # système de fichiers simulé (bench disque)
+        self.free_bytes = free_bytes
+        self.dirs: list[Path] = []
+        self.temp_files: list[Path] = []
+        self.removed: list[Path] = []
 
     def which(self, name: str) -> str | None:
         known = name in self.outputs or name in self.failing
@@ -203,6 +214,23 @@ class FakeTools:
 
     def exists(self, path: str) -> bool:
         return path in self.files
+
+    def home(self) -> Path:
+        return Path("/home/test")
+
+    def make_dirs(self, path: Path) -> None:
+        self.dirs.append(path)
+
+    def disk_free(self, path: Path) -> int:
+        return self.free_bytes
+
+    def temp_file(self, directory: Path, prefix: str) -> Path:
+        path = directory / f"{prefix}{len(self.temp_files)}.tmp"
+        self.temp_files.append(path)
+        return path
+
+    def remove(self, path: Path) -> None:
+        self.removed.append(path)
 
     def run(self, args: list[str], timeout: float) -> _run.Completed:
         self.calls.append(list(args))
@@ -215,7 +243,17 @@ class FakeTools:
 
 
 def _install_tools(monkeypatch: pytest.MonkeyPatch, tools: FakeTools) -> FakeTools:
-    for name in ("which", "getenv", "exists", "run"):
+    for name in (
+        "which",
+        "getenv",
+        "exists",
+        "run",
+        "home",
+        "make_dirs",
+        "disk_free",
+        "temp_file",
+        "remove",
+    ):
         monkeypatch.setattr(_run, name, getattr(tools, name))
     return tools
 
@@ -252,12 +290,17 @@ def make_result(
     presentation: str | None = None,
     **overrides: Any,
 ) -> Result:
-    """Result minimal ; backend et catégorie déduits du nom (« native-cpu-multi », « vkmark »)."""
+    """Result minimal ; backend et catégorie déduits du nom (« native-cpu-multi », « vkmark »,
+    « sysbench-memory-single », « fio-disk »)."""
     if backend is None:
         backend = "native" if name.startswith("native-") else name.split("-")[0]
     if category is None:
         category = (
-            Category.CPU_SINGLE
+            Category.MEMORY
+            if "-memory-" in name
+            else Category.DISK
+            if name.startswith("fio")
+            else Category.CPU_SINGLE
             if name.endswith("single")
             else Category.CPU_MULTI
             if name.endswith("multi")

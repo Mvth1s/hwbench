@@ -2,8 +2,8 @@ from rich.console import Group
 from rich.table import Table
 from rich.text import Text
 
-from hwbench.compare import Cell, CompareWarning, Comparison, Incomparable, Notice
-from hwbench.display.bench import CATEGORY_LABELS, UNIT_LABELS
+from hwbench.compare import INFO_NOTICES, Cell, CompareWarning, Comparison, Incomparable, Notice
+from hwbench.display.bench import CATEGORY_LABELS, DETAIL_LABELS, UNIT_LABELS
 from hwbench.display.fmt import compact, measure, num
 from hwbench.display.scores import ISSUE_LABELS
 from hwbench.export import MachineExport
@@ -100,8 +100,20 @@ def render_bench_rows(comparison: Comparison, labels: list[str]) -> Table:
     t = _table(labels, "Bench (valeur brute)")
     for row in comparison.benches:
         unit = UNIT_LABELS.get(row.unit, row.unit)
-        t.add_row(Text(row.name), *(_cell(c, f"{measure(c.value or 0)} {unit}") for c in row.cells))
+        label = Text(row.name)
+        if row.detail is not None:
+            label = Text(f"  ↳ {DETAIL_LABELS.get(row.detail, row.detail)}", style="dim")
+        t.add_row(label, *(_cell(c, f"{measure(c.value or 0)} {unit}") for c in row.cells))
     return t
+
+
+def _per_file(notice: Notice, labels: list[str] | None) -> str:
+    names = labels or [f"fichier {i + 1}" for i in range(len(notice.values))]
+    return ", ".join(
+        f"{name} : {value}"
+        for name, value in zip(names, notice.values, strict=False)
+        if value is not None
+    )
 
 
 def notice_message(notice: Notice, labels: list[str] | None = None) -> str:
@@ -126,6 +138,14 @@ def notice_message(notice: Notice, labels: list[str] | None = None) -> str:
                 f"{notice.subject} : même GPU, pilotes différents ({drivers}). Écart calculé "
                 "quand même ; une partie peut venir du pilote."
             )
+        case CompareWarning.TOOL_VERSION_DIFFERS:
+            return (
+                f"{notice.subject} : même disque, versions de l'outil différentes "
+                f"({_per_file(notice, labels)}). Écart calculé quand même ; une partie peut venir "
+                "de l'outil."
+            )
+        case CompareWarning.TOOL_VERSION_INFO:
+            return f"{notice.subject} : version de l'outil ({_per_file(notice, labels)})."
 
 
 def render_comparison(comparison: Comparison, labels: list[str]) -> Group:
@@ -133,5 +153,10 @@ def render_comparison(comparison: Comparison, labels: list[str]) -> Group:
     if comparison.scores:
         parts.append(render_score_rows(comparison, labels))
     parts.append(render_bench_rows(comparison, labels))
-    parts += [Text(f"⚠ {notice_message(n, labels)}", style="yellow") for n in comparison.warnings]
+    parts += [
+        Text(notice_message(n, labels), style="dim")
+        if n.code in INFO_NOTICES
+        else Text(f"⚠ {notice_message(n, labels)}", style="yellow")
+        for n in comparison.warnings
+    ]
     return Group(*parts)

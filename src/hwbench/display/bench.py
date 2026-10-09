@@ -4,49 +4,23 @@ from rich.table import Table
 from rich.text import Text
 
 from hwbench.display.fmt import measure, num
+from hwbench.labels import (  # noqa: F401 — réexportés pour display/
+    CATEGORY_LABELS,
+    DETAIL_LABELS,
+    ENVIRONMENT_LABELS,
+    PRESENTATION_LABELS,
+    PROFILE_LABELS,
+    UNIT_LABELS,
+    disk_size_label,
+    unit_label,
+)
 from hwbench.results import BenchWarning, Category, MachineState, Result
-
-CATEGORY_LABELS = {
-    Category.CPU_SINGLE: "CPU single-core",
-    Category.CPU_MULTI: "CPU multi-core",
-    Category.GPU: "GPU",
-}
-
-DETAIL_LABELS = {
-    "sha256": "SHA-256",
-    "zlib": "Compression zlib (niveau 6)",
-    "lzma": "Compression LZMA (preset 1)",
-    "powmod": "Exponentiation modulaire 2048 bits",
-}
-
-# « index » : moyenne géométrique de débits, sans unité. Les points (référence = 1000) sont
-# calculés par le scoring et affichés à part (display/scores.py).
-UNIT_LABELS = {"MiB/s": "Mio/s", "index": "indice brut"}
-
-PROFILE_LABELS = {"platform_profile": "profil plateforme", "energy_performance_preference": "EPP"}
-
-# Conditions des benchs externes : libellé français devant la valeur brute.
-ENVIRONMENT_LABELS = {
-    "binary": "binaire",
-    "session": "session",
-    "resolution": "résolution",
-    "renderer": "rendu",
-    "driver": "pilote",
-    "cpu-max-prime": "cpu-max-prime",
-    "time": "durée",
-}
-
-PRESENTATION_LABELS = {
-    "offscreen": "hors écran (sans vsync)",
-    "headless": "headless, sans affichage (sans vsync)",
-    "immediate-requested": "fenêtre, mode immediate demandé (non vérifiable)",
-}
 
 NA = Text("non disponible", style="dim")
 
 
 def _unit(unit: str) -> str:
-    return UNIT_LABELS.get(unit, unit)
+    return unit_label(unit)
 
 
 def warning_message(
@@ -147,7 +121,9 @@ def render_result(result: Result) -> Panel:
     if result.workers is not None:
         # le natif lance des processus (GIL) ; les outils externes, des threads
         t.add_row("Processus" if result.backend == "native" else "Threads", str(result.workers))
-    if result.presentation is not None:
+    if result.presentation is not None and result.category is Category.DISK:
+        t.add_row("Fichier de test", disk_size_label(result.presentation))
+    elif result.presentation is not None:
         t.add_row("Présentation", PRESENTATION_LABELS.get(result.presentation, result.presentation))
     _state_rows(t, result)
 

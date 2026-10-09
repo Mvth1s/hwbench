@@ -2,6 +2,7 @@ import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import ClassVar
 
 from hwbench.results import Availability, BenchWarning, Category, Measurement
@@ -10,6 +11,8 @@ from hwbench.results import Availability, BenchWarning, Category, Measurement
 @dataclass(frozen=True)
 class BenchOptions:
     workers: int | None = None  # None = nombre de CPU logiques utilisables
+    disk_size: int = 1024**3  # taille du fichier de test du bench disque, en octets
+    disk_path: Path | None = None  # dossier du fichier de test ; None = ~/.cache/hwbench
 
 
 def logical_cpus() -> int:
@@ -54,6 +57,10 @@ class Benchmark(ABC):
     def environment(self) -> dict[str, str]:
         return {}
 
+    def notice(self) -> str | None:
+        """Message affiché avant le bench (ex. fichier que le bench disque va écrire)."""
+        return None
+
     def warnings(self) -> list[BenchWarning]:
         """Avertissements propres au backend, connus après les runs (ex. vsync non coupée)."""
         return []
@@ -64,6 +71,10 @@ class Benchmark(ABC):
 
     @abstractmethod
     def run(self) -> Measurement: ...
+
+    def cleanup(self) -> None:  # noqa: B027 — rien à libérer par défaut
+        """Appelé une fois après les runs, même en cas d'erreur ou de Ctrl+C (fichiers
+        temporaires du bench disque)."""
 
 
 _REGISTRY: list[type[Benchmark]] = []
@@ -86,7 +97,7 @@ def known_backends() -> set[str]:
 
 
 def select(categories: Iterable[Category], backend: str) -> list[type[Benchmark]]:
-    """Benchs voulus, par catégorie (single, multi, GPU) puis natif d'abord."""
+    """Benchs voulus, par catégorie (ordre de Category) puis natif d'abord."""
     wanted = set(categories)
     order = list(Category)
     return sorted(
@@ -95,5 +106,11 @@ def select(categories: Iterable[Category], backend: str) -> list[type[Benchmark]
             for cls in benchmark_classes()
             if cls.category in wanted and backend in ("all", cls.backend)
         ),
-        key=lambda cls: (order.index(cls.category), cls.backend != "native", cls.name),
+        # natif d'abord, puis single avant multi dans une même catégorie (mémoire)
+        key=lambda cls: (
+            order.index(cls.category),
+            cls.backend != "native",
+            cls.name.endswith("-multi"),
+            cls.name,
+        ),
     )

@@ -9,6 +9,14 @@ class Category(StrEnum):
     CPU_SINGLE = "cpu_single"
     CPU_MULTI = "cpu_multi"
     GPU = "gpu"
+    # Catégories d'information : notées contre la référence si elle les contient, jamais dans le
+    # score combiné ni dans le classement (COMBINED_CATEGORIES).
+    MEMORY = "memory"
+    DISK = "disk"
+
+
+# Catégories du score combiné et du classement, dans l'ordre d'affichage.
+COMBINED_CATEGORIES = (Category.CPU_SINGLE, Category.CPU_MULTI, Category.GPU)
 
 
 class BenchWarning(StrEnum):
@@ -59,6 +67,24 @@ def gpu_name(renderer: str | None) -> str | None:
     return name or None
 
 
+def disk_key(model: str | None) -> str | None:
+    """Clé de comparaison d'un disque : modèle (lsblk) en minuscules, espaces normalisées."""
+    key = " ".join(model.split()).lower() if model else ""
+    return key or None
+
+
+# Benchs dont la version de l'outil est une information, hors identité (comme le pilote GPU) :
+# relevée, affichée, signalée pour un même disque mesuré avec une autre version, mais sans
+# empêcher la notation. fio : options du protocole toutes explicites, comportement inchangé de
+# 3.40 à 3.42 ; le noyau, le système de fichiers et le firmware pèsent bien plus que fio.
+TOOL_VERSION_NOT_IN_IDENTITY = frozenset({"fio-disk"})
+
+
+def identity_tool_version(name: str, tool_version: str | None) -> str | None:
+    """Version de l'outil telle qu'elle entre dans BackendId (None si simple information)."""
+    return None if name in TOOL_VERSION_NOT_IN_IDENTITY else tool_version
+
+
 def gpu_key(renderer: str | None) -> str | None:
     """Clé de comparaison d'un GPU : gpu_name en minuscules (« amd radeon rx 9070 xt »)."""
     name = gpu_name(renderer)
@@ -67,8 +93,9 @@ def gpu_key(renderer: str | None) -> str | None:
 
 @dataclass(frozen=True)
 class BackendId:
-    """Ce qui rend deux mesures comparables : même bench, même version, même version d'outil,
-    même mode de présentation (hors écran, headless, à l'écran)."""
+    """Ce qui rend deux mesures comparables : même bench, même version, même version d'outil
+    (sauf TOOL_VERSION_NOT_IN_IDENTITY), même mode de présentation (GPU : hors écran, headless,
+    à l'écran ; disque : taille du fichier de test)."""
 
     name: str
     version: str
@@ -119,14 +146,14 @@ class MachineState:
         """
         issues: list[str] = []
         profile = self.platform_profile
-        if profile is not None and profile != "custom" and profile != self._best_profile():
+        if profile is not None and profile != "custom" and profile != self.best_profile():
             issues.append("platform_profile")
         epp = self.energy_performance_preference
         if epp is not None and epp != "performance":
             issues.append("energy_performance_preference")
         return issues
 
-    def _best_profile(self) -> str:
+    def best_profile(self) -> str:
         known = [c for c in self.platform_profile_choices if c in PLATFORM_PROFILE_ORDER]
         return max(known, key=PLATFORM_PROFILE_ORDER.index, default="performance")
 
@@ -138,7 +165,7 @@ class Result:
     backend: str
     version: str
     tool_version: str | None  # version de l'outil externe (None pour le natif)
-    presentation: str | None  # GPU : offscreen, headless, immediate-requested
+    presentation: str | None  # GPU : offscreen, headless… ; disque : taille du fichier (1GiB)
     unit: str
     higher_is_better: bool
     value: float  # médiane des runs
@@ -160,7 +187,12 @@ class Result:
 
     @property
     def backend_id(self) -> BackendId:
-        return BackendId(self.name, self.version, self.tool_version, self.presentation)
+        return BackendId(
+            self.name,
+            self.version,
+            identity_tool_version(self.name, self.tool_version),
+            self.presentation,
+        )
 
     @property
     def cv_percent(self) -> float:

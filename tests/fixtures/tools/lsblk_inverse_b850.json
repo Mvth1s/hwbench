@@ -1,0 +1,16 @@
+{
+   "blockdevices": [
+      {
+         "name": "nvme1n1p4",
+         "model": null,
+         "type": "part",
+         "children": [
+            {
+               "name": "nvme1n1",
+               "model": "Lexar SSD NM1090 PRO 1TB",
+               "type": "disk"
+            }
+         ]
+      }
+   ]
+}

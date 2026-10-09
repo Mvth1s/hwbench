@@ -2,20 +2,29 @@
 
 Rien n'est comparé « à peu près » :
 - un bench n'a d'écart que si son identité (BackendId : version du protocole, version de
-  l'outil, mode de présentation) est la même dans les deux fichiers ;
+  l'outil sauf pour fio, mode de présentation) est la même dans les deux fichiers ;
 - un score de catégorie ou le combiné n'a d'écart que si les deux fichiers ont été notés contre
   la même référence (même empreinte) avec exactement la même liste de backends (et, pour le
   combiné, les mêmes pondérations).
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
 from hwbench.export import MachineExport
-from hwbench.results import BackendId, Category, Result, driver_key, gpu_key
+from hwbench.results import (
+    TOOL_VERSION_NOT_IN_IDENTITY,
+    BackendId,
+    Category,
+    Result,
+    disk_key,
+    driver_key,
+    gpu_key,
+)
 from hwbench.scoring import CategoryScore, CombinedScore, ScoreIssue
 
-CATEGORY_ORDER = (Category.CPU_SINGLE, Category.CPU_MULTI, Category.GPU)
+CATEGORY_ORDER = tuple(Category)
 
 
 class Incomparable(StrEnum):
@@ -34,6 +43,14 @@ class CompareWarning(StrEnum):
     FORCED_REFERENCE = "forced_reference"
     # information : le pilote n'est pas dans BackendId, l'écart reste calculé
     DRIVER_DIFFERS = "driver_differs"
+    # même règle pour la version d'un outil hors identité (fio) : signalée sur un même disque
+    TOOL_VERSION_DIFFERS = "tool_version_differs"
+    # disques différents : versions citées pour information, sans avertissement
+    TOOL_VERSION_INFO = "tool_version_info"
+
+
+# Notices d'information : affichées sans ⚠
+INFO_NOTICES = frozenset({CompareWarning.TOOL_VERSION_INFO})
 
 
 @dataclass(frozen=True)
@@ -54,6 +71,10 @@ class BenchRow:
     cells: list[Cell]
     drivers: list[str | None] = field(default_factory=list)  # pilote GPU par fichier (brut)
     gpus: list[str | None] = field(default_factory=list)  # renderer GPU par fichier (brut)
+    # version de l'outil et modèle du disque par fichier (benchs hors identité d'outil : fio)
+    tool_versions: list[str | None] = field(default_factory=list)
+    devices: list[str | None] = field(default_factory=list)
+    detail: str | None = None  # sous-mesure d'un bench (disque : seq_read…), ligne d'information
 
 
 @dataclass(frozen=True)
@@ -99,33 +120,56 @@ def _bench_rows(exports: list[MachineExport]) -> list[BenchRow]:
     rows = []
     for name in names:
         results = [f.get(name) for f in by_file]
-        base = results[0]
-        cells = []
-        for i, r in enumerate(results):
-            if r is None:
-                cells.append(Cell(None, issue=Incomparable.MISSING))
-            elif i == 0:
-                cells.append(Cell(r.value))
-            elif base is None:
-                cells.append(Cell(r.value, issue=Incomparable.MISSING))
-            elif r.backend_id != base.backend_id:
-                cells.append(Cell(r.value, issue=Incomparable.IDENTITY_DIFFERS))
-            else:
-                delta, better = _delta(r.value, base.value, r.higher_is_better)
-                cells.append(Cell(r.value, delta, better))
         ref = first[name]
+        identities = [r.backend_id if r else None for r in results]
         rows.append(
             BenchRow(
                 name,
                 ref.category,
                 ref.unit,
-                [r.backend_id if r else None for r in results],
-                cells,
+                identities,
+                _cells(results, lambda r: r.value),
                 [r.environment.get("driver") if r else None for r in results],
                 [r.environment.get("renderer") if r else None for r in results],
+                [r.tool_version if r else None for r in results],
+                [r.environment.get("device") if r else None for r in results],
             )
         )
+        # disque : débits et IOPS de chaque test, sous l'indice (mêmes règles d'identité)
+        if ref.category is Category.DISK:
+            for key in ref.details:
+                rows.append(
+                    BenchRow(
+                        name,
+                        ref.category,
+                        ref.detail_units.get(key, ""),
+                        identities,
+                        _cells(results, lambda r, key=key: r.details.get(key)),
+                        detail=key,
+                    )
+                )
     return rows
+
+
+def _cells(results: list[Result | None], value_of: Callable[[Result], float | None]) -> list[Cell]:
+    """Valeur de chaque fichier et écart à la base, si l'identité du bench est la même."""
+    base = results[0]
+    base_value = value_of(base) if base is not None else None
+    cells = []
+    for i, r in enumerate(results):
+        value = value_of(r) if r is not None else None
+        if r is None or value is None:
+            cells.append(Cell(None, issue=Incomparable.MISSING))
+        elif i == 0:
+            cells.append(Cell(value))
+        elif base is None or base_value is None:
+            cells.append(Cell(value, issue=Incomparable.MISSING))
+        elif r.backend_id != base.backend_id:
+            cells.append(Cell(value, issue=Incomparable.IDENTITY_DIFFERS))
+        else:
+            delta, better = _delta(value, base_value, r.higher_is_better)
+            cells.append(Cell(value, delta, better))
+    return cells
 
 
 def _composition(score: CategoryScore | CombinedScore) -> list[BackendId]:
@@ -197,14 +241,37 @@ def _driver_notices(row: BenchRow) -> list[Notice]:
     return notices
 
 
+def _tool_notices(row: BenchRow) -> list[Notice]:
+    """Versions différentes d'un outil hors identité (fio), même règle que le pilote : un
+    avertissement entre fichiers mesurés sur le même modèle de disque, une information entre
+    disques différents (ou inconnus). Valeurs : version par fichier, None hors du groupe."""
+    if row.name not in TOOL_VERSION_NOT_IN_IDENTITY or row.detail is not None:
+        return []
+    measured = [i for i, v in enumerate(row.tool_versions) if v is not None]
+    if len({row.tool_versions[i] for i in measured}) < 2:
+        return []
+    groups: dict[str, list[int]] = {}
+    for i in measured:
+        if (key := disk_key(row.devices[i] if i < len(row.devices) else None)) is not None:
+            groups.setdefault(key, []).append(i)
+
+    def values(members: list[int]) -> list[str | None]:
+        return [v if i in members else None for i, v in enumerate(row.tool_versions)]
+
+    flagged = [m for m in groups.values() if len({row.tool_versions[i] for i in m}) > 1]
+    if flagged:
+        return [Notice(CompareWarning.TOOL_VERSION_DIFFERS, row.name, values(m)) for m in flagged]
+    return [Notice(CompareWarning.TOOL_VERSION_INFO, row.name, values(measured))]
+
+
 def _warnings(exports: list[MachineExport], benches: list[BenchRow]) -> list[Notice]:
     warnings = [
         Notice(CompareWarning.BENCH_VERSION_DIFFERS, row.name)
         for row in benches
-        if len({i for i in row.identities if i is not None}) > 1
+        if row.detail is None and len({i for i in row.identities if i is not None}) > 1
     ]
     for row in benches:
-        warnings += _driver_notices(row)
+        warnings += _driver_notices(row) + _tool_notices(row)
     digests = {e.reference.digest for e in exports if e.reference is not None}
     if len(digests) > 1:
         warnings.append(Notice(CompareWarning.REFERENCE_DIFFERS, ""))

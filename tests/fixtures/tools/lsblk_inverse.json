@@ -1,0 +1,16 @@
+{
+   "blockdevices": [
+      {
+         "name": "nvme0n1p3",
+         "model": null,
+         "type": "part",
+         "children": [
+            {
+               "name": "nvme0n1",
+               "model": "Samsung SSD 990 EVO Plus 1TB",
+               "type": "disk"
+            }
+         ]
+      }
+   ]
+}

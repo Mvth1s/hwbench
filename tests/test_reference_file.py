@@ -9,10 +9,12 @@ from test_fixtures_privacy import _live_identifiers
 from test_scoring import snapshot
 
 from hwbench import privacy
+from hwbench.benchmarks.external.fio import FIO_VERSION
 from hwbench.benchmarks.external.glmark2 import GLMARK2_VERSION
-from hwbench.benchmarks.external.sysbench import SYSBENCH_VERSION
+from hwbench.benchmarks.external.sysbench import SYSBENCH_MEMORY_VERSION, SYSBENCH_VERSION
 from hwbench.benchmarks.external.vkmark import VKMARK_VERSION
 from hwbench.benchmarks.native.cpu import NATIVE_CPU_VERSION
+from hwbench.benchmarks.native.memory import NATIVE_MEMORY_VERSION
 from hwbench.reference import build_reference
 from hwbench.results import Category
 from hwbench.scoring import load_reference
@@ -24,6 +26,13 @@ EXPECTED = {
     "sysbench-cpu-multi": (Category.CPU_MULTI, SYSBENCH_VERSION, None),
     "glmark2": (Category.GPU, GLMARK2_VERSION, "offscreen"),
     "vkmark": (Category.GPU, VKMARK_VERSION, "headless"),
+    # catégories d'information (hors score combiné), notées contre la référence
+    "native-memory-single": (Category.MEMORY, NATIVE_MEMORY_VERSION, None),
+    "native-memory-multi": (Category.MEMORY, NATIVE_MEMORY_VERSION, None),
+    "sysbench-memory-single": (Category.MEMORY, SYSBENCH_MEMORY_VERSION, None),
+    "sysbench-memory-multi": (Category.MEMORY, SYSBENCH_MEMORY_VERSION, None),
+    # taille par défaut du fichier de test : seule taille notée contre la référence
+    "fio-disk": (Category.DISK, FIO_VERSION, "1GiB"),
 }
 
 
@@ -99,3 +108,13 @@ def test_build_reference_scrubs_identifiers() -> None:
     bench = build_reference([leaky], snapshot(), [])["benchmarks"][0]
     assert bench["environment"]["serial"] == privacy.REDACTED
     assert "aa:bb:cc:dd:ee:ff" not in bench["environment"]["note"]
+
+
+def test_disk_reference_records_the_disk_and_filesystem() -> None:
+    """La règle de version de fio (même disque) a besoin du modèle du disque de la référence."""
+    reference = load_reference()
+    assert reference is not None
+    entry = reference.find("fio-disk")
+    assert entry is not None and entry.device and entry.tool_version
+    bench = next(b for b in json.loads(raw_reference())["benchmarks"] if b["name"] == "fio-disk")
+    assert bench["environment"]["filesystem"]

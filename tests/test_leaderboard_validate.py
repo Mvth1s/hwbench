@@ -2,12 +2,18 @@ import json
 from dataclasses import replace
 
 import pytest
+from conftest import make_result
 from test_compare import export
 from test_scoring import REFERENCE, machine, payload
 
 from hwbench.export import to_dict
 from hwbench.leaderboard import __main__ as cli
-from hwbench.leaderboard.validate import MAX_BYTES, current_versions, validate_file
+from hwbench.leaderboard.validate import (
+    MAX_BYTES,
+    current_versions,
+    stale_reference,
+    validate_file,
+)
 from hwbench.scoring import reference_from_dict
 
 
@@ -74,6 +80,45 @@ def test_other_reference(tmp_path) -> None:
     other = reference_from_dict(payload(["power_unknown"]))
     found = problems(tmp_path, to_dict(export(machine(1.0), reference=other)))
     assert any("autre référence que celle du paquet" in p for p in found)
+
+
+def stale_payload() -> dict:
+    """Export noté contre une référence antérieure (autre empreinte), sans autre problème."""
+    older = reference_from_dict(payload([]) | {"created": "2026-01-01T00:00:00+00:00"})
+    assert older.digest != REFERENCE.digest
+    return to_dict(export(machine(1.0), reference=older))
+
+
+def test_stale_reference_is_detected() -> None:
+    older = reference_from_dict(payload([]) | {"created": "2026-01-01T00:00:00+00:00"})
+    assert stale_reference(export(machine(1.0), reference=older), REFERENCE)
+    assert not stale_reference(export(machine(1.0)), REFERENCE)
+    assert not stale_reference(export(machine(1.0), reference=None), REFERENCE)
+
+
+def test_stale_reference_is_tolerated_only_on_request(tmp_path) -> None:
+    path = submit(tmp_path, stale_payload())
+    assert any("autre référence que celle du paquet" in p for p in validate_file(path, REFERENCE))
+    assert validate_file(path, REFERENCE, tolerate_stale_reference=True) == []
+
+
+def test_tolerating_a_stale_reference_keeps_every_other_check(tmp_path) -> None:
+    data = stale_payload()
+    data["results"][0]["version"] = "0"
+    data["snapshot"]["hostname"] = "mon-pc"
+    found = validate_file(submit(tmp_path, data), REFERENCE, tolerate_stale_reference=True)
+    assert not any("autre référence" in p for p in found)
+    assert any("protocole v0" in p for p in found)
+    assert any("hostname" in p for p in found)
+
+
+def test_cli_refuses_a_stale_reference(tmp_path, capsys, monkeypatch) -> None:
+    """La validation des soumissions (results.yml) ne tolère jamais une référence périmée."""
+    monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    stale = submit(tmp_path, stale_payload(), "ancien.json")
+    assert cli.main(["validate", str(stale)]) == 1
+    out = capsys.readouterr()
+    assert f"✗ {stale}" in out.out and "autre référence que celle du paquet" in out.out
 
 
 def test_forced_reference(tmp_path) -> None:
@@ -143,7 +188,7 @@ def test_cli_reports_each_file_and_fails_on_any_problem(tmp_path, capsys, monkey
     out = capsys.readouterr()
     assert f"✓ {good}" in out.out and f"✗ {bad}" in out.out
     assert "schéma d'export 1" in out.out
-    assert "1 fichier(s) refusé(s) sur 2" in out.err
+    assert "1 fichier refusé sur 2" in out.err
 
 
 def test_cli_annotates_problems_under_github_actions(tmp_path, capsys, monkeypatch) -> None:
@@ -211,7 +256,7 @@ def test_duplicate_keys_cannot_hide_an_identifier(tmp_path) -> None:
     sneaky = text.replace('"machine": ', '"machine": "aa:bb:cc:dd:ee:ff", "machine": ', 1)
     assert json.loads(sneaky)["machine"] != "aa:bb:cc:dd:ee:ff"
     found = problems(tmp_path, sneaky)
-    assert found == ["JSON invalide : clé(s) en double : machine"]
+    assert found == ["JSON invalide : clé en double : machine"]
 
 
 def test_non_standard_constants_are_refused(tmp_path) -> None:
@@ -223,3 +268,20 @@ def test_non_standard_constants_are_refused(tmp_path) -> None:
 def test_invalid_export_date_is_refused(tmp_path, created) -> None:
     data = good_payload() | {"created": created}
     assert "created : date d'export invalide (ISO 8601 attendu)" in problems(tmp_path, data)
+
+
+def test_export_with_memory_and_disk_is_accepted(tmp_path) -> None:
+    results = machine(1.2) + [
+        make_result("native-memory-single", 12_000.0),
+        make_result("native-memory-multi", 30_000.0),
+        make_result("sysbench-memory-single", 13_000.0, tool_version="1.0.20"),
+        make_result(
+            "fio-disk",
+            9_000.0,
+            tool_version="3.40",
+            presentation="1GiB",
+            details={"seq_read": 3000.0, "rand_read_4k": 200_000.0},
+            detail_units={"seq_read": "MiB/s", "rand_read_4k": "IOPS"},
+        ),
+    ]
+    assert problems(tmp_path, to_dict(export(results, "Avec disque"))) == []

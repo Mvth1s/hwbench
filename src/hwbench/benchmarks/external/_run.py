@@ -7,6 +7,7 @@ ToolError au lieu de renvoyer None.
 import os
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -32,6 +33,30 @@ def getenv(name: str) -> str | None:
 
 def exists(path: str) -> bool:
     return Path(path).exists()
+
+
+def home() -> Path:
+    return Path.home()
+
+
+def make_dirs(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def disk_free(path: Path) -> int:
+    """Octets libres pour un utilisateur ordinaire sur le système de fichiers de `path`."""
+    return shutil.disk_usage(path).free
+
+
+def temp_file(directory: Path, prefix: str) -> Path:
+    """Fichier vide, créé de façon exclusive (nom imprévisible), à supprimer par remove()."""
+    fd, name = tempfile.mkstemp(prefix=prefix, suffix=".tmp", dir=directory)
+    os.close(fd)
+    return Path(name)
+
+
+def remove(path: Path) -> None:
+    path.unlink(missing_ok=True)
 
 
 def run(args: list[str], timeout: float) -> Completed:

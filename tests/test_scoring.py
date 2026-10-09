@@ -1,6 +1,7 @@
 import json
 import math
 import re
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -204,7 +205,10 @@ def test_weights() -> None:
     assert combined.weights == {Category.CPU_SINGLE: 0.25, Category.CPU_MULTI: 0.75}
 
 
-@pytest.mark.parametrize("text", ["cpu-single=-1", "gpu", "ram=1", "cpu-single=0,cpu-multi=0"])
+@pytest.mark.parametrize(
+    "text",
+    ["cpu-single=-1", "gpu", "ram=1", "cpu-single=0,cpu-multi=0", "memory=1", "disk=2"],
+)
 def test_invalid_weights(text: str) -> None:
     with pytest.raises(ValueError):
         parse_weights(text)
@@ -373,3 +377,139 @@ def test_scores_panel_other_gpu_shows_driver_without_warning() -> None:
 def test_gpu_name_keeps_original_case(renderer, expected) -> None:
     assert gpu_name(renderer) == expected
     assert gpu_key(renderer) == (expected.lower() if expected else None)
+
+
+# --- Mémoire et disque : catégories d'information, hors score combiné ----------------------
+
+FIO = dict(tool_version="3.38", presentation="1GiB")
+
+
+def info_results(factor: float = 1.0) -> list[Result]:
+    return [
+        make_result("native-memory-single", 10_000.0 * factor),
+        make_result("native-memory-multi", 40_000.0 * factor),
+        make_result("sysbench-memory-single", 12_000.0 * factor, **SYSBENCH),
+        make_result("fio-disk", 5_000.0 * factor, **FIO),
+    ]
+
+
+def test_memory_and_disk_stay_raw_without_reference_entries() -> None:
+    scores = score_results(machine(2.0) + info_results(), REFERENCE)
+    by_cat = {c.category: c for c in scores.categories}
+    assert by_cat[Category.MEMORY].points is None
+    assert by_cat[Category.MEMORY].issue is ScoreIssue.NOT_IN_REFERENCE
+    assert by_cat[Category.DISK].issue is ScoreIssue.NOT_IN_REFERENCE
+    # le combiné ne bouge pas
+    assert scores.combined is not None and scores.combined.points == pytest.approx(2000)
+    assert set(scores.combined.weights) == {Category.CPU_SINGLE, Category.CPU_MULTI, Category.GPU}
+
+
+def test_memory_and_disk_scored_when_in_reference_but_never_combined() -> None:
+    reference = reference_from_dict(
+        build_reference(reference_results() + info_results(), snapshot(), [])
+    )
+    results = machine(2.0) + [
+        make_result("native-memory-single", 20_000.0),  # 2000 pts
+        make_result("native-memory-multi", 320_000.0),  # 8000 pts
+        make_result("sysbench-memory-single", 1.0, **SYSBENCH),  # information
+        make_result("fio-disk", 500.0, **FIO),  # 100 pts
+    ]
+    scores = score_results(results, reference)
+    by_cat = {c.category: c for c in scores.categories}
+    assert by_cat[Category.MEMORY].points == pytest.approx(4000)  # √(2000 × 8000)
+    assert by_cat[Category.DISK].points == pytest.approx(100)
+    sysbench_memory = next(b for b in scores.backends if b.backend.name == "sysbench-memory-single")
+    assert not sysbench_memory.official
+    assert scores.combined is not None and scores.combined.points == pytest.approx(2000)
+
+
+def test_disk_size_is_part_of_the_identity() -> None:
+    reference = reference_from_dict(build_reference(info_results(), snapshot(), []))
+    other_size = make_result("fio-disk", 5_000.0, tool_version="3.38", presentation="4GiB")
+    score = normalize(other_size, reference)
+    assert (score.points, score.issue) == (None, ScoreIssue.PRESENTATION_MISMATCH)
+
+
+def test_memory_only_has_no_combined_score() -> None:
+    scores = score_results(info_results(), REFERENCE)
+    assert scores.combined is None
+
+
+def _panel_text(scores) -> str:
+    console = Console(width=200, record=True)
+    console.print(render_scores(scores))
+    return console.export_text()
+
+
+def test_scores_panel_info_categories() -> None:
+    raw = _panel_text(score_results(machine(2.0) + info_results(), REFERENCE))
+    assert "Mémoire" in raw and "valeurs brutes (pas encore dans la référence)" in raw
+    reference = reference_from_dict(
+        build_reference(reference_results() + info_results(), snapshot(), [])
+    )
+    scored = _panel_text(score_results(machine(2.0) + info_results(2.0), reference))
+    assert re.search(r"Disque +2000 pts  \(information, hors score combiné\)", scored)
+    assert re.search(r"Mémoire +2000 pts  \(information, hors score combiné\)", scored)
+
+
+# --- fio : version de l'outil hors identité, même règle que le pilote GPU ----------------
+
+EVO = "Samsung SSD 990 EVO Plus 1TB"
+SN850 = "WD_BLACK SN850X 2000GB"
+
+
+def _fio(value: float, tool: str | None, device: str | None = EVO) -> Result:
+    env = {"filesystem": "btrfs", **({"device": device} if device else {})}
+    return make_result("fio-disk", value, tool_version=tool, presentation="1GiB", environment=env)
+
+
+def _fio_reference(tool: str = "3.42", device: str | None = EVO):
+    return reference_from_dict(build_reference([_fio(2000.0, tool, device)], snapshot(), []))
+
+
+def test_fio_tool_version_is_recorded_but_not_part_of_the_identity() -> None:
+    reference = _fio_reference()
+    entry = reference.find("fio-disk")
+    assert entry.id == BackendId("fio-disk", "1", None, "1GiB")
+    assert (entry.tool_version, entry.device) == ("3.42", EVO)
+    result = _fio(1000.0, "3.40")
+    assert result.tool_version == "3.40" and result.backend_id.tool_version is None
+
+
+def test_sysbench_memory_tool_version_stays_in_the_identity() -> None:
+    ref_result = make_result("sysbench-memory-single", 9000.0, tool_version="1.0.20")
+    reference = reference_from_dict(build_reference([ref_result], snapshot(), []))
+    assert reference.find("sysbench-memory-single").id.tool_version == "1.0.20"
+    score = normalize(replace(ref_result, tool_version="1.1.0"), reference)
+    assert (score.points, score.issue) == (None, ScoreIssue.TOOL_VERSION_MISMATCH)
+
+
+def test_same_disk_other_fio_version_is_scored_and_flagged() -> None:
+    score = normalize(_fio(3000.0, "3.40"), _fio_reference())
+    assert (score.points, score.issue) == (pytest.approx(1500), None)
+    assert score.same_device and score.tool_differs and not score.tool_info
+    out = _panel(score_results([_fio(3000.0, "3.40")], _fio_reference()))
+    assert "⚠ fio-disk : outil 3.40 (référence : 3.42, même disque)" in out
+
+
+@pytest.mark.parametrize("device", [f"  {EVO.lower()} ", EVO])
+def test_same_disk_same_fio_version_says_nothing(device) -> None:
+    score = normalize(_fio(2000.0, "3.42", device), _fio_reference())
+    assert score.same_device and not score.tool_differs and not score.tool_info
+    assert "outil" not in _panel(score_results([_fio(2000.0, "3.42", device)], _fio_reference()))
+
+
+@pytest.mark.parametrize("device", [SN850, None])
+def test_other_disk_shows_fio_version_as_information(device) -> None:
+    score = normalize(_fio(1000.0, "3.40", device), _fio_reference())
+    assert score.points == pytest.approx(500)
+    assert not score.same_device and not score.tool_differs and score.tool_info
+    out = _panel(score_results([_fio(1000.0, "3.40", device)], _fio_reference()))
+    assert "fio-disk : outil 3.40 (référence : 3.42, autre disque)" in out
+    assert "⚠ fio-disk" not in out
+
+
+def test_tool_rule_does_not_apply_to_gpu_backends() -> None:
+    score = normalize(_glmark2(2000.0, "Mesa 26.2.3"), _reference("Mesa 26.2.3"))
+    assert not score.tool_differs and not score.tool_info
+    assert score.tool_version is None and score.device is None
