@@ -65,6 +65,10 @@ class Benchmark(ABC):
     @abstractmethod
     def run(self) -> Measurement: ...
 
+    def cleanup(self) -> None:  # noqa: B027 — rien à libérer par défaut
+        """Appelé une fois après les runs, même en cas d'erreur ou de Ctrl+C (fichiers
+        temporaires du bench disque)."""
+
 
 _REGISTRY: list[type[Benchmark]] = []
 

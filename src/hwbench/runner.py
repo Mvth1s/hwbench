@@ -98,13 +98,17 @@ def run_benchmark(
     settings = settings or RunSettings()
     before = probe()
     start = clock()
-    burst, warmup_runs, stable = _warmup(bench, settings, progress, clock)
-    warmup_s = clock() - start
-    measurements = []
-    for i in range(settings.runs):
-        if progress:
-            progress("run", i + 1, settings.runs)
-        measurements.append(bench.run())
+    # cleanup() quoi qu'il arrive (erreur, Ctrl+C) : le bench disque supprime son fichier
+    try:
+        burst, warmup_runs, stable = _warmup(bench, settings, progress, clock)
+        warmup_s = clock() - start
+        measurements = []
+        for i in range(settings.runs):
+            if progress:
+                progress("run", i + 1, settings.runs)
+            measurements.append(bench.run())
+    finally:
+        bench.cleanup()
     duration = clock() - start
     after = probe()
 
