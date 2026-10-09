@@ -1,5 +1,7 @@
 import json
+import os
 from dataclasses import asdict
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -23,7 +25,7 @@ from hwbench.display.scores import (
     render_backends,
     render_scores,
 )
-from hwbench.export import ExportError, build_export, load_export, write_export
+from hwbench.export import ExportError, MachineExport, build_export, load_export, write_export
 from hwbench.machine_state import capture_state
 from hwbench.reference import (
     ReferenceIssue,
@@ -32,6 +34,7 @@ from hwbench.reference import (
     results_issues,
     state_issues,
 )
+from hwbench.report import render_report
 from hwbench.results import Availability, Category, Result
 from hwbench.runner import MIN_RUNS, RunSettings, run_benchmark, start_warnings
 from hwbench.scoring import (
@@ -169,6 +172,52 @@ DiskPathOption = Annotated[
         help="Dossier du fichier de test du bench disque (défaut : ~/.cache/hwbench).",
     ),
 ]
+
+
+ReportOption = Annotated[
+    bool,
+    typer.Option(
+        "--report",
+        help="Écrit aussi la session en JSON et son rapport HTML (dossier des rapports).",
+    ),
+]
+ReportDirOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--report-dir",
+        file_okay=False,
+        help="Dossier des rapports (défaut : ~/.local/share/hwbench/reports).",
+    ),
+]
+
+
+def reports_dir() -> Path:
+    """$XDG_DATA_HOME/hwbench/reports, soit ~/.local/share/hwbench/reports par défaut."""
+    base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
+    return Path(base) / "hwbench" / "reports"
+
+
+def write_report(session: MachineExport, directory: Path, now: datetime) -> tuple[Path, Path]:
+    """Session en JSON puis rapport HTML rendu depuis ce JSON relu (sa seule source).
+
+    Nom = horodatage local à la seconde ; un suffixe -2, -3… évite d'écraser un rapport.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    stamp = now.strftime("%Y-%m-%d_%H%M%S")
+    name, n = stamp, 1
+    while (directory / f"{name}.json").exists() or (directory / f"{name}.html").exists():
+        n += 1
+        name = f"{stamp}-{n}"
+    json_path, html_path = directory / f"{name}.json", directory / f"{name}.html"
+    write_export(session, json_path)
+    html_path.write_text(render_report(load_export(json_path)), encoding="utf-8")
+    return json_path, html_path
+
+
+def _print_report(console: Console, paths: tuple[Path, Path]) -> None:
+    console.print("Rapport enregistré :")
+    console.print(Text(f"  JSON  {paths[0]}"))
+    console.print(Text(f"  HTML  {paths[1]}"))
 
 
 def _bench_options(workers: int | None, disk_size: str, disk_path: Path | None) -> BenchOptions:
@@ -343,11 +392,24 @@ def bench(
     weights: WeightsOption = None,
     disk_size: DiskSizeOption = "1G",
     disk_path: DiskPathOption = None,
+    report: ReportOption = False,
+    report_dir: ReportDirOption = None,
 ) -> None:
-    """Lance les benchmarks notés."""
+    """Lance les benchmarks notés.
+
+    Avec --report : session en JSON et rapport HTML dans le dossier des rapports. Bench
+    interrompu ou sans résultat : aucun fichier.
+    """
+    console = Console()
     settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start, reliable_cv)
     options = _bench_options(workers, disk_size, disk_path)
-    _bench_session(Console(), target, backend, settings, options, weights)
+    results, scores = _bench_session(console, target, backend, settings, options, weights)
+    if report:
+        snapshot, _ = collect_snapshot()
+        session = build_export(
+            snapshot, machine_label(snapshot), results, scores, settings=settings
+        )
+        _print_report(console, write_report(session, report_dir or reports_dir(), datetime.now()))
 
 
 @app.command()
@@ -367,6 +429,8 @@ def export(
     weights: WeightsOption = None,
     disk_size: DiskSizeOption = "1G",
     disk_path: DiskPathOption = None,
+    report: ReportOption = False,
+    report_dir: ReportDirOption = None,
 ) -> None:
     """Lance les benchmarks et exporte le tout en JSON pour `hwbench compare`.
 
@@ -377,10 +441,37 @@ def export(
     options = _bench_options(workers, disk_size, disk_path)
     results, scores = _bench_session(console, target, backend, settings, options, weights)
     snapshot, _ = collect_snapshot()
-    write_export(
-        build_export(snapshot, machine_label(snapshot), results, scores, settings=settings), output
-    )
-    console.print(f"Export écrit : {output} ({len(results)} benchs)")
+    session = build_export(snapshot, machine_label(snapshot), results, scores, settings=settings)
+    write_export(session, output)
+    console.print(Text(f"Export écrit : {output} ({len(results)} benchs)"))
+    if report:
+        _print_report(console, write_report(session, report_dir or reports_dir(), datetime.now()))
+
+
+@app.command("report")
+def report_cmd(
+    file: Annotated[
+        Path, typer.Argument(help="Session ou export JSON (hwbench export, --report).")
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Fichier HTML (défaut : même nom, extension .html)."),
+    ] = None,
+) -> None:
+    """Rapport HTML autonome (hors ligne, imprimable) à partir d'un fichier JSON."""
+    out = output or file.with_suffix(".html")
+    if out.resolve() == file.resolve():
+        typer.echo(
+            "Erreur : le rapport écraserait le fichier JSON (-o pour un autre nom).", err=True
+        )
+        raise typer.Exit(code=2)
+    try:
+        session = load_export(file)
+    except ExportError as exc:
+        typer.echo(f"Erreur : {exc}", err=True)
+        raise typer.Exit(code=2) from None
+    out.write_text(render_report(session), encoding="utf-8")
+    Console().print(Text(f"Rapport écrit : {out}"))
 
 
 @app.command()
