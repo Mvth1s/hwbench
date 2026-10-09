@@ -1,35 +1,35 @@
 """Site statique du classement : index.html (classements par catégorie) + une page par machine.
 
-HTML et CSS intégrés, sans JavaScript (onglets en CSS pur). Les points sont recalculés à partir
-des résultats bruts contre la référence actuelle du paquet, jamais repris de l'export. Tout
-texte venu d'un export passe par html.escape (un export peut venir de n'importe qui).
+HTML et CSS intégrés (moteur commun report/html.py), sans JavaScript (onglets en CSS pur). La
+page machine assemble les sections du rapport (report/sections.py), sans recommandations ni
+JSON embarqué, avec les seuils par défaut. Les points sont recalculés à partir des résultats
+bruts contre la référence actuelle du paquet, jamais repris de l'export. Tout texte venu d'un
+export passe par html.escape (un export peut venir de n'importe qui).
 """
 
-import html
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
-from hwbench.display.fmt import compact, fr_date, measure, num
+from hwbench.analysis import analyze
+from hwbench.display.fmt import compact, fr_date, num
 from hwbench.export import ExportError, MachineExport, from_dict
-from hwbench.labels import CATEGORY_LABELS, DETAIL_LABELS, UNIT_LABELS, disk_size_label
+from hwbench.labels import CATEGORY_LABELS
 from hwbench.leaderboard.validate import (
     SubmissionError,
     read_bounded,
     resolves_to_itself,
     strict_json,
 )
-from hwbench.results import COMBINED_CATEGORIES, Category, Result, gpu_name
+from hwbench.report.html import e, page
+from hwbench.report.sections import Context, render_sections
+from hwbench.results import COMBINED_CATEGORIES, Category, gpu_name
+from hwbench.runner import RunSettings
 from hwbench.scoring import Reference, Scores, score_results
 
 # Mémoire et disque : colonnes d'information, jamais classées ni dans le combiné
 INFO_CATEGORIES = tuple(c for c in Category if c not in COMBINED_CATEGORIES)
-# favicon intégré (data URI) : aucune requête externe
-FAVICON = (
-    "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
-    "<text y='.9em' font-size='90'>📊</text></svg>"
-)
 
 
 @dataclass(frozen=True)
@@ -37,11 +37,6 @@ class Entry:
     slug: str  # nom du fichier sans .json (validé : minuscules, chiffres, tirets)
     export: MachineExport
     scores: Scores
-
-
-def e(value: object) -> str:
-    """Texte échappé pour HTML (contenu et attributs entre guillemets)."""
-    return html.escape("" if value is None else str(value), quote=True)
 
 
 def load_entries(results_dir: Path, reference: Reference) -> tuple[list[Entry], list[str]]:
@@ -107,58 +102,15 @@ def _gpu(export: MachineExport) -> str | None:
     )
 
 
-def _ram_gb(export: MachineExport) -> float | None:
-    ram = export.snapshot.ram
-    return ram.installed_gb if ram.installed_gb is not None else ram.total_gb
-
-
-CSS = """
-:root { color-scheme: light dark; --fg: #1d2129; --bg: #fff; --muted: #5f6b7a;
-  --line: #d9dee5; --accent: #0b6bcb; --row: #f4f6f9; }
-@media (prefers-color-scheme: dark) { :root { --fg: #e6e9ee; --bg: #14171c;
-  --muted: #9aa5b4; --line: #2c323b; --accent: #5aa9ff; --row: #1b1f26; } }
-* { box-sizing: border-box; }
-body { margin: 0 auto; max-width: 1100px; padding: 24px 16px; font: 15px/1.5 system-ui,
-  sans-serif; color: var(--fg); background: var(--bg); }
-h1 { margin: 0 0 4px; } h2 { margin-top: 32px; }
-a { color: var(--accent); }
-.muted { color: var(--muted); } .small { font-size: 13px; }
-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line);
-  vertical-align: top; }
-tbody tr:nth-child(odd) { background: var(--row); }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tabs > input { position: absolute; opacity: 0; }
-.tabs > label { display: inline-block; padding: 6px 14px; margin: 0 4px 0 0;
-  border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
-.tabs > input:checked + label { background: var(--accent); color: var(--bg);
-  border-color: var(--accent); }
-.tabs > input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
-.panel { display: none; }
-#tab-combined:checked ~ #panel-combined, #tab-cpu_single:checked ~ #panel-cpu_single,
-#tab-cpu_multi:checked ~ #panel-cpu_multi, #tab-gpu:checked ~ #panel-gpu { display: block; }
-"""
-
-
 def _page(title: str, body: str, generated: datetime) -> str:
-    return f"""<!doctype html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="{FAVICON}">
-<title>{e(title)}</title>
-<style>{CSS}</style>
-</head>
-<body>
-{body}
-<p class="muted small">Généré le {e(generated.strftime("%d/%m/%Y %H:%M"))} UTC par hwbench.
-Résultats déclaratifs, soumis par pull request.
-<a href="https://github.com/Mvth1s/hwbench">Dépôt</a> ·
-<a href="https://github.com/Mvth1s/hwbench/blob/main/CONTRIBUTING.md">Soumettre un résultat</a></p>
-</body>
-</html>
-"""
+    footer = (
+        f"Généré le {e(generated.strftime('%d/%m/%Y %H:%M'))} UTC par hwbench. Résultats "
+        "déclaratifs, soumis par pull request. "
+        '<a href="https://github.com/Mvth1s/hwbench">Dépôt</a> · '
+        '<a href="https://github.com/Mvth1s/hwbench/blob/main/CONTRIBUTING.md">Soumettre un '
+        "résultat</a>"
+    )
+    return page(title, body, footer)
 
 
 def _reference_block(reference: Reference) -> str:
@@ -248,137 +200,83 @@ disque : information, hors classement.</p>
     return _page("hwbench · classement", body, generated)
 
 
-def _kv(rows: Iterable[tuple[str, object]]) -> str:
+SETTING_LABELS = {
+    "runs": ("runs", ""),
+    "max_warmup_s": ("plafond du warm-up", " s"),
+    "warmup_tolerance_percent": ("tolérance du warm-up", " %"),
+    "high_variance_cv_percent": ("seuil de CV", " %"),
+    "hot_start_c": ("départ chaud", " °C"),
+    "reliable_cv_percent": ("seuil de très bonne reproductibilité", " %"),
+}
+
+
+def settings_note(measured: RunSettings | None) -> str:
+    """Le site analyse toujours avec les seuils par défaut, jamais ceux du fichier soumis : il
+    le dit, et cite les seuils de la mesure qui en diffèrent."""
+    default = RunSettings()
+    if measured is None:
+        return (
+            "Seuils par défaut, comme pour toutes les machines du classement (réglages de la "
+            "mesure non enregistrés dans ce fichier)."
+        )
+    changed = []
+    for name, (label, unit) in SETTING_LABELS.items():
+        ours, theirs = getattr(default, name), getattr(measured, name)
+        if ours != theirs:
+            shown = "défaut" if theirs is None else f"{compact(theirs)}{unit}"
+            normal = "défaut" if ours is None else f"{compact(ours)}{unit}"
+            changed.append(f"{label} {shown} au lieu de {normal}")
+    if not changed:
+        return "Seuils par défaut, identiques à ceux de la mesure."
     return (
-        "<table><tbody>"
-        + "".join(
-            f"<tr><th>{e(k)}</th><td>{e(v if v not in (None, '') else '—')}</td></tr>"
-            for k, v in rows
-        )
-        + "</tbody></table>"
+        "Les seuils de la mesure diffèrent des seuils par défaut ("
+        + ", ".join(changed)
+        + ") : cette page applique les seuils par défaut, comme pour toutes les machines du "
+        "classement."
     )
 
 
-def _bench_rows(results: list[Result], scores: Scores) -> str:
-    by_name = {s.backend.name: s for s in scores.backends}
-    rows = []
-    for r in results:
-        score = by_name.get(r.name)
-        points = num(score.points, 0) if score and score.points is not None else "non comparable"
-        cv = num(r.cv_percent) + " %"
-        rows.append(
-            f"<tr><td>{e(r.name)}</td><td>v{e(r.version)}</td><td>{e(r.tool_version or '—')}</td>"
-            f"<td>{e(r.presentation or '—')}</td>"
-            f'<td class="num">{e(measure(r.value))} {e(UNIT_LABELS.get(r.unit, r.unit))}</td>'
-            f'<td class="num">{e(cv)}</td><td class="num">{e(points)}</td>'
-            f'<td class="small">{e(r.environment.get("driver", "—"))}</td></tr>'
-        )
-    return (
-        "<table><thead><tr><th>Bench</th><th>Protocole</th><th>Outil</th><th>Présentation</th>"
-        '<th class="num">Valeur (médiane)</th><th class="num">CV</th><th class="num">Points</th>'
-        "<th>Pilote</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
-    )
-
-
-def _disk_details(results: list[Result]) -> str:
-    """Débits et IOPS de chaque test fio (le bench lui-même n'expose qu'un indice)."""
-    blocks = []
-    for r in results:
-        if r.category is not Category.DISK or not r.details:
-            continue
-        rows = "".join(
-            f"<tr><td>{e(DETAIL_LABELS.get(key, key))}</td>"
-            f'<td class="num">{e(measure(value))} '
-            f"{e(UNIT_LABELS.get(r.detail_units.get(key, ''), r.detail_units.get(key, '')))}"
-            "</td></tr>"
-            for key, value in r.details.items()
-        )
-        where = ", ".join(
-            filter(
-                None,
-                [
-                    f"fichier de {disk_size_label(r.presentation)}" if r.presentation else None,
-                    r.environment.get("filesystem"),
-                    r.environment.get("device"),
-                ],
-            )
-        )
-        blocks.append(
-            f'<h3>{e(r.name)}</h3><p class="muted small">{e(where)}</p>'
-            f"<table><tbody>{rows}</tbody></table>"
-        )
-    return "".join(blocks)
-
-
-def render_machine(entry: Entry, reference: Reference, generated: datetime) -> str:
-    ex = entry.export
-    snap = ex.snapshot
-    ram = _ram_gb(ex)
-    disks = ", ".join(
-        f"{d.model or d.name} ({compact(round(d.size_bytes / 1024**3))} Gio)"
-        if d.size_bytes
-        else (d.model or d.name)
-        for d in snap.disks.disks
-    )
-    components = _kv(
-        [
-            ("Machine", ex.machine),
-            ("CPU", snap.cpu.model),
-            (
-                "Cœurs / threads",
-                f"{snap.cpu.physical_cores or '?'} / {snap.cpu.logical_cores or '?'}",
-            ),
-            ("GPU", _gpu(ex)),
-            ("RAM", f"{compact(round(ram, 1))} Gio" if ram is not None else None),
-            (
-                "Carte mère",
-                " ".join(filter(None, [snap.board.board_vendor, snap.board.board_name])),
-            ),
-            ("Disques", disks),
-        ]
-    )
-    scores = [(CATEGORY_LABELS[c], category_points(entry, c)) for c in COMBINED_CATEGORIES] + [
-        ("Score combiné", category_points(entry, None))
-    ]
-    score_rows = "".join(
+def _ranking_block(entry: Entry) -> str:
+    rows = [(CATEGORY_LABELS[c], category_points(entry, c)) for c in COMBINED_CATEGORIES]
+    rows.append(("Score combiné", category_points(entry, None)))
+    cells = "".join(
         f'<tr><th>{e(label)}</th><td class="num">'
         f"{e(num(points, 0) + ' pts' if points is not None else 'non classé')}</td></tr>"
-        for label, points in scores
+        for label, points in rows
     ) + "".join(
         f'<tr><th>{e(CATEGORY_LABELS[c])} (information)</th><td class="num">{e(value)}</td></tr>'
         for c in INFO_CATEGORIES
         if (value := info_value(entry, c)) is not None
     )
-    state = ex.results[0].state_before if ex.results else None
-    conditions = _kv(
-        [
-            ("Exporté le", fr_date(ex.created)),
-            ("Version de hwbench", ex.hwbench_version),
-            ("Governor", ", ".join(state.governors) if state else None),
-            ("EPP", state.energy_performance_preference if state else None),
-            ("Profil plateforme", state.platform_profile if state else None),
-            (
-                "Alimentation",
-                None
-                if not state or state.on_ac is None
-                else ("secteur" if state.on_ac else "batterie"),
-            ),
-        ]
+    return (
+        '<section id="classement"><h2>Classement</h2>'
+        f"<table><tbody>{cells}</tbody></table></section>"
     )
-    body = f"""<p><a href="../index.html">← Classement</a></p>
-<h1>{e(ex.machine)}</h1>
-<p class="muted">Fichier <code>results/{e(entry.slug)}.json</code></p>
-<h2>Scores</h2>
-<table><tbody>{score_rows}</tbody></table>
-<p class="muted small">Recalculés contre la référence {e(reference.machine)} (1000 points).</p>
-<h2>Composants</h2>
-{components}
-<h2>Benchmarks</h2>
-{_bench_rows(ex.results, entry.scores)}
-{_disk_details(ex.results)}
-<h2>Conditions de mesure</h2>
-{conditions}"""
-    return _page(f"{ex.machine} · hwbench", body, generated)
+
+
+def render_machine(entry: Entry, reference: Reference, generated: datetime) -> str:
+    """Page machine : sections du rapport (mêmes graphiques, même synthèse), sans
+    recommandations ni JSON embarqué. Points recalculés contre la référence du paquet, analyse
+    avec les seuils par défaut."""
+    ex = entry.export
+    scored = replace(
+        ex,
+        backend_scores=entry.scores.backends,
+        categories=entry.scores.categories,
+        combined=entry.scores.combined,
+        reference=reference.info(),
+    )
+    settings = RunSettings()
+    ctx = Context(scored, analyze(scored, settings), settings, settings_note(ex.settings))
+    intro = (
+        '<p><a href="../index.html">← Classement</a></p>'
+        f'<p class="muted">Fichier <code>results/{e(entry.slug)}.json</code> · points recalculés '
+        f"contre la référence {e(reference.machine)} (1000 points).</p>"
+    )
+    sections = render_sections(
+        ctx, with_recommendations=False, embed_json=False, after_header=_ranking_block(entry)
+    )
+    return _page(f"{ex.machine} · hwbench", intro + sections, generated)
 
 
 def build_site(
