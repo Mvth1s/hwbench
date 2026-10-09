@@ -99,5 +99,11 @@ def select(categories: Iterable[Category], backend: str) -> list[type[Benchmark]
             for cls in benchmark_classes()
             if cls.category in wanted and backend in ("all", cls.backend)
         ),
-        key=lambda cls: (order.index(cls.category), cls.backend != "native", cls.name),
+        # natif d'abord, puis single avant multi dans une même catégorie (mémoire)
+        key=lambda cls: (
+            order.index(cls.category),
+            cls.backend != "native",
+            cls.name.endswith("-multi"),
+            cls.name,
+        ),
     )

@@ -1,13 +1,13 @@
 import re
 
 import pytest
-from conftest import TINY
+from conftest import TINY, TINY_MEMORY
 from rich.console import Console
 from typer.testing import CliRunner
 
 from hwbench import cli
 from hwbench import runner as bench_runner
-from hwbench.benchmarks.native import cpu
+from hwbench.benchmarks.native import cpu, memory
 from hwbench.display.bench import render_result
 from hwbench.results import BenchWarning, Category, MachineState, Result
 
@@ -19,6 +19,8 @@ COOL_AC = MachineState(governors=["performance"], on_ac=True, cpu_temp_c=45.0)
 @pytest.fixture(autouse=True)
 def fast_and_isolated(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cpu, "WORKLOADS", TINY)
+    monkeypatch.setattr(memory, "SINGLE", TINY_MEMORY)
+    monkeypatch.setattr(memory, "MULTI", TINY_MEMORY)
     monkeypatch.setattr(cli, "capture_state", lambda: COOL_AC)
     # indépendant de la référence du paquet (testée dans test_reference_file.py)
     monkeypatch.setattr(cli, "load_reference", lambda: None)
@@ -42,6 +44,7 @@ def test_bench_all_with_workers() -> None:
     assert result.exit_code == 0, result.output
     assert "CPU single-core · native v1" in result.output
     assert "CPU multi-core · native v1" in result.output
+    assert "Mémoire · native v1" in result.output
     assert re.search(r"Processus +2 ", result.output)
     assert "GPU : le backend « native » ne couvre pas cette catégorie." in result.output
 

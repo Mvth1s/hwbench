@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from hwbench.benchmarks.external import _run
+from hwbench.benchmarks.native.memory import MemoryCopy
 from hwbench.benchmarks.native.workloads import Workload
 from hwbench.collectors.linux import _exec
 from hwbench.results import Category, MachineState, Result
@@ -168,6 +169,9 @@ def laptop(fake_system: Callable[..., FakeSystem]) -> Callable[..., FakeSystem]:
 # --- Outils externes des benchs (sysbench, glmark2, vkmark) ---------------------------
 
 TOOLS = FIXTURES / "tools"
+
+# Copies mémoire réduites (1 Mio) : à patcher dans memory.SINGLE et memory.MULTI.
+TINY_MEMORY = (MemoryCopy("copy", "MiB/s", size=1024 * 1024, repeat=2),)
 
 
 def tool_output(name: str) -> str:
