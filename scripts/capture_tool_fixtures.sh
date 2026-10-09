@@ -3,7 +3,8 @@
 #
 # Usage : scripts/capture_tool_fixtures.sh   (sans sudo, depuis une session graphique)
 #   Les lignes de commande viennent des backends eux-mêmes (hwbench.benchmarks.external),
-#   seule la durée des scènes est raccourcie (1 s) : les fixtures suivent le vrai protocole.
+#   seules les durées sont raccourcies (scènes 1 s, sysbench memory 2 s) : les fixtures
+#   suivent le vrai protocole.
 #   L'UUID du GPU affiché par vkmark (« Device UUID ») est remplacé par des zéros.
 #
 # Bash obligatoire : les tableaux gardent intacts les arguments contenant « ; » ou « : ».
@@ -18,15 +19,21 @@ mkdir -p "$OUT"
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
-# Ligne de commande d'un backend, un argument par ligne, durées de scène ramenées à 1 s.
+# Ligne de commande d'un backend, un argument par ligne, durées raccourcies.
 backend_command() {
     "$PYTHON" - "$1" <<'EOF'
 import sys
 from hwbench.benchmarks.external.glmark2 import Glmark2
+from hwbench.benchmarks.external.sysbench import SysbenchMemoryMulti, SysbenchMemorySingle
 from hwbench.benchmarks.external.vkmark import Vkmark
-bench = {"glmark2": Glmark2, "vkmark": Vkmark}[sys.argv[1]]()
+bench = {
+    "glmark2": Glmark2,
+    "vkmark": Vkmark,
+    "sysbench-memory-single": SysbenchMemorySingle,
+    "sysbench-memory-multi": SysbenchMemoryMulti,
+}[sys.argv[1]]()
 for arg in bench.command():
-    print(arg.replace(":duration=3", ":duration=1"))
+    print(arg.replace(":duration=3", ":duration=1").replace("--time=5", "--time=2"))
 EOF
 }
 
@@ -44,6 +51,10 @@ capture() {
 echo "sysbench :"
 capture sysbench_cpu_1thread.txt sysbench cpu --threads=1 --time=2 --cpu-max-prime=10000 run
 capture sysbench_cpu_multi.txt sysbench cpu --threads="$(nproc)" --time=2 --cpu-max-prime=10000 run
+mapfile -t cmd < <(backend_command sysbench-memory-single)
+capture sysbench_memory_1thread.txt "${cmd[@]}"
+mapfile -t cmd < <(backend_command sysbench-memory-multi)
+capture sysbench_memory_multi.txt "${cmd[@]}"
 
 echo "glmark2 (binaire choisi selon la session) :"
 mapfile -t cmd < <(backend_command glmark2)
