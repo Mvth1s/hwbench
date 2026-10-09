@@ -237,6 +237,14 @@ MaxCvOption = Annotated[
     float,
     typer.Option("--max-cv", min=0, help="Seuil (%) de l'avertissement « mesures instables »."),
 ]
+ReliableCvOption = Annotated[
+    float,
+    typer.Option(
+        "--reliable-cv",
+        min=0,
+        help="Seuil (%) sous lequel le rapport juge les mesures très reproductibles.",
+    ),
+]
 HotStartOption = Annotated[
     float, typer.Option("--hot-start", help="Température CPU (°C) de départ jugée trop chaude.")
 ]
@@ -249,7 +257,12 @@ WeightsOption = Annotated[
 
 
 def _settings(
-    runs: int, max_warmup: float | None, tolerance: float, max_cv: float, hot_start: float
+    runs: int,
+    max_warmup: float | None,
+    tolerance: float,
+    max_cv: float,
+    hot_start: float,
+    reliable_cv: float = DEFAULTS.reliable_cv_percent,
 ) -> RunSettings:
     return RunSettings(
         runs=runs,
@@ -257,6 +270,7 @@ def _settings(
         warmup_tolerance_percent=tolerance,
         high_variance_cv_percent=max_cv,
         hot_start_c=hot_start,
+        reliable_cv_percent=reliable_cv,
     )
 
 
@@ -325,12 +339,13 @@ def bench(
     warmup_tolerance: ToleranceOption = DEFAULTS.warmup_tolerance_percent,
     max_cv: MaxCvOption = DEFAULTS.high_variance_cv_percent,
     hot_start: HotStartOption = DEFAULTS.hot_start_c,
+    reliable_cv: ReliableCvOption = DEFAULTS.reliable_cv_percent,
     weights: WeightsOption = None,
     disk_size: DiskSizeOption = "1G",
     disk_path: DiskPathOption = None,
 ) -> None:
     """Lance les benchmarks notés."""
-    settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start)
+    settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start, reliable_cv)
     options = _bench_options(workers, disk_size, disk_path)
     _bench_session(Console(), target, backend, settings, options, weights)
 
@@ -348,6 +363,7 @@ def export(
     warmup_tolerance: ToleranceOption = DEFAULTS.warmup_tolerance_percent,
     max_cv: MaxCvOption = DEFAULTS.high_variance_cv_percent,
     hot_start: HotStartOption = DEFAULTS.hot_start_c,
+    reliable_cv: ReliableCvOption = DEFAULTS.reliable_cv_percent,
     weights: WeightsOption = None,
     disk_size: DiskSizeOption = "1G",
     disk_path: DiskPathOption = None,
@@ -357,11 +373,13 @@ def export(
     L'export contient les composants (sans aucun identifiant), les résultats et les scores.
     """
     console = Console()
-    settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start)
+    settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start, reliable_cv)
     options = _bench_options(workers, disk_size, disk_path)
     results, scores = _bench_session(console, target, backend, settings, options, weights)
     snapshot, _ = collect_snapshot()
-    write_export(build_export(snapshot, machine_label(snapshot), results, scores), output)
+    write_export(
+        build_export(snapshot, machine_label(snapshot), results, scores, settings=settings), output
+    )
     console.print(f"Export écrit : {output} ({len(results)} benchs)")
 
 

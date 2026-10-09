@@ -47,3 +47,14 @@ def test_export_rejects_unknown_backend_without_writing(fake_runs, tmp_path) -> 
     result = runner.invoke(cli.app, ["export", "-o", str(out), "--backend", "geekbench"])
     assert result.exit_code == 2
     assert not out.exists()
+
+
+def test_export_records_the_settings(fake_runs, monkeypatch, tmp_path) -> None:  # noqa: F811
+    monkeypatch.setattr(cli, "load_reference", lambda: None)
+    out = tmp_path / "machine.json"
+    args = ["export", "-o", str(out), "--backend", "native", "--hot-start", "65"]
+    result = runner.invoke(cli.app, [*args, "--reliable-cv", "0.5", "--runs", "4"], env=WIDE)
+    assert result.exit_code == 0, result.output
+    settings = load_export(out).settings
+    assert settings is not None
+    assert (settings.runs, settings.hot_start_c, settings.reliable_cv_percent) == (4, 65.0, 0.5)
