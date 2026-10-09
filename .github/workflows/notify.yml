@@ -30,7 +30,7 @@ jobs:
       contents: read # extraction du script (branche par défaut)
       actions: read # jobs du run et runs précédents
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: scripts/discord_notify.py
@@ -54,7 +54,7 @@ jobs:
       checks: read # annotations d'erreur du validateur (raisons du refus)
       pull-requests: read # PR liée au run
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: scripts/discord_notify.py
@@ -79,7 +79,7 @@ jobs:
       contents: read # extraction du script (branche par défaut)
       pull-requests: read # PR liée au run
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: scripts/discord_notify.py
