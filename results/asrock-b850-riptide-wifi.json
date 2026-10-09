@@ -1,7 +1,7 @@
 {
-  "schema_version": 2,
-  "hwbench_version": "0.3.0",
-  "created": "2026-10-04T21:26:05+00:00",
+  "schema_version": 3,
+  "hwbench_version": "0.6.0",
+  "created": "2026-10-09T19:35:02+00:00",
   "machine": "ASRock B850 Riptide WiFi",
   "snapshot": {
     "cpu": {
@@ -26,52 +26,52 @@
         },
         {
           "cpu": 1,
-          "current_mhz": 2372.906,
+          "current_mhz": 4002.737,
           "governor": "performance"
         },
         {
           "cpu": 2,
-          "current_mhz": 2372.906,
+          "current_mhz": 4004.05,
           "governor": "performance"
         },
         {
           "cpu": 3,
-          "current_mhz": 5050.567,
+          "current_mhz": 5026.45,
           "governor": "performance"
         },
         {
           "cpu": 4,
-          "current_mhz": 2372.906,
+          "current_mhz": 4007.826,
           "governor": "performance"
         },
         {
           "cpu": 5,
-          "current_mhz": 4372.879,
+          "current_mhz": 4004.484,
           "governor": "performance"
         },
         {
           "cpu": 6,
-          "current_mhz": 2372.906,
+          "current_mhz": 4546.515,
           "governor": "performance"
         },
         {
           "cpu": 7,
-          "current_mhz": 4059.965,
+          "current_mhz": 4059.377,
           "governor": "performance"
         },
         {
           "cpu": 8,
-          "current_mhz": 4034.894,
+          "current_mhz": 2372.906,
           "governor": "performance"
         },
         {
           "cpu": 9,
-          "current_mhz": 4056.186,
+          "current_mhz": 2372.906,
           "governor": "performance"
         },
         {
           "cpu": 10,
-          "current_mhz": 4039.53,
+          "current_mhz": 2372.906,
           "governor": "performance"
         },
         {
@@ -81,22 +81,22 @@
         },
         {
           "cpu": 12,
-          "current_mhz": 4034.468,
+          "current_mhz": 2372.906,
           "governor": "performance"
         },
         {
           "cpu": 13,
-          "current_mhz": 4040.16,
+          "current_mhz": 4978.553,
           "governor": "performance"
         },
         {
           "cpu": 14,
-          "current_mhz": 4070.934,
+          "current_mhz": 4286.308,
           "governor": "performance"
         },
         {
           "cpu": 15,
-          "current_mhz": 4887.756,
+          "current_mhz": 3984.344,
           "governor": "performance"
         }
       ],
@@ -104,7 +104,7 @@
       "energy_performance_preference": "performance"
     },
     "ram": {
-      "total_gb": 30.925067901611328,
+      "total_gb": 30.925060272216797,
       "installed_gb": null,
       "modules": null,
       "modules_unavailable": "needs_root"
@@ -127,7 +127,7 @@
     "disks": {
       "disks": [
         {
-          "name": "nvme0n1",
+          "name": "nvme1n1",
           "size_bytes": 1024209543168,
           "model": "Lexar SSD NM1090 PRO 1TB",
           "type": "disk",
@@ -137,7 +137,7 @@
           "temperature_c": null
         },
         {
-          "name": "nvme1n1",
+          "name": "nvme0n1",
           "size_bytes": 4000787030016,
           "model": "Samsung SSD 990 EVO Plus 4TB",
           "type": "disk",
@@ -164,63 +164,63 @@
         {
           "chip": "nvme",
           "label": "Composite",
-          "current_c": 36.85,
+          "current_c": 33.85,
           "high_c": 80.85,
           "critical_c": 84.85,
-          "instance": "nvme1"
+          "instance": "nvme0"
         },
         {
           "chip": "nvme",
           "label": "Sensor 1",
-          "current_c": 46.85,
+          "current_c": 45.85,
           "high_c": null,
           "critical_c": null,
-          "instance": "nvme1"
+          "instance": "nvme0"
         },
         {
           "chip": "nvme",
           "label": "Sensor 2",
-          "current_c": 36.85,
+          "current_c": 33.85,
           "high_c": null,
           "critical_c": null,
-          "instance": "nvme1"
+          "instance": "nvme0"
         },
         {
           "chip": "nvme",
           "label": "Composite",
-          "current_c": 36.85,
+          "current_c": 38.85,
           "high_c": 82.85,
           "critical_c": 84.85,
-          "instance": "nvme0"
+          "instance": "nvme1"
         },
         {
           "chip": "nvme",
           "label": "Sensor 1",
-          "current_c": 47.85,
+          "current_c": 54.85,
           "high_c": null,
           "critical_c": null,
-          "instance": "nvme0"
+          "instance": "nvme1"
         },
         {
           "chip": "nvme",
           "label": "Sensor 2",
-          "current_c": 36.85,
+          "current_c": 38.85,
           "high_c": null,
           "critical_c": null,
-          "instance": "nvme0"
+          "instance": "nvme1"
         },
         {
-          "chip": "k10temp",
-          "label": "Tctl",
-          "current_c": 42.5,
+          "chip": "prom21_xhci",
+          "label": "temp1",
+          "current_c": 56.459,
           "high_c": null,
           "critical_c": null,
           "instance": null
         },
         {
-          "chip": "prom21_xhci",
-          "label": "temp1",
-          "current_c": 58.273,
+          "chip": "k10temp",
+          "label": "Tctl",
+          "current_c": 46.75,
           "high_c": null,
           "critical_c": null,
           "instance": null
@@ -228,7 +228,7 @@
         {
           "chip": "spd5118",
           "label": "temp1",
-          "current_c": 36.25,
+          "current_c": 37.75,
           "high_c": 55.0,
           "critical_c": 85.0,
           "instance": "spd5118 #1"
@@ -236,7 +236,7 @@
         {
           "chip": "spd5118",
           "label": "temp1",
-          "current_c": 35.5,
+          "current_c": 37.5,
           "high_c": 55.0,
           "critical_c": 85.0,
           "instance": "spd5118 #2"
@@ -244,7 +244,7 @@
         {
           "chip": "r8169_0_b00:00",
           "label": "temp1",
-          "current_c": 38.0,
+          "current_c": 33.5,
           "high_c": 120.0,
           "critical_c": null,
           "instance": null
@@ -252,7 +252,7 @@
         {
           "chip": "mt7925_phy0",
           "label": "temp1",
-          "current_c": 35.0,
+          "current_c": 33.0,
           "high_c": null,
           "critical_c": null,
           "instance": null
@@ -260,7 +260,7 @@
         {
           "chip": "amdgpu",
           "label": "edge",
-          "current_c": 53.0,
+          "current_c": 44.0,
           "high_c": null,
           "critical_c": 110.0,
           "instance": null
@@ -268,7 +268,7 @@
         {
           "chip": "amdgpu",
           "label": "junction",
-          "current_c": 58.0,
+          "current_c": 45.0,
           "high_c": null,
           "critical_c": 110.0,
           "instance": null
@@ -276,7 +276,7 @@
         {
           "chip": "amdgpu",
           "label": "mem",
-          "current_c": 77.0,
+          "current_c": 66.0,
           "high_c": null,
           "critical_c": 108.0,
           "instance": null
@@ -286,7 +286,7 @@
         {
           "chip": "amdgpu",
           "label": "fan1",
-          "rpm": 2373,
+          "rpm": 0,
           "instance": null
         }
       ]
@@ -308,23 +308,23 @@
       "presentation": null,
       "unit": "index",
       "higher_is_better": true,
-      "value": 125.39556872570476,
-      "stdev": 0.44336345293372387,
+      "value": 120.97390063749009,
+      "stdev": 0.9283419839524899,
       "runs": [
-        126.12548972472368,
-        125.39556872570476,
-        125.3244960205321
+        119.78413514077477,
+        121.61344085741592,
+        120.97390063749009
       ],
       "warmup_runs": 2,
-      "warmup_s": 2.59813375199883,
+      "warmup_s": 2.666940302000512,
       "warmup_stable": true,
-      "burst": 125.50486766434315,
-      "duration_s": 6.346530640003039,
+      "burst": 121.77155040876745,
+      "duration_s": 6.544536416000483,
       "details": {
-        "sha256": 2354.083530124807,
-        "zlib": 65.2196983617502,
-        "lzma": 23.600386920964013,
-        "powmod": 68.63497916860693
+        "sha256": 2326.629097071195,
+        "zlib": 65.13316279735828,
+        "lzma": 20.646803870118877,
+        "powmod": 68.39132753368374
       },
       "detail_units": {
         "sha256": "MiB/s",
@@ -344,7 +344,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 39.125,
+        "cpu_temp_c": 38.375,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -355,7 +355,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 62.75,
+        "cpu_temp_c": 61.25,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -372,18 +372,18 @@
       "presentation": null,
       "unit": "events/s",
       "higher_is_better": true,
-      "value": 5650.3,
-      "stdev": 7.994131180643122,
+      "value": 5605.58,
+      "stdev": 20.186597038629095,
       "runs": [
-        5650.3,
-        5649.82,
-        5663.9
+        5584.22,
+        5624.57,
+        5605.58
       ],
       "warmup_runs": 2,
-      "warmup_s": 10.008170385000994,
+      "warmup_s": 10.00787827699969,
       "warmup_stable": true,
-      "burst": 5645.21,
-      "duration_s": 25.019523846000084,
+      "burst": 5634.25,
+      "duration_s": 25.019252677999248,
       "details": {},
       "detail_units": {},
       "workers": null,
@@ -396,7 +396,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 62.5,
+        "cpu_temp_c": 61.0,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -407,7 +407,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 47.25,
+        "cpu_temp_c": 47.0,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -424,23 +424,23 @@
       "presentation": null,
       "unit": "index",
       "higher_is_better": true,
-      "value": 1123.1452976731982,
-      "stdev": 0.4757117122371703,
+      "value": 1117.0994025482837,
+      "stdev": 6.448640262060381,
       "runs": [
-        1123.1452976731982,
-        1122.896165998542,
-        1123.815939328284
+        1106.4973727070637,
+        1117.0994025482837,
+        1118.1586239536925
       ],
       "warmup_runs": 2,
-      "warmup_s": 5.6190773350026575,
+      "warmup_s": 5.766112494000481,
       "warmup_stable": true,
-      "burst": 1131.6936071734929,
-      "duration_s": 14.14863347299979,
+      "burst": 1110.8046271333076,
+      "duration_s": 14.384699652999188,
       "details": {
-        "sha256": 29162.901292517025,
-        "zlib": 692.5518798424808,
-        "lzma": 108.19734343351438,
-        "powmod": 721.6391885583517
+        "sha256": 29062.506758536045,
+        "zlib": 684.6434178054468,
+        "lzma": 108.05546801844844,
+        "powmod": 722.2146349254488
       },
       "detail_units": {
         "sha256": "MiB/s",
@@ -460,7 +460,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 47.25,
+        "cpu_temp_c": 46.875,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -471,7 +471,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 68.375,
+        "cpu_temp_c": 67.0,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -488,18 +488,18 @@
       "presentation": null,
       "unit": "events/s",
       "higher_is_better": true,
-      "value": 45390.2,
-      "stdev": 13.450317220545294,
+      "value": 45438.54,
+      "stdev": 95.04763034044119,
       "runs": [
-        45399.39,
-        45390.2,
-        45372.9
+        45294.3,
+        45438.54,
+        45473.65
       ],
       "warmup_runs": 2,
-      "warmup_s": 10.00866768299602,
+      "warmup_s": 10.008147903999998,
       "warmup_stable": true,
-      "burst": 45491.21,
-      "duration_s": 25.021216191002168,
+      "burst": 45478.76,
+      "duration_s": 25.020916702998875,
       "details": {},
       "detail_units": {},
       "workers": 16,
@@ -512,7 +512,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 68.0,
+        "cpu_temp_c": 66.625,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -523,7 +523,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 58.5,
+        "cpu_temp_c": 57.625,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -540,27 +540,27 @@
       "presentation": "offscreen",
       "unit": "fps",
       "higher_is_better": true,
-      "value": 3713.0,
-      "stdev": 1.5275252316519468,
+      "value": 3686.0,
+      "stdev": 11.590225767142472,
       "runs": [
-        3712.0,
-        3713.0,
-        3715.0
+        3700.0,
+        3686.0,
+        3677.0
       ],
       "warmup_runs": 2,
-      "warmup_s": 48.554724745001295,
+      "warmup_s": 48.57085632400049,
       "warmup_stable": true,
-      "burst": 3744.0,
-      "duration_s": 121.39401814600569,
+      "burst": 3660.0,
+      "duration_s": 121.41922403199897,
       "details": {
-        "effect2d-edge": 5537.0,
-        "effect2d-blur": 3317.0,
-        "desktop-blur": 2767.0,
-        "desktop-shadow": 4022.0,
-        "jellyfish": 5374.0,
-        "terrain": 987.0,
-        "shadow": 5850.0,
-        "refract": 1871.0
+        "effect2d-edge": 5508.0,
+        "effect2d-blur": 3224.0,
+        "desktop-blur": 2700.0,
+        "desktop-shadow": 4005.0,
+        "jellyfish": 5443.0,
+        "terrain": 980.0,
+        "shadow": 5805.0,
+        "refract": 1858.0
       },
       "detail_units": {
         "effect2d-edge": "fps",
@@ -585,7 +585,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 58.25,
+        "cpu_temp_c": 57.375,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -596,7 +596,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 38.5,
+        "cpu_temp_c": 39.625,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -613,21 +613,21 @@
       "presentation": "headless",
       "unit": "fps",
       "higher_is_better": true,
-      "value": 10581.0,
-      "stdev": 27.784887978899608,
+      "value": 10596.0,
+      "stdev": 18.036999011291577,
       "runs": [
-        10577.0,
-        10627.0,
-        10581.0
+        10580.0,
+        10596.0,
+        10616.0
       ],
       "warmup_runs": 2,
-      "warmup_s": 12.191433899999538,
+      "warmup_s": 12.190446381999209,
       "warmup_stable": true,
-      "burst": 10370.0,
-      "duration_s": 30.477029702000436,
+      "burst": 10305.0,
+      "duration_s": 30.47805417299969,
       "details": {
-        "effect2d-blur": 5832.0,
-        "effect2d-edge": 15386.0
+        "effect2d-blur": 5839.0,
+        "effect2d-edge": 15387.0
       },
       "detail_units": {
         "effect2d-blur": "fps",
@@ -646,7 +646,7 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 38.5,
+        "cpu_temp_c": 39.625,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -657,7 +657,279 @@
           "performance"
         ],
         "on_ac": true,
-        "cpu_temp_c": 42.0,
+        "cpu_temp_c": 43.5,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "warnings": []
+    },
+    {
+      "name": "native-memory-single",
+      "category": "memory",
+      "backend": "native",
+      "version": "1",
+      "tool_version": null,
+      "presentation": null,
+      "unit": "MiB/s",
+      "higher_is_better": true,
+      "value": 23777.758578986344,
+      "stdev": 101.04601281477429,
+      "runs": [
+        23930.360407840777,
+        23739.318909965496,
+        23777.758578986344
+      ],
+      "warmup_runs": 2,
+      "warmup_s": 0.476978243999838,
+      "warmup_stable": true,
+      "burst": 24090.756844899788,
+      "duration_s": 0.864924121000513,
+      "details": {},
+      "detail_units": {},
+      "workers": null,
+      "environment": {
+        "python": "CPython 3.14.7"
+      },
+      "state_before": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 43.375,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "state_after": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 48.25,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "warnings": []
+    },
+    {
+      "name": "native-memory-multi",
+      "category": "memory",
+      "backend": "native",
+      "version": "1",
+      "tool_version": null,
+      "presentation": null,
+      "unit": "MiB/s",
+      "higher_is_better": true,
+      "value": 30416.23132757858,
+      "stdev": 694.3934080439175,
+      "runs": [
+        29804.072496969675,
+        31189.731825937397,
+        30416.23132757858
+      ],
+      "warmup_runs": 2,
+      "warmup_s": 2.114317514000504,
+      "warmup_stable": true,
+      "burst": 30635.744030462472,
+      "duration_s": 5.302190694999808,
+      "details": {},
+      "detail_units": {},
+      "workers": 16,
+      "environment": {
+        "python": "CPython 3.14.7"
+      },
+      "state_before": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 48.125,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "state_after": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 55.875,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "warnings": []
+    },
+    {
+      "name": "sysbench-memory-single",
+      "category": "memory",
+      "backend": "sysbench",
+      "version": "1",
+      "tool_version": "1.0.20",
+      "presentation": null,
+      "unit": "MiB/s",
+      "higher_is_better": true,
+      "value": 50198.78,
+      "stdev": 318.853675740664,
+      "runs": [
+        49736.82,
+        50198.78,
+        50348.52
+      ],
+      "warmup_runs": 2,
+      "warmup_s": 10.02193529500073,
+      "warmup_stable": true,
+      "burst": 50527.04,
+      "duration_s": 25.058229477001078,
+      "details": {},
+      "detail_units": {},
+      "workers": null,
+      "environment": {
+        "block-size": "128M",
+        "operation": "read, seq",
+        "time": "5 s"
+      },
+      "state_before": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 55.625,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "state_after": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 57.0,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "warnings": []
+    },
+    {
+      "name": "sysbench-memory-multi",
+      "category": "memory",
+      "backend": "sysbench",
+      "version": "1",
+      "tool_version": "1.0.20",
+      "presentation": null,
+      "unit": "MiB/s",
+      "higher_is_better": true,
+      "value": 56332.53,
+      "stdev": 62.079674881023465,
+      "runs": [
+        56302.28,
+        56421.69,
+        56332.53
+      ],
+      "warmup_runs": 2,
+      "warmup_s": 10.09042759300064,
+      "warmup_stable": true,
+      "burst": 56162.0,
+      "duration_s": 25.22507871199923,
+      "details": {},
+      "detail_units": {},
+      "workers": 16,
+      "environment": {
+        "block-size": "32M",
+        "operation": "read, seq",
+        "time": "5 s"
+      },
+      "state_before": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 56.875,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "state_after": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 46.0,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "warnings": []
+    },
+    {
+      "name": "fio-disk",
+      "category": "disk",
+      "backend": "fio",
+      "version": "1",
+      "tool_version": "3.42",
+      "presentation": "1GiB",
+      "unit": "index",
+      "higher_is_better": true,
+      "value": 39432.99045491295,
+      "stdev": 202.32035436507104,
+      "runs": [
+        39501.20862708854,
+        39432.99045491295,
+        39121.68632742896
+      ],
+      "warmup_runs": 3,
+      "warmup_s": 28.433826792999753,
+      "warmup_stable": true,
+      "burst": 40917.80977060725,
+      "duration_s": 56.614165143999344,
+      "details": {
+        "seq_read": 5871.12887096405,
+        "seq_write": 6431.0689306259155,
+        "rand_read_4k": 261099.450275,
+        "rand_write_4k": 243458.770615
+      },
+      "detail_units": {
+        "seq_read": "MiB/s",
+        "seq_write": "MiB/s",
+        "rand_read_4k": "IOPS",
+        "rand_write_4k": "IOPS"
+      },
+      "workers": null,
+      "environment": {
+        "ioengine": "libaio",
+        "time": "2 s par test",
+        "filesystem": "ext4",
+        "device": "Lexar SSD NM1090 PRO 1TB"
+      },
+      "state_before": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 46.0,
+        "platform_profile": null,
+        "platform_profile_choices": [],
+        "energy_performance_preference": "performance",
+        "has_battery": false
+      },
+      "state_after": {
+        "governors": [
+          "performance"
+        ],
+        "on_ac": true,
+        "cpu_temp_c": 47.125,
         "platform_profile": null,
         "platform_profile_choices": [],
         "energy_performance_preference": "performance",
@@ -668,10 +940,10 @@
   ],
   "reference": {
     "machine": "ASRock B850 Riptide WiFi",
-    "created": "2026-09-29T19:35:45+00:00",
+    "created": "2026-10-09T19:15:36+00:00",
     "forced": false,
     "forced_reasons": [],
-    "digest": "sha256:d79ab08a99ef63dbbbcb54d6dbe71eda48c677739992a81d78c49c8cd05ebd64"
+    "digest": "sha256:ed9604b98c5ba87c3e17c7556b24193e1b92b9c6417af1f5ee42a8230fb3c35d"
   },
   "backend_scores": [
     {
@@ -683,13 +955,17 @@
       },
       "category": "cpu_single",
       "official": true,
-      "points": 1021.8699751821938,
+      "points": 955.1227210976031,
       "issue": null,
       "reference_backend": null,
       "driver": null,
       "reference_driver": null,
       "gpu": null,
-      "reference_gpu": null
+      "reference_gpu": null,
+      "tool_version": null,
+      "reference_tool_version": null,
+      "device": null,
+      "reference_device": null
     },
     {
       "backend": {
@@ -700,13 +976,17 @@
       },
       "category": "cpu_single",
       "official": false,
-      "points": 1017.3406866054855,
+      "points": 990.509410191031,
       "issue": null,
       "reference_backend": null,
       "driver": null,
       "reference_driver": null,
       "gpu": null,
-      "reference_gpu": null
+      "reference_gpu": null,
+      "tool_version": null,
+      "reference_tool_version": null,
+      "device": null,
+      "reference_device": null
     },
     {
       "backend": {
@@ -717,13 +997,17 @@
       },
       "category": "cpu_multi",
       "official": true,
-      "points": 1000.2766710490354,
+      "points": 976.8671790618055,
       "issue": null,
       "reference_backend": null,
       "driver": null,
       "reference_driver": null,
       "gpu": null,
-      "reference_gpu": null
+      "reference_gpu": null,
+      "tool_version": null,
+      "reference_tool_version": null,
+      "device": null,
+      "reference_device": null
     },
     {
       "backend": {
@@ -734,13 +1018,17 @@
       },
       "category": "cpu_multi",
       "official": false,
-      "points": 1006.3518056496905,
+      "points": 995.5514248192109,
       "issue": null,
       "reference_backend": null,
       "driver": null,
       "reference_driver": null,
       "gpu": null,
-      "reference_gpu": null
+      "reference_gpu": null,
+      "tool_version": null,
+      "reference_tool_version": null,
+      "device": null,
+      "reference_device": null
     },
     {
       "backend": {
@@ -751,13 +1039,17 @@
       },
       "category": "gpu",
       "official": true,
-      "points": 1017.2602739726027,
+      "points": 1006.0043668122272,
       "issue": null,
       "reference_backend": null,
       "driver": "Mesa 26.2.4-arch1.1",
-      "reference_driver": "Mesa 26.2.3-arch1.1",
+      "reference_driver": "Mesa 26.2.4-arch1.1",
       "gpu": "AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.8-arch1-2)",
-      "reference_gpu": "AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.7-arch1-1)"
+      "reference_gpu": "AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.8-arch1-2)",
+      "tool_version": null,
+      "reference_tool_version": null,
+      "device": null,
+      "reference_device": null
     },
     {
       "backend": {
@@ -768,19 +1060,128 @@
       },
       "category": "gpu",
       "official": true,
-      "points": 989.8035547240411,
+      "points": 987.2356284356657,
       "issue": null,
       "reference_backend": null,
       "driver": "RADV 26.2.4",
-      "reference_driver": "RADV 26.2.3",
+      "reference_driver": "RADV 26.2.4",
       "gpu": "AMD Radeon RX 9070 XT (RADV GFX1201)",
-      "reference_gpu": "AMD Radeon RX 9070 XT (RADV GFX1201)"
+      "reference_gpu": "AMD Radeon RX 9070 XT (RADV GFX1201)",
+      "tool_version": null,
+      "reference_tool_version": null,
+      "device": null,
+      "reference_device": null
+    },
+    {
+      "backend": {
+        "name": "native-memory-single",
+        "version": "1",
+        "tool_version": null,
+        "presentation": null
+      },
+      "category": "memory",
+      "official": true,
+      "points": 1014.9225095178472,
+      "issue": null,
+      "reference_backend": null,
+      "driver": null,
+      "reference_driver": null,
+      "gpu": null,
+      "reference_gpu": null,
+      "tool_version": null,
+      "reference_tool_version": null,
+      "device": null,
+      "reference_device": null
+    },
+    {
+      "backend": {
+        "name": "native-memory-multi",
+        "version": "1",
+        "tool_version": null,
+        "presentation": null
+      },
+      "category": "memory",
+      "official": true,
+      "points": 1012.6655295360742,
+      "issue": null,
+      "reference_backend": null,
+      "driver": null,
+      "reference_driver": null,
+      "gpu": null,
+      "reference_gpu": null,
+      "tool_version": null,
+      "reference_tool_version": null,
+      "device": null,
+      "reference_device": null
+    },
+    {
+      "backend": {
+        "name": "sysbench-memory-single",
+        "version": "1",
+        "tool_version": "1.0.20",
+        "presentation": null
+      },
+      "category": "memory",
+      "official": false,
+      "points": 977.596526371015,
+      "issue": null,
+      "reference_backend": null,
+      "driver": null,
+      "reference_driver": null,
+      "gpu": null,
+      "reference_gpu": null,
+      "tool_version": null,
+      "reference_tool_version": null,
+      "device": null,
+      "reference_device": null
+    },
+    {
+      "backend": {
+        "name": "sysbench-memory-multi",
+        "version": "1",
+        "tool_version": "1.0.20",
+        "presentation": null
+      },
+      "category": "memory",
+      "official": false,
+      "points": 1002.5026738729248,
+      "issue": null,
+      "reference_backend": null,
+      "driver": null,
+      "reference_driver": null,
+      "gpu": null,
+      "reference_gpu": null,
+      "tool_version": null,
+      "reference_tool_version": null,
+      "device": null,
+      "reference_device": null
+    },
+    {
+      "backend": {
+        "name": "fio-disk",
+        "version": "1",
+        "tool_version": null,
+        "presentation": "1GiB"
+      },
+      "category": "disk",
+      "official": true,
+      "points": 1001.022982002969,
+      "issue": null,
+      "reference_backend": null,
+      "driver": null,
+      "reference_driver": null,
+      "gpu": null,
+      "reference_gpu": null,
+      "tool_version": "3.42",
+      "reference_tool_version": "3.42",
+      "device": "Lexar SSD NM1090 PRO 1TB",
+      "reference_device": "Lexar SSD NM1090 PRO 1TB"
     }
   ],
   "categories": [
     {
       "category": "cpu_single",
-      "points": 1021.8699751821937,
+      "points": 955.122721097603,
       "backends": [
         {
           "name": "native-cpu-single",
@@ -801,7 +1202,7 @@
     },
     {
       "category": "cpu_multi",
-      "points": 1000.2766710490351,
+      "points": 976.8671790618052,
       "backends": [
         {
           "name": "native-cpu-multi",
@@ -822,7 +1223,7 @@
     },
     {
       "category": "gpu",
-      "points": 1003.4380076804118,
+      "points": 996.5758141149589,
       "backends": [
         {
           "name": "glmark2",
@@ -852,10 +1253,64 @@
         }
       ],
       "issue": null
+    },
+    {
+      "category": "memory",
+      "points": 1013.7933914456983,
+      "backends": [
+        {
+          "name": "native-memory-single",
+          "version": "1",
+          "tool_version": null,
+          "presentation": null
+        },
+        {
+          "name": "native-memory-multi",
+          "version": "1",
+          "tool_version": null,
+          "presentation": null
+        }
+      ],
+      "reference_backends": [
+        {
+          "name": "native-memory-single",
+          "version": "1",
+          "tool_version": null,
+          "presentation": null
+        },
+        {
+          "name": "native-memory-multi",
+          "version": "1",
+          "tool_version": null,
+          "presentation": null
+        }
+      ],
+      "issue": null
+    },
+    {
+      "category": "disk",
+      "points": 1001.0229820029688,
+      "backends": [
+        {
+          "name": "fio-disk",
+          "version": "1",
+          "tool_version": null,
+          "presentation": "1GiB"
+        }
+      ],
+      "reference_backends": [
+        {
+          "name": "fio-disk",
+          "version": "1",
+          "tool_version": null,
+          "presentation": "1GiB"
+        }
+      ],
+      "issue": null
     }
   ],
   "combined": {
-    "points": 1008.4834495171067,
+    "points": 976.0416399673961,
     "weights": {
       "cpu_single": 0.3333333333333333,
       "cpu_multi": 0.3333333333333333,
@@ -889,5 +1344,13 @@
     ],
     "gpu_missing": false,
     "issue": null
+  },
+  "settings": {
+    "runs": 3,
+    "max_warmup_s": null,
+    "warmup_tolerance_percent": 3.0,
+    "high_variance_cv_percent": 5.0,
+    "hot_start_c": 70.0,
+    "reliable_cv_percent": 1.0
   }
 }
