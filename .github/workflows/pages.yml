@@ -1,7 +1,9 @@
 name: Pages
 
 # Classement statique : généré depuis results/ et publié sur GitHub Pages à chaque push sur
-# main (Settings > Pages > Source : GitHub Actions).
+# main (Settings > Pages > Source : GitHub Actions). Après le déploiement : URL du site dans
+# #deploiements et chaque machine ajoutée depuis le push précédent dans #classement (rang
+# combiné calculé par `hwbench.leaderboard summary` sur le code de main, jamais sur une PR).
 on:
   push:
     branches: [main]
@@ -17,16 +19,37 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      summary: ${{ steps.new.outputs.summary }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          fetch-depth: 0 # comparaison avec le push précédent (nouvelles machines)
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - run: pip install .
       - name: Générer le site
         run: python -m hwbench.leaderboard site --results results --out _site
+      # Fichiers results/*.json ajoutés depuis le push précédent -> JSON sur une ligne (rang au
+      # classement combiné), passé au job notify par env. Noms par -z / xargs -0. Sans commit
+      # précédent connu (premier push, historique réécrit) : rien.
+      - name: Nouvelles machines (notification)
+        id: new
+        continue-on-error: true
+        shell: bash
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          summary=""
+          if git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            summary="$(git diff -z --name-only --diff-filter=A "$BEFORE" HEAD -- 'results/*.json' \
+              | xargs -0 --no-run-if-empty python -m hwbench.leaderboard summary \
+                  --results results --new)"
+          fi
+          echo "summary=$summary" >> "$GITHUB_OUTPUT"
+
       - name: Préparer l'artefact Pages
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
@@ -41,7 +64,38 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Déployer
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  notify:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # extraction du script
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/discord_notify.py
+          sparse-checkout-cone-mode: false
+
+      - name: Notifier #deploiements
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_DEPLOIEMENTS: ${{ secrets.DISCORD_WEBHOOK_DEPLOIEMENTS }}
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: python3 scripts/discord_notify.py pages --url "$PAGE_URL"
+
+      # noms de machines venus des exports : par env (SUMMARY), jamais interpolés dans run
+      - name: Notifier #classement (nouvelles machines)
+        if: needs.build.outputs.summary != ''
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_CLASSEMENT: ${{ secrets.DISCORD_WEBHOOK_CLASSEMENT }}
+          SUMMARY: ${{ needs.build.outputs.summary }}
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: python3 scripts/discord_notify.py new-machines --site-url "$PAGE_URL"
