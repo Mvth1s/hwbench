@@ -1,0 +1,36 @@
+name: Hebdo
+
+# Chaque lundi : téléchargements PyPI (API publique pypistats), étoiles, PR et issues ouvertes,
+# dernier état de la CI sur main et dev, nombre de machines au classement, dernière release
+# -> #rapport-hebdo. Une source injoignable est affichée « non disponible ». schedule ne tourne
+# que depuis main.
+on:
+  schedule:
+    - cron: "7 7 * * 1" # lundi, 07:07 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  hebdo:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # extraction du script et de results/, dépôt et dernière release
+      actions: read # dernier run de CI
+      issues: read # issues ouvertes
+      pull-requests: read # PR ouvertes
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/discord_notify.py
+            results/
+          sparse-checkout-cone-mode: false
+
+      - name: Notifier #rapport-hebdo
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DISCORD_WEBHOOK_HEBDO: ${{ secrets.DISCORD_WEBHOOK_HEBDO }}
+        run: python3 scripts/discord_notify.py hebdo --results results
