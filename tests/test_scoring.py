@@ -432,3 +432,20 @@ def test_disk_size_is_part_of_the_identity() -> None:
 def test_memory_only_has_no_combined_score() -> None:
     scores = score_results(info_results(), REFERENCE)
     assert scores.combined is None
+
+
+def _panel_text(scores) -> str:
+    console = Console(width=200, record=True)
+    console.print(render_scores(scores))
+    return console.export_text()
+
+
+def test_scores_panel_info_categories() -> None:
+    raw = _panel_text(score_results(machine(2.0) + info_results(), REFERENCE))
+    assert "Mémoire" in raw and "valeurs brutes (pas encore dans la référence)" in raw
+    reference = reference_from_dict(
+        build_reference(reference_results() + info_results(), snapshot(), [])
+    )
+    scored = _panel_text(score_results(machine(2.0) + info_results(2.0), reference))
+    assert re.search(r"Disque +2000 pts  \(information, hors score combiné\)", scored)
+    assert re.search(r"Mémoire +2000 pts  \(information, hors score combiné\)", scored)
