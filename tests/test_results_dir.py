@@ -61,5 +61,8 @@ def test_all_results_load_for_the_site() -> None:
 @ALLOW_STALE
 def test_stale_warning_survives_warnings_as_errors() -> None:
     """Sous -W error ou filterwarnings = error, ce warn lèverait une exception sans le marqueur
-    (pytest applique les marqueurs après les filtres de la ligne de commande et de la config)."""
-    warnings.warn("à ré-exporter", StaleReferenceWarning, stacklevel=1)
+    (pytest applique les marqueurs après les filtres de la ligne de commande et de la config).
+    catch_warnings garde les filtres actifs et enregistre l'avertissement sans l'afficher."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.warn("à ré-exporter", StaleReferenceWarning, stacklevel=1)
+    assert [w.category for w in caught] == [StaleReferenceWarning]
