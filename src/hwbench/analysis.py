@@ -1,7 +1,11 @@
 """Analyse déterministe d'une session (un export) : des constats codés, sans texte ni HTML.
 
 Chaque règle se déclenche sur les données mesurées et produit un `Finding` : un code, un statut
-et des paramètres (valeurs mesurées, seuils lus dans les RunSettings de la session). Le texte
+et des paramètres (valeurs mesurées, seuils lus dans les RunSettings passés à `analyze`). Les
+constats liés à un seuil (batterie, profil, départ chaud, CV, warm-up) sont recalculés depuis les
+valeurs mesurées avec ces RunSettings, pas lus dans les avertissements enregistrés : le site du
+classement peut ainsi appliquer les seuils par défaut à tout fichier soumis. Seuls les
+avertissements propres à un outil (vsync, rendu logiciel) sont repris tels quels. Le texte
 français est produit par la couche de rendu (report/texts.py). Aucune règle n'explique une
 cause qu'elle n'a pas mesurée.
 
@@ -15,7 +19,7 @@ from typing import Any
 from hwbench.export import MachineExport
 from hwbench.models import Unavailable
 from hwbench.results import BenchWarning, Category, Result
-from hwbench.runner import RunSettings
+from hwbench.runner import RunSettings, start_warnings
 from hwbench.scoring import ScoreIssue
 
 
@@ -71,22 +75,29 @@ MULTI_PAIRS = (
 
 
 def _with(results: list[Result], warning: BenchWarning) -> list[Result]:
+    """Tests qui portent un avertissement d'outil enregistré (vsync, rendu logiciel)."""
     return [r for r in results if warning in r.warnings]
+
+
+def _at_start(results: list[Result], warning: BenchWarning, settings: RunSettings) -> list[Result]:
+    """Tests dont l'état de départ déclenche l'avertissement avec ces seuils (même calcul que
+    le runner : runner.start_warnings)."""
+    return [r for r in results if warning in start_warnings(r.state_before, settings)]
 
 
 def _bench_items(results: list[Result]) -> list[dict[str, Any]]:
     return [{"bench": r.name} for r in results]
 
 
-def _power(results: list[Result]) -> list[Finding]:
+def _power(results: list[Result], settings: RunSettings) -> list[Finding]:
     findings = []
-    if battery := _with(results, BenchWarning.ON_BATTERY):
+    if battery := _at_start(results, BenchWarning.ON_BATTERY, settings):
         findings.append(Finding(FindingCode.ON_BATTERY, Status.FIX, items=_bench_items(battery)))
     # EPP et profil plateforme seulement (throttling_settings), jamais le governor : sous
     # intel_pstate, « powersave » est le governor normal et ne bride rien.
     if not findings and (conforming := _conforming_conditions(results)) is not None:
         findings.append(conforming)
-    if throttled := _with(results, BenchWarning.POWER_PROFILE):
+    if throttled := _at_start(results, BenchWarning.POWER_PROFILE, settings):
         state = throttled[0].state_before
         findings.append(
             Finding(
@@ -134,8 +145,9 @@ def _per_bench_warnings(results: list[Result], settings: RunSettings) -> list[Fi
             Finding(FindingCode.SOFTWARE_RENDERING, Status.FIX, items=_bench_items(software))
         )
     hot = []
+    hot_names = {r.name for r in _at_start(results, BenchWarning.HOT_START, settings)}
     for i, r in enumerate(results):
-        if BenchWarning.HOT_START in r.warnings:
+        if r.name in hot_names:
             hot.append(
                 {
                     "bench": r.name,
@@ -147,7 +159,8 @@ def _per_bench_warnings(results: list[Result], settings: RunSettings) -> list[Fi
         findings.append(
             Finding(FindingCode.HOT_START, Status.CHECK, {"threshold_c": settings.hot_start_c}, hot)
         )
-    if unstable := _with(results, BenchWarning.HIGH_VARIANCE):
+    unstable = [r for r in results if r.cv_percent > settings.high_variance_cv_percent]
+    if unstable:
         findings.append(
             Finding(
                 FindingCode.HIGH_VARIANCE,
@@ -156,7 +169,7 @@ def _per_bench_warnings(results: list[Result], settings: RunSettings) -> list[Fi
                 [{"bench": r.name, "cv_percent": r.cv_percent} for r in unstable],
             )
         )
-    if warmup := _with(results, BenchWarning.WARMUP_UNSTABLE):
+    if warmup := [r for r in results if not r.warmup_stable]:
         findings.append(
             Finding(
                 FindingCode.WARMUP_UNSTABLE,
@@ -279,7 +292,7 @@ def analyze(session: MachineExport, settings: RunSettings | None = None) -> list
     settings = settings or RunSettings()
     results = session.results
     findings = (
-        _power(results)
+        _power(results, settings)
         + _per_bench_warnings(results, settings)
         + _temperatures(session)
         + _reproducible(results, settings)

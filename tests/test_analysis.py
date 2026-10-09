@@ -166,7 +166,7 @@ def test_hot_first_test_has_no_previous() -> None:
 def test_high_variance_uses_the_session_threshold() -> None:
     results = [
         make_result("vkmark", 100.0, stdev=17.0, warnings=[BenchWarning.HIGH_VARIANCE]),
-        make_result("glmark2", 100.0, stdev=4.0),  # sous le seuil : pas cité
+        make_result("glmark2", 100.0, stdev=2.9),  # sous le seuil : pas cité
     ]
     f = find(
         analyze(session(results), RunSettings(high_variance_cv_percent=3.0)),
@@ -319,3 +319,33 @@ def test_real_b850_session_is_clean() -> None:
     assert FindingCode.REPRODUCIBLE in codes(findings)
     # k10temp n'expose pas de seuil : maximum seul, sans jugement
     assert FindingCode.TEMPERATURE_MAX in codes(findings)
+
+
+def test_threshold_findings_use_the_given_settings_not_the_stored_warnings() -> None:
+    """Le site applique les seuils par défaut : un avertissement enregistré avec un seuil plus
+    strict ne compte pas, et un fichier sans avertissement enregistré est quand même jugé."""
+    warm = replace(COOL_AC_STATE, cpu_temp_c=66.0)
+    results = [
+        # mesuré avec --hot-start 60 et --max-cv 2 : avertissements enregistrés
+        make_result(
+            "native-cpu-single",
+            100.0,
+            stdev=3.0,
+            state_before=warm,
+            warnings=[BenchWarning.HOT_START, BenchWarning.HIGH_VARIANCE],
+        ),
+        # retouché : aucun avertissement enregistré malgré un CV de 12 % et 75 °C au départ
+        make_result(
+            "native-cpu-multi",
+            100.0,
+            stdev=12.0,
+            state_before=replace(COOL_AC_STATE, cpu_temp_c=75.0),
+        ),
+    ]
+    findings = analyze(session(results), RunSettings())
+    assert [i["bench"] for i in find(findings, FindingCode.HOT_START).items] == ["native-cpu-multi"]
+    assert [i["bench"] for i in find(findings, FindingCode.HIGH_VARIANCE).items] == [
+        "native-cpu-multi"
+    ]
+    strict = analyze(session(results), RunSettings(hot_start_c=60.0, high_variance_cv_percent=2.0))
+    assert len(find(strict, FindingCode.HOT_START).items) == 2
