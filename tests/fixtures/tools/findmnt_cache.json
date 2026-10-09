@@ -1,0 +1,8 @@
+{
+   "filesystems": [
+      {
+         "source": "/dev/nvme0n1p3[/home]",
+         "fstype": "btrfs"
+      }
+   ]
+}

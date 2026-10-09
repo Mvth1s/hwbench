@@ -3,8 +3,8 @@
 #
 # Usage : scripts/capture_tool_fixtures.sh   (sans sudo, depuis une session graphique)
 #   Les lignes de commande viennent des backends eux-mêmes (hwbench.benchmarks.external),
-#   seules les durées sont raccourcies (scènes 1 s, sysbench memory 2 s) : les fixtures
-#   suivent le vrai protocole.
+#   seules les durées sont raccourcies (scènes 1 s, sysbench memory 2 s, fio 1 s par test sur
+#   un fichier de 64 Mio, supprimé ensuite) : les fixtures suivent le vrai protocole.
 #   L'UUID du GPU affiché par vkmark (« Device UUID ») est remplacé par des zéros.
 #
 # Bash obligatoire : les tableaux gardent intacts les arguments contenant « ; » ou « : ».
@@ -26,6 +26,13 @@ import sys
 from hwbench.benchmarks.external.glmark2 import Glmark2
 from hwbench.benchmarks.external.sysbench import SysbenchMemoryMulti, SysbenchMemorySingle
 from hwbench.benchmarks.external.vkmark import Vkmark
+from hwbench.benchmarks.base import BenchOptions
+from hwbench.benchmarks.external.fio import Fio
+if sys.argv[1] == "fio":
+    # fichier de 64 Mio, nom relatif (lancé depuis son dossier) : aucun chemin personnel
+    for arg in Fio(BenchOptions(disk_size=64 * 1024**2)).command(sys.argv[2]):
+        print(arg.replace("--runtime=2", "--runtime=1"))
+    sys.exit()
 bench = {
     "glmark2": Glmark2,
     "vkmark": Vkmark,
@@ -74,6 +81,19 @@ if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
     capture vkmark_wayland_immediate.txt vkmark --winsys wayland --present-mode immediate \
         --size 3840x2160 "${scenes[@]}"
 fi
+
+echo "fio (fichier de 64 Mio dans ~/.cache/hwbench, supprimé ensuite) :"
+# pas /tmp : souvent un tmpfs, qui refuse les E/S directes (direct=1)
+FIO_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/hwbench"
+FIO_FILE="hwbench-fio-capture.tmp"
+mkdir -p "$FIO_DIR"
+mapfile -t cmd < <(backend_command fio "$FIO_FILE")
+(cd "$FIO_DIR" && capture fio_disk.json "${cmd[@]}")
+rm -f -- "$FIO_DIR/$FIO_FILE"
+# système de fichiers et disque sous ce dossier (sorties JSON, sans serial)
+capture findmnt_cache.json findmnt -J -T "$FIO_DIR" -o SOURCE,FSTYPE
+source="$(findmnt -n -T "$FIO_DIR" -o SOURCE | sed 's/\[.*\]$//')"
+capture lsblk_inverse.json lsblk -J -s -o NAME,MODEL,TYPE "$source"
 
 sed -i -E 's/(Device UUID: +)[0-9a-fA-F]{32}/\100000000000000000000000000000000/' "$OUT"/vkmark_*.txt
 echo "Fixtures écrites dans $OUT"

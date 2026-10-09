@@ -2,6 +2,7 @@ import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import ClassVar
 
 from hwbench.results import Availability, BenchWarning, Category, Measurement
@@ -10,6 +11,8 @@ from hwbench.results import Availability, BenchWarning, Category, Measurement
 @dataclass(frozen=True)
 class BenchOptions:
     workers: int | None = None  # None = nombre de CPU logiques utilisables
+    disk_size: int = 1024**3  # taille du fichier de test du bench disque, en octets
+    disk_path: Path | None = None  # dossier du fichier de test ; None = ~/.cache/hwbench
 
 
 def logical_cpus() -> int:
