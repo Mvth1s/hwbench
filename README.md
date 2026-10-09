@@ -374,19 +374,40 @@ construit par ce dépôt, à partir du commit tagué. Ce sont les mêmes fichier
 Releases et sur PyPI. Pour vérifier, avec la [CLI GitHub](https://cli.github.com/) :
 
 ```sh
+# dernière version publiée (ou VERSION=0.4.0 pour une version précise)
+VERSION=$(gh release view --repo Mvth1s/hwbench --json tagName --jq '.tagName | ltrimstr("v")')
+
 # depuis la GitHub Release
-gh release download v0.3.0 --repo Mvth1s/hwbench --pattern '*.whl'
-gh attestation verify hwbench-0.3.0-py3-none-any.whl --repo Mvth1s/hwbench \
+gh release download "v$VERSION" --repo Mvth1s/hwbench --pattern '*.whl'
+gh attestation verify "hwbench-$VERSION-py3-none-any.whl" --repo Mvth1s/hwbench \
   --signer-workflow Mvth1s/hwbench/.github/workflows/release.yml
 
 # ou depuis PyPI
-pip download hwbench==0.3.0 --no-deps
-gh attestation verify hwbench-0.3.0-py3-none-any.whl --repo Mvth1s/hwbench
+pip download "hwbench==$VERSION" --no-deps
+gh attestation verify "hwbench-$VERSION-py3-none-any.whl" --repo Mvth1s/hwbench
 ```
+
+Sous fish : `set VERSION (gh release view …)` à la place de `VERSION=$(…)`.
 
 La commande échoue si le fichier a été modifié ou s'il n'a pas été construit par le workflow
 de release de ce dépôt. Les versions antérieures à l'ajout de l'attestation (0.1.0, 0.2.0) n'en
 ont pas.
+
+### Notifications
+
+L'activité du projet est relayée sur Discord. Commits, pull requests, issues et discussions
+passent par les webhooks natifs de GitHub. Le reste passe par des workflows GitHub Actions et
+`scripts/discord_notify.py` (bibliothèque standard uniquement) :
+
+- échecs de CI sur `dev` et `main`, puis le retour au vert ;
+- soumissions au classement validées ou refusées (avec la raison) et nouvelles machines ;
+- résultats de CI des pull requests Dependabot ;
+- releases, publication sur PyPI et déploiements du site ;
+- veille hebdomadaire des versions de glmark2, vkmark, sysbench et Python ;
+- rapport hebdomadaire.
+
+Ces workflows ne lisent que des métadonnées (événement, API GitHub), jamais le code d'une pull
+request. Une notification qui échoue ne fait jamais échouer un workflow.
 
 ## Vie privée
 

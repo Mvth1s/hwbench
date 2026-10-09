@@ -28,6 +28,11 @@ CATEGORY_LABELS = {
     Category.GPU: "GPU",
 }
 UNIT_LABELS = {"MiB/s": "Mio/s", "index": "indice brut"}
+# favicon intégré (data URI) : aucune requête externe
+FAVICON = (
+    "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+    "<text y='.9em' font-size='90'>📊</text></svg>"
+)
 
 
 @dataclass(frozen=True)
@@ -124,6 +129,7 @@ def _page(title: str, body: str, generated: datetime) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="{FAVICON}">
 <title>{e(title)}</title>
 <style>{CSS}</style>
 </head>

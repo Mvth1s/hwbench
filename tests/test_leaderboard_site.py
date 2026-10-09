@@ -98,6 +98,27 @@ def test_cli_site(tmp_path, monkeypatch, capsys) -> None:
     assert (out / "index.html").exists()
 
 
+def test_cli_summary_gives_combined_ranks(tmp_path, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    d = results_dir(tmp_path)
+    assert cli.main(["summary", "--results", str(d)]) == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["ranked"] == 3
+    by_slug = {m["slug"]: m for m in summary["machines"]}
+    assert by_slug["rapide"]["rank"] == 1 and round(by_slug["rapide"]["combined"]) == 2000
+    assert by_slug["piege"]["machine"] == EVIL  # brut : l'échappement revient au consommateur
+    # combiné sans GPU : présent, mais sans rang
+    assert by_slug["portable"]["rank"] is None and by_slug["portable"]["combined"] is None
+
+    new = [str(d / "moyen.json"), str(d / "portable.json")]
+    assert cli.main(["summary", "--results", str(d), "--new", *new]) == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert [(m["slug"], m["rank"]) for m in summary["machines"]] == [
+        ("moyen", 2),
+        ("portable", None),
+    ]
+
+
 def test_site_skips_symlinks(tmp_path) -> None:
     d = results_dir(tmp_path)
     (d / "lien.json").symlink_to(d / "rapide.json")
