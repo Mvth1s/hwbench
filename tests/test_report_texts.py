@@ -30,6 +30,15 @@ def test_every_code_and_status_has_a_text() -> None:
                 "best_profile": "performance",
             },
         ),
+        FindingCode.CONDITIONS_OK: Finding(
+            FindingCode.CONDITIONS_OK,
+            Status.OK,
+            {
+                "has_battery": False,
+                "platform_profile": None,
+                "energy_performance_preference": "performance",
+            },
+        ),
         FindingCode.SOFTWARE_RENDERING: Finding(
             FindingCode.SOFTWARE_RENDERING, Status.FIX, items=[{"bench": "glmark2"}]
         ),
@@ -113,6 +122,16 @@ def test_every_code_and_status_has_a_text() -> None:
         "fichier de 1 Gio, système de fichiers btrfs et Samsung" in texts[FindingCode.DISK_CONTEXT]
     )
     assert "68 °C" in texts[FindingCode.TEMPERATURE_MAX]
+    for code in (
+        FindingCode.TEMPERATURE_OK,
+        FindingCode.TEMPERATURE_MAX,
+        FindingCode.TEMPERATURE_REACHED,
+    ):
+        assert texts[code].startswith("Température CPU maximale relevée avant et après chaque test")
+    assert texts[FindingCode.CONDITIONS_OK] == (
+        "Conditions conformes pendant tous les tests : sur secteur (pas de batterie) et EPP "
+        "« performance », au meilleur réglage disponible."
+    )
 
 
 def test_bench_labels() -> None:
@@ -135,8 +154,13 @@ def test_dell_synthesis() -> None:
         "Mesures instables pour 2 tests : GPU OpenGL (glmark2) avec un CV de 8,8 % et GPU "
         "Vulkan (vkmark) avec un CV de 17,0 %, au-delà du seuil de 5 %. Ces scores sont à "
         "confirmer.",
-        "Température CPU maximale relevée : 72 °C, sous le seuil haut du capteur (100 °C).",
+        "Conditions conformes pendant tous les tests : sur secteur, profil plateforme "
+        "« performance » et EPP « performance », au meilleur réglage disponible.",
     ]
+    assert sentences[3] == (
+        "Température CPU maximale relevée avant et après chaque test : 72 °C, sous le seuil "
+        "haut du capteur (100 °C)."
+    )
     # un seul facteur multi-cœur en synthèse (natif CPU), sysbench reste dans sa section
     assert sum("fois plus vite" in s for s in sentences) == 1
     assert len(sentences) == 5

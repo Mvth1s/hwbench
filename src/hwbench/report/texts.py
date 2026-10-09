@@ -28,6 +28,11 @@ def _celsius(value: float | None) -> str:
     return "?" if value is None else f"{num(value, 0)} °C"
 
 
+# hwbench relève la température CPU au début et à la fin de chaque test, pas pendant : le
+# maximum cité est celui de ces relevés.
+TEMPERATURE_PREFIX = "Température CPU maximale relevée avant et après chaque test"
+
+
 def _tests(count: int) -> str:
     return "1 test" if count == 1 else f"{count} tests"
 
@@ -58,6 +63,16 @@ def finding_text(finding: Finding) -> str:
             return (
                 f"Rendu graphique fait par le processeur (llvmpipe ou lavapipe) pour "
                 f"{_benches(finding)} : le score ne mesure pas la carte graphique."
+            )
+        case FindingCode.CONDITIONS_OK:
+            power = "sur secteur" + (" (pas de batterie)" if p["has_battery"] is False else "")
+            parts = [power]
+            for key in ("platform_profile", "energy_performance_preference"):
+                if p[key] is not None:
+                    parts.append(f"{PROFILE_LABELS[key]} « {p[key]} »")
+            return (
+                f"Conditions conformes pendant tous les tests : {_list(parts)}, au meilleur "
+                "réglage disponible."
             )
         case FindingCode.HOT_START:
             threshold = _celsius(p["threshold_c"])
@@ -90,8 +105,8 @@ def finding_text(finding: Finding) -> str:
             )
         case FindingCode.TEMPERATURE_REACHED:
             return (
-                f"Température CPU maximale relevée : {_celsius(p['max_c'])}, au niveau du seuil "
-                f"haut du capteur ({_celsius(p['threshold_c'])})."
+                f"{TEMPERATURE_PREFIX} : {_celsius(p['max_c'])}, au niveau du seuil haut du "
+                f"capteur ({_celsius(p['threshold_c'])})."
             )
         case FindingCode.REPRODUCIBLE:
             return (
@@ -100,13 +115,13 @@ def finding_text(finding: Finding) -> str:
             )
         case FindingCode.TEMPERATURE_OK:
             return (
-                f"Température CPU maximale relevée : {_celsius(p['max_c'])}, sous le seuil haut "
-                f"du capteur ({_celsius(p['threshold_c'])})."
+                f"{TEMPERATURE_PREFIX} : {_celsius(p['max_c'])}, sous le seuil haut du capteur "
+                f"({_celsius(p['threshold_c'])})."
             )
         case FindingCode.TEMPERATURE_MAX:
             return (
-                f"Température CPU maximale relevée : {_celsius(p['max_c'])} (le capteur "
-                "n'indique pas de seuil)."
+                f"{TEMPERATURE_PREFIX} : {_celsius(p['max_c'])} (le capteur n'indique pas de "
+                "seuil)."
             )
         case FindingCode.MULTI_FACTOR:
             native = p["backend"] == "native"
