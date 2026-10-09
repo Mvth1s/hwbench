@@ -374,15 +374,20 @@ construit par ce dépôt, à partir du commit tagué. Ce sont les mêmes fichier
 Releases et sur PyPI. Pour vérifier, avec la [CLI GitHub](https://cli.github.com/) :
 
 ```sh
+# dernière version publiée (ou VERSION=0.4.0 pour une version précise)
+VERSION=$(gh release view --repo Mvth1s/hwbench --json tagName --jq '.tagName | ltrimstr("v")')
+
 # depuis la GitHub Release
-gh release download v0.3.0 --repo Mvth1s/hwbench --pattern '*.whl'
-gh attestation verify hwbench-0.3.0-py3-none-any.whl --repo Mvth1s/hwbench \
+gh release download "v$VERSION" --repo Mvth1s/hwbench --pattern '*.whl'
+gh attestation verify "hwbench-$VERSION-py3-none-any.whl" --repo Mvth1s/hwbench \
   --signer-workflow Mvth1s/hwbench/.github/workflows/release.yml
 
 # ou depuis PyPI
-pip download hwbench==0.3.0 --no-deps
-gh attestation verify hwbench-0.3.0-py3-none-any.whl --repo Mvth1s/hwbench
+pip download "hwbench==$VERSION" --no-deps
+gh attestation verify "hwbench-$VERSION-py3-none-any.whl" --repo Mvth1s/hwbench
 ```
+
+Sous fish : `set VERSION (gh release view …)` à la place de `VERSION=$(…)`.
 
 La commande échoue si le fichier a été modifié ou s'il n'a pas été construit par le workflow
 de release de ce dépôt. Les versions antérieures à l'ajout de l'attestation (0.1.0, 0.2.0) n'en
