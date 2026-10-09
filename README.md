@@ -119,12 +119,13 @@ Exemple (sans root) :
 
 ```sh
 hwbench bench                          # toutes les catégories, tous les backends disponibles
-hwbench bench cpu-single               # une seule catégorie : cpu-single, cpu-multi, gpu, all
+hwbench bench cpu-single               # une catégorie : cpu-single, cpu-multi, gpu, memory, disk, all
 hwbench bench cpu-multi --workers 4    # nombre de processus (défaut : CPU logiques)
 hwbench bench --backend native --runs 5
 hwbench bench cpu-multi --max-warmup 180   # plafond du warm-up en secondes
 hwbench bench --max-cv 3 --hot-start 60    # seuils des avertissements (défaut : 5 %, 70 °C)
 hwbench bench --weights cpu-single=1,cpu-multi=2,gpu=1   # pondération du score combiné
+hwbench bench disk --disk-path /mnt/data --disk-size 4G  # dossier et taille du fichier de test
 hwbench backends                       # backends disponibles et commande d'installation
 ```
 
@@ -140,11 +141,21 @@ affiché. Le multi-cœur lance la même charge dans N processus (`multiprocessin
 à cause du GIL) et additionne leurs débits. Les versions de Python, OpenSSL, zlib et liblzma
 sont relevées avec chaque résultat.
 
+### Backend natif (mémoire)
+
+Bande passante de copie : un gros buffer copié dans un autre via `memoryview`, que CPython
+exécute en C (`memcpy`), si bien que le temps mesuré est celui de la copie. Les buffers dépassent
+les caches : 128 Mio en single (256 Mio avec la destination), 32 Mio par processus en
+multi-processus (N processus, débits additionnés, comme le CPU). Les pages sont touchées avant
+le chrono. Le résultat compte les octets copiés, en Mio/s.
+
 ### Backends externes
 
 | Backend | Catégories | Protocole |
 |---|---|---|
 | `sysbench` | CPU single, multi | `sysbench cpu`, nombres premiers jusqu'à 10 000, 5 s par run ; 1 thread ou N threads |
+| `sysbench` | mémoire | `sysbench memory`, lecture séquentielle d'un bloc par thread (128 Mio en single, 32 Mio par thread en multi), 5 s par run |
+| `fio` | disque | 4 tests de 2 s en E/S directes (`direct=1`, `libaio`) : lecture et écriture séquentielles (1 Mio, QD8, en Mio/s), lecture et écriture aléatoires 4K (QD32, en IOPS) |
 | `glmark2` | GPU (OpenGL) | 8 scènes, 3 s chacune, 3840×2160 **hors écran** (`--off-screen`) |
 | `vkmark` | GPU (Vulkan) | 2 scènes, 3 s chacune, 3840×2160, plugin **headless** (aucun affichage) |
 
@@ -159,6 +170,17 @@ vsync n'est pas vérifiable. Un rendu logiciel (llvmpipe, lavapipe) est aussi si
 
 **Binaire glmark2.** `glmark2-wayland` sous Wayland (repli sur `glmark2` via XWayland),
 `glmark2` sous X11, `glmark2-drm` sans session graphique.
+
+**Disque.** fio travaille sur un fichier temporaire de 1 Gio (`--disk-size`, minimum 64M) dans
+`~/.cache/hwbench` (`--disk-path` pour mesurer un autre disque ; `$XDG_CACHE_HOME` est
+respecté). hwbench annonce le fichier avant de commencer, vérifie l'espace libre avant
+d'écrire, et supprime le fichier à la fin, même en cas d'erreur ou de Ctrl+C. Les E/S directes
+contournent le cache de pages ; un système de fichiers qui ne les accepte pas (tmpfs) fait
+échouer le bench avec le message de fio. La taille du fichier fait partie de l'identité du
+bench : une autre taille que 1 Gio n'est comparable ni à la référence ni à un fichier mesuré en
+1 Gio (le cache SLC d'un SSD favorise les petits fichiers). Le score fio est un indice
+(moyenne géométrique des quatre tests) ; les quatre valeurs sont affichées. Seuls le type de
+système de fichiers et le modèle du disque sont relevés, jamais le chemin.
 
 #### Choix des scènes GPU
 
@@ -193,7 +215,7 @@ incrémentée.
 
 Warm-up adaptatif : le bench enchaîne les itérations jusqu'à ce que deux consécutives soient à
 moins de 3 % l'une de l'autre (`--warmup-tolerance`), dans la limite d'un plafond de 30 s en
-single-core, 90 s en multi-cœur et GPU (`--max-warmup`). Si le plafond est atteint sans stabilité,
+single-core et mémoire, 90 s en multi-cœur et GPU, 60 s pour le disque (`--max-warmup`). Si le plafond est atteint sans stabilité,
 hwbench l'indique. Suivent au moins 3 runs mesurés ; le score est leur médiane, l'écart-type est
 conservé.
 
@@ -255,9 +277,13 @@ référence, et qu'il a le même environnement d'outils que les fixtures de test
 - **GPU** : moyenne géométrique de glmark2 et vkmark. Chaque score de catégorie garde la liste
   des backends utilisés ; si elle diffère de celle de la référence (vkmark absent par exemple),
   le score GPU est « non comparable ». Jamais de moyenne sur « ce qui est installé ».
-- **Score combiné** : moyenne géométrique pondérée des catégories (1/3 chacune par défaut,
-  `--weights`). Sans GPU mesuré, il est calculé sur le CPU seul et le signale ; un GPU mesuré mais
-  non comparable rend le combiné non comparable.
+- **Mémoire et disque** : catégories d'information. Mémoire = moyenne géométrique des deux
+  benchs natifs (single et multi), sysbench à côté pour information ; disque = fio. Elles sont
+  notées quand la référence contient ces benchs, sinon elles restent en valeurs brutes. Elles
+  n'entrent **jamais** dans le score combiné ni dans le classement.
+- **Score combiné** : moyenne géométrique pondérée des catégories CPU single, CPU multi et GPU
+  (1/3 chacune par défaut, `--weights`). Sans GPU mesuré, il est calculé sur le CPU seul et le
+  signale ; un GPU mesuré mais non comparable rend le combiné non comparable.
 
 La référence est `src/hwbench/data/reference.json`, versionnée dans le repo. Elle se régénère
 sur le desktop B850, depuis la session graphique (pour glmark2 et vkmark), rien d'autre ne
@@ -268,8 +294,8 @@ tournant :
 ```
 
 À refaire seulement quand ce qui fait l'identité d'un bench change : version du protocole
-hwbench (un test l'impose) ou version de l'outil (sysbench, glmark2, vkmark) installée sur le
-desktop. Un résultat mesuré avec une autre version d'outil que la référence est déclaré non
+hwbench (un test l'impose) ou version de l'outil (sysbench, glmark2, vkmark, fio) installée sur
+le desktop. Un résultat mesuré avec une autre version d'outil que la référence est déclaré non
 comparable.
 
 Le pilote GPU (Mesa, RADV…) n'en fait pas partie : il change trop souvent (à chaque mise à
@@ -332,7 +358,9 @@ puis une pull request, voir [CONTRIBUTING.md](https://github.com/Mvth1s/hwbench/
 Chaque fichier soumis est validé en CI (schéma connu, aucun identifiant, référence actuelle,
 versions de bench à jour, points cohérents avec les résultats bruts). Le site recalcule les
 points à partir des résultats bruts ; le score combiné n'est classé que s'il porte sur les trois
-catégories, comme la référence. Les résultats sont déclaratifs.
+catégories, comme la référence. Mémoire et disque apparaissent en colonnes d'information (points
+si la référence les contient, sinon valeurs brutes), hors classement. Les résultats sont
+déclaratifs.
 
 ```sh
 python -m hwbench.leaderboard validate results/*.json      # validation locale
@@ -353,9 +381,10 @@ Aucune n'est obligatoire : si un outil manque, le champ correspondant est affich
 | `nvidia-smi` | GPU NVIDIA | fourni par le pilote propriétaire | fourni par le pilote propriétaire |
 | `dmidecode` | barrettes RAM (root) | `sudo dnf install dmidecode` | `sudo apt install dmidecode` |
 | `smartctl` ≥ 7.0 | santé des disques (root) | `sudo dnf install smartmontools` | `sudo apt install smartmontools` |
-| `sysbench` | bench CPU externe | `sudo dnf install sysbench` | `sudo apt install sysbench` |
+| `sysbench` | bench CPU et mémoire externe | `sudo dnf install sysbench` | `sudo apt install sysbench` |
 | `glmark2` | bench GPU OpenGL | `sudo dnf install glmark2` | `sudo apt install glmark2-wayland glmark2-x11` |
 | `vkmark` | bench GPU Vulkan | `sudo dnf install vkmark` | `sudo apt install vkmark` |
+| `fio` | bench disque | `sudo dnf install fio` | `sudo apt install fio` |
 
 ## Contribuer et versions
 
