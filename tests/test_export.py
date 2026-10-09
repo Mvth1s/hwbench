@@ -105,7 +105,7 @@ def test_load_errors_name_the_file(tmp_path) -> None:
 
 # --- schéma 3 : réglages des mesures ; schéma 2 toujours relu -------------------------------
 
-RESULTS = Path(__file__).parents[1] / "results"
+EXPORTS = Path(__file__).parent / "fixtures" / "exports"  # copies figées, jamais results/
 
 
 def test_settings_roundtrip(tmp_path) -> None:
@@ -118,7 +118,7 @@ def test_settings_roundtrip(tmp_path) -> None:
 
 
 def test_schema_2_files_are_still_read_without_settings() -> None:
-    for path in RESULTS.glob("*.json"):
+    for path in sorted(EXPORTS.glob("*-schema2.json")):
         assert json.loads(path.read_text())["schema_version"] == 2
         ex = load_export(path)
         assert ex.settings is None

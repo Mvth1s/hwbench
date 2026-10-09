@@ -1,9 +1,10 @@
 """Rapport HTML : snapshot, aller-retour JSON, hors ligne, vie privée, sections partielles.
 
 Snapshot : tests/fixtures/report/session.html, rendu de session.json. Dans cette session, CPU,
-GPU, composants et états machine sont réels (export du Dell, results/dell-latitude-5420.json,
-passé au schéma 3) ; les résultats mémoire et disque sont synthétiques, des valeurs construites
-pour couvrir ces sections (voir tests/fixtures/report/README.md).
+GPU, composants et états machine sont réels (export du Dell, copie figée dans
+tests/fixtures/exports/dell-latitude-5420-schema2.json, passé au schéma 3) ; les résultats
+mémoire et disque sont synthétiques, des valeurs construites pour couvrir ces sections (voir
+tests/fixtures/report/README.md).
 
 Pour accepter le snapshot après un changement voulu du gabarit :
 HWBENCH_UPDATE_SNAPSHOTS=1 .venv/bin/pytest tests/test_report.py
@@ -30,7 +31,9 @@ from hwbench.scoring import score_results
 FIXTURES = Path(__file__).parent / "fixtures" / "report"
 SESSION = FIXTURES / "session.json"
 EXPECTED = FIXTURES / "session.html"
-RESULTS = Path(__file__).parents[1] / "results"
+EXPORTS = Path(__file__).parent / "fixtures" / "exports"  # copies figées, jamais results/
+DELL = EXPORTS / "dell-latitude-5420-schema2.json"
+B850 = EXPORTS / "asrock-b850-riptide-wifi-schema2.json"
 VERSION_MARK = "@@HWBENCH_VERSION@@"
 
 
@@ -129,15 +132,15 @@ def test_partial_session_has_only_measured_sections() -> None:
 
 
 def test_schema_2_uses_default_thresholds_and_says_so() -> None:
-    html = render_report(load_export(RESULTS / "dell-latitude-5420.json"))
+    html = render_report(load_export(DELL))
     note = html_escape(DEFAULT_SETTINGS_NOTE)
     assert note in html
     assert note not in rendered()
 
 
-@pytest.mark.parametrize("name", ["dell-latitude-5420", "asrock-b850-riptide-wifi"])
-def test_real_results_render(name: str) -> None:
-    html = render_report(load_export(RESULTS / f"{name}.json"))
+@pytest.mark.parametrize("path", [DELL, B850], ids=lambda p: p.stem)
+def test_real_exports_render(path: Path) -> None:
+    html = render_report(load_export(path))
     assert html.startswith("<!doctype html>") and html.endswith("</html>\n")
     assert '<section id="synthese">' in html
 
@@ -149,22 +152,22 @@ def test_settings_of_the_session_are_cited() -> None:
 
 
 def test_conditions_tile_says_why() -> None:
-    html = render_report(load_export(RESULTS / "dell-latitude-5420.json"))
+    html = render_report(load_export(DELL))
     assert (
         '<div class="label">Conditions de mesure</div><div class="value"><span class="status '
         'status-check">À vérifier</span></div><div class="small muted">4 départs chauds</div>'
     ) in html
-    b850 = render_report(load_export(RESULTS / "asrock-b850-riptide-wifi.json"))
+    b850 = render_report(load_export(B850))
     assert 'Fiable</span></div><div class="small muted">secteur, meilleur réglage' in b850
 
 
 def test_start_temperature_row_gives_the_range() -> None:
-    html = render_report(load_export(RESULTS / "dell-latitude-5420.json"))
+    html = render_report(load_export(DELL))
     assert "<td>51 à 72 °C</td>" in html
     assert "4 tests ont démarré à 70 °C ou plus (seuil de départ chaud)." in html
 
 
-@pytest.mark.parametrize("path", [SESSION, *sorted(RESULTS.glob("*.json"))])
+@pytest.mark.parametrize("path", [SESSION, DELL, B850])
 def test_no_ambiguous_plural_or_strict_threshold_wording(path: Path) -> None:
     html = render_report(load_export(path))
     assert "(s)" not in html and "au-dessus du seuil" not in html
