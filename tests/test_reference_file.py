@@ -9,10 +9,12 @@ from test_fixtures_privacy import _live_identifiers
 from test_scoring import snapshot
 
 from hwbench import privacy
+from hwbench.benchmarks.external.fio import FIO_VERSION
 from hwbench.benchmarks.external.glmark2 import GLMARK2_VERSION
-from hwbench.benchmarks.external.sysbench import SYSBENCH_VERSION
+from hwbench.benchmarks.external.sysbench import SYSBENCH_MEMORY_VERSION, SYSBENCH_VERSION
 from hwbench.benchmarks.external.vkmark import VKMARK_VERSION
 from hwbench.benchmarks.native.cpu import NATIVE_CPU_VERSION
+from hwbench.benchmarks.native.memory import NATIVE_MEMORY_VERSION
 from hwbench.reference import build_reference
 from hwbench.results import COMBINED_CATEGORIES, Category
 from hwbench.scoring import load_reference
@@ -30,7 +32,14 @@ EXPECTED = {
 # Mémoire et disque : ajoutés à la référence à sa prochaine régénération sur le desktop B850.
 # Tant qu'ils n'y sont pas, ces catégories restent en valeurs brutes ; une fois présents, ils
 # doivent être à la version actuelle de leur protocole.
-OPTIONAL: dict[str, tuple[Category, str, str | None]] = {}
+OPTIONAL: dict[str, tuple[Category, str, str | None]] = {
+    "native-memory-single": (Category.MEMORY, NATIVE_MEMORY_VERSION, None),
+    "native-memory-multi": (Category.MEMORY, NATIVE_MEMORY_VERSION, None),
+    "sysbench-memory-single": (Category.MEMORY, SYSBENCH_MEMORY_VERSION, None),
+    "sysbench-memory-multi": (Category.MEMORY, SYSBENCH_MEMORY_VERSION, None),
+    # taille par défaut du fichier de test : seule taille notée contre la référence
+    "fio-disk": (Category.DISK, FIO_VERSION, "1GiB"),
+}
 
 
 def raw_reference() -> str:
