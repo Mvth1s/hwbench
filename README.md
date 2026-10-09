@@ -393,6 +393,22 @@ La commande échoue si le fichier a été modifié ou s'il n'a pas été constru
 de release de ce dépôt. Les versions antérieures à l'ajout de l'attestation (0.1.0, 0.2.0) n'en
 ont pas.
 
+### Notifications
+
+L'activité du projet est relayée sur Discord. Commits, pull requests, issues et discussions
+passent par les webhooks natifs de GitHub. Le reste passe par des workflows GitHub Actions et
+`scripts/discord_notify.py` (bibliothèque standard uniquement) :
+
+- échecs de CI sur `dev` et `main`, puis le retour au vert ;
+- soumissions au classement validées ou refusées (avec la raison) et nouvelles machines ;
+- résultats de CI des pull requests Dependabot ;
+- releases, publication sur PyPI et déploiements du site ;
+- veille hebdomadaire des versions de glmark2, vkmark, sysbench et Python ;
+- rapport hebdomadaire.
+
+Ces workflows ne lisent que des métadonnées (événement, API GitHub), jamais le code d'une pull
+request. Une notification qui échoue ne fait jamais échouer un workflow.
+
 ## Vie privée
 
 Numéros de série (disques, RAM, système, carte mère), UUID produit, EUI-64/NGUID/WWN des
