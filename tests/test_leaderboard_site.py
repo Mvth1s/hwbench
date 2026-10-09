@@ -2,6 +2,7 @@ import json
 import re
 from dataclasses import replace
 from datetime import UTC, datetime
+from pathlib import Path
 
 from conftest import COOL_AC_STATE, make_result
 from test_compare import disk, export
@@ -75,7 +76,7 @@ def test_site_files_and_escaping(tmp_path) -> None:
     assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &lt;img" in index
     assert 'href="machines/rapide.html">Desktop rapide</a>' in index
     assert "Généré le 05/10/2026 12:00 UTC" in index
-    assert "1 machine(s) non classée(s) ici" in index  # le portable, dans le combiné
+    assert "1 machine non classée ici" in index  # le portable, dans le combiné
 
 
 def test_machine_page_details(tmp_path) -> None:
@@ -104,7 +105,7 @@ def test_cli_site(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
     out = tmp_path / "_site"
     assert cli.main(["site", "--results", str(results_dir(tmp_path)), "--out", str(out)]) == 0
-    assert "4 machine(s)" in capsys.readouterr().out
+    assert "(4 machines)" in capsys.readouterr().out
     assert (out / "index.html").exists()
 
 
@@ -234,3 +235,18 @@ def test_settings_note() -> None:
     note = settings_note(RunSettings(runs=5, max_warmup_s=180.0))
     assert "runs 5 au lieu de 3" in note
     assert "plafond du warm-up 180 s au lieu de défaut" in note
+
+
+def test_generated_site_has_no_ambiguous_plural(tmp_path) -> None:
+    out = tmp_path / "_site"
+    build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW)
+    for page in [out / "index.html", *(out / "machines").glob("*.html")]:
+        assert "(s)" not in page.read_text(), page.name
+    assert "4 machines." in (out / "index.html").read_text()
+
+
+def test_real_site_has_no_ambiguous_plural(tmp_path) -> None:
+    out = tmp_path / "_site"
+    build_site(Path(__file__).parents[1] / "results", out, REFERENCE, generated=NOW)
+    for page in [out / "index.html", *(out / "machines").glob("*.html")]:
+        assert "(s)" not in page.read_text(), page.name

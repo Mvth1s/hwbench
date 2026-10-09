@@ -24,6 +24,7 @@ from hwbench.leaderboard.validate import (
 )
 from hwbench.report.html import e, page
 from hwbench.report.sections import Context, render_sections
+from hwbench.report.texts import plural
 from hwbench.results import COMBINED_CATEGORIES, Category, gpu_name
 from hwbench.runner import RunSettings
 from hwbench.scoring import Reference, Scores, score_results
@@ -173,8 +174,9 @@ def render_index(
     for key, label, category in tabs:
         ranked = ranking(entries, category)
         unranked = len(entries) - len(ranked)
+        unranked_text = plural(unranked, "machine non classée", "machines non classées")
         note = (
-            f'<p class="muted small">{unranked} machine(s) non classée(s) ici : catégorie non '
+            f'<p class="muted small">{unranked_text} ici : catégorie non '
             "mesurée, non comparable à la référence"
             + (", ou score combiné calculé sans GPU" if category is None else "")
             + ".</p>"
@@ -190,8 +192,9 @@ def render_index(
         if skipped
         else ""
     )
+    count = plural(len(entries), "machine", "machines")
     body = f"""<h1>hwbench · classement</h1>
-<p class="muted">{len(entries)} machine(s). Benchmarks CPU et GPU notés contre une machine de
+<p class="muted">{count}. Benchmarks CPU et GPU notés contre une machine de
 référence (1000 points). Score combiné : moyenne géométrique des trois catégories. Mémoire et
 disque : information, hors classement.</p>
 <div class="tabs">{radios}{"".join(panels)}</div>

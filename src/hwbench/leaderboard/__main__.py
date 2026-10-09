@@ -9,6 +9,7 @@ from pathlib import Path
 
 from hwbench.leaderboard.site import build_site, load_entries, ranking
 from hwbench.leaderboard.validate import validate_file
+from hwbench.report.texts import plural
 from hwbench.scoring import load_reference
 
 
@@ -39,7 +40,8 @@ def _validate(files: list[Path]) -> int:
         else:
             print(f"✓ {path}")
     if failed:
-        print(f"\n{failed} fichier(s) refusé(s) sur {len(files)}.", file=sys.stderr)
+        refused = plural(failed, "fichier refusé", "fichiers refusés")
+        print(f"\n{refused} sur {len(files)}.", file=sys.stderr)
     return 1 if failed else 0
 
 
@@ -49,7 +51,7 @@ def _site(results: Path, out: Path) -> int:
         print("Erreur : pas de référence dans le paquet.", file=sys.stderr)
         return 2
     entries = build_site(results, out, reference)
-    print(f"Site écrit dans {out} ({len(entries)} machine(s)).")
+    print(f"Site écrit dans {out} ({plural(len(entries), 'machine', 'machines')}).")
     return 0
 
 

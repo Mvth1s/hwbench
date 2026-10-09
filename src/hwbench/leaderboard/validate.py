@@ -173,7 +173,8 @@ def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     keys = [k for k, _ in pairs]
     duplicates = sorted({k for k in keys if keys.count(k) > 1})
     if duplicates:
-        raise ValueError(f"clé(s) en double : {', '.join(duplicates)}")
+        label = "clé en double" if len(duplicates) == 1 else "clés en double"
+        raise ValueError(f"{label} : {', '.join(duplicates)}")
     return dict(pairs)
 
 
