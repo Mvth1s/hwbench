@@ -3,8 +3,9 @@ les valeurs mesurées et les seuils de la session. Aucune cause non mesurée.
 """
 
 from hwbench.analysis import Finding, FindingCode, Status
-from hwbench.display.bench import disk_size_label
 from hwbench.display.fmt import num
+from hwbench.labels import CATEGORY_LABELS, PROFILE_LABELS, bench_label, disk_size_label
+from hwbench.results import Category
 
 STATUS_LABELS = {
     Status.FIX: "À corriger",
@@ -13,28 +14,7 @@ STATUS_LABELS = {
     Status.INFO: "Information",
 }
 
-# Noms lisibles des benchs ; un bench inconnu garde son nom technique.
-BENCH_LABELS = {
-    "native-cpu-single": "CPU single-core (natif)",
-    "native-cpu-multi": "CPU multi-cœur (natif)",
-    "sysbench-cpu-single": "CPU single-core (sysbench)",
-    "sysbench-cpu-multi": "CPU multi-cœur (sysbench)",
-    "glmark2": "GPU OpenGL (glmark2)",
-    "vkmark": "GPU Vulkan (vkmark)",
-    "native-memory-single": "mémoire, un processus (natif)",
-    "native-memory-multi": "mémoire, multi-processus (natif)",
-    "sysbench-memory-single": "mémoire, un thread (sysbench)",
-    "sysbench-memory-multi": "mémoire, multi-thread (sysbench)",
-    "fio-disk": "disque (fio)",
-}
-
-PROFILE_LABELS = {"platform_profile": "profil plateforme", "energy_performance_preference": "EPP"}
 NEEDS_ROOT_LABELS = {"ram_modules": "barrettes RAM", "smart": "santé SMART des disques"}
-CATEGORY_LABELS = {"memory": "mémoire", "disk": "disque"}
-
-
-def bench_label(name: str) -> str:
-    return BENCH_LABELS.get(name, name)
 
 
 def _list(parts: list[str]) -> str:
@@ -155,7 +135,7 @@ def finding_text(finding: Finding) -> str:
         case FindingCode.NO_REFERENCE:
             return "Aucune machine de référence : les scores sont des valeurs brutes, sans points."
         case FindingCode.NOT_IN_REFERENCE:
-            categories = _list([CATEGORY_LABELS.get(c, c) for c in p["categories"]])
+            categories = _list([CATEGORY_LABELS[Category(c)].lower() for c in p["categories"]])
             return (
                 f"Catégories d'information sans points ({categories}) : la référence ne les "
                 "contient pas encore, les valeurs restent brutes."

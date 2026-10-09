@@ -136,7 +136,11 @@ RunsOption = Annotated[
 ]
 WorkersOption = Annotated[
     int | None,
-    typer.Option("--workers", min=1, help="Parallélisme du multi-cœur (défaut : CPU logiques)."),
+    typer.Option(
+        "--workers",
+        min=1,
+        help="Parallélisme du CPU multi-core et de la mémoire (défaut : CPU logiques).",
+    ),
 ]
 MaxWarmupOption = Annotated[
     float | None,
@@ -145,7 +149,7 @@ MaxWarmupOption = Annotated[
         min=0,
         help=(
             "Plafond du warm-up en secondes (défaut : 30 single-core et mémoire, "
-            "90 multi-cœur et GPU, 60 disque)."
+            "90 CPU multi-core et GPU, 60 disque)."
         ),
     ),
 ]

@@ -4,9 +4,14 @@ from pathlib import Path
 
 from test_analysis import RESULTS
 
+from hwbench import labels
 from hwbench.analysis import Finding, FindingCode, Status, analyze
+from hwbench.display import bench, compare, scores
 from hwbench.export import load_export
+from hwbench.leaderboard import site
+from hwbench.report import texts
 from hwbench.report.texts import STATUS_LABELS, bench_label, finding_text, synthesis
+from hwbench.results import Category
 
 
 def test_every_code_and_status_has_a_text() -> None:
@@ -125,7 +130,7 @@ def test_dell_synthesis() -> None:
     sentences = synthesis(analyze(load_export(RESULTS / "dell-latitude-5420.json")))
     assert sentences[:3] == [
         "4 tests ont démarré à 70 °C ou plus (seuil de départ chaud), chacun juste après un "
-        "autre test : CPU single-core (sysbench) à 71 °C, CPU multi-cœur (sysbench) à 72 °C, "
+        "autre test : CPU single-core (sysbench) à 71 °C, CPU multi-core (sysbench) à 72 °C, "
         "GPU OpenGL (glmark2) à 72 °C et GPU Vulkan (vkmark) à 70 °C.",
         "Mesures instables pour 2 tests : GPU OpenGL (glmark2) avec un CV de 8,8 % et GPU "
         "Vulkan (vkmark) avec un CV de 17,0 %, au-delà du seuil de 5 %. Ces scores sont à "
@@ -140,3 +145,11 @@ def test_dell_synthesis() -> None:
 def test_synthesis_limit() -> None:
     findings = analyze(load_export(Path(RESULTS) / "dell-latitude-5420.json"))
     assert len(synthesis(findings, limit=2)) == 2
+
+
+def test_one_label_table_for_terminal_report_and_site() -> None:
+    for module in (bench, scores, compare, site):
+        assert module.CATEGORY_LABELS is labels.CATEGORY_LABELS
+    assert texts.bench_label is labels.bench_label
+    assert labels.CATEGORY_LABELS[Category.CPU_MULTI] == "CPU multi-core"
+    assert all("cœur" not in label for label in labels.BENCH_LABELS.values())

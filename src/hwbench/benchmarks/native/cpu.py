@@ -100,7 +100,7 @@ def _worker(workloads: tuple[Any, ...], barrier: Barrier, queue: Any) -> None:
 
 
 def run_parallel(
-    workloads: tuple[Any, ...], n: int, what: str = "multi-cœur"
+    workloads: tuple[Any, ...], n: int, what: str = "CPU multi-core"
 ) -> tuple[dict[str, float], float]:
     """Les mêmes charges sur n processus (spawn), démarrage et préparation hors chrono.
 

@@ -11,9 +11,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from hwbench.display.bench import DETAIL_LABELS, disk_size_label
 from hwbench.display.fmt import compact, fr_date, measure, num
 from hwbench.export import ExportError, MachineExport, from_dict
+from hwbench.labels import CATEGORY_LABELS, DETAIL_LABELS, UNIT_LABELS, disk_size_label
 from hwbench.leaderboard.validate import (
     SubmissionError,
     read_bounded,
@@ -23,16 +23,8 @@ from hwbench.leaderboard.validate import (
 from hwbench.results import COMBINED_CATEGORIES, Category, Result, gpu_name
 from hwbench.scoring import Reference, Scores, score_results
 
-CATEGORY_LABELS = {
-    Category.CPU_SINGLE: "CPU single-core",
-    Category.CPU_MULTI: "CPU multi-core",
-    Category.GPU: "GPU",
-    Category.MEMORY: "Mémoire",
-    Category.DISK: "Disque",
-}
 # Mémoire et disque : colonnes d'information, jamais classées ni dans le combiné
 INFO_CATEGORIES = tuple(c for c in Category if c not in COMBINED_CATEGORIES)
-UNIT_LABELS = {"MiB/s": "Mio/s", "index": "indice brut"}
 # favicon intégré (data URI) : aucune requête externe
 FAVICON = (
     "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
