@@ -86,7 +86,7 @@ def known_backends() -> set[str]:
 
 
 def select(categories: Iterable[Category], backend: str) -> list[type[Benchmark]]:
-    """Benchs voulus, par catégorie (single, multi, GPU) puis natif d'abord."""
+    """Benchs voulus, par catégorie (ordre de Category) puis natif d'abord."""
     wanted = set(categories)
     order = list(Category)
     return sorted(

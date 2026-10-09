@@ -5,14 +5,16 @@ from rich.text import Text
 
 from hwbench.display.bench import CATEGORY_LABELS
 from hwbench.display.fmt import num
-from hwbench.results import Availability, BackendId, Category
+from hwbench.results import COMBINED_CATEGORIES, Availability, BackendId, Category
 from hwbench.scoring import BackendScore, CategoryScore, CombinedScore, ScoreIssue, Scores
 
 ISSUE_LABELS = {
     ScoreIssue.NOT_IN_REFERENCE: "absent de la référence",
     ScoreIssue.VERSION_MISMATCH: "version du bench différente de la référence",
     ScoreIssue.TOOL_VERSION_MISMATCH: "version de l'outil différente de la référence",
-    ScoreIssue.PRESENTATION_MISMATCH: "mode de présentation différent de la référence",
+    ScoreIssue.PRESENTATION_MISMATCH: (
+        "mode de présentation (ou taille du fichier disque) différent de la référence"
+    ),
     ScoreIssue.BACKENDS_DIFFER: "backends différents de la référence",
     ScoreIssue.CATEGORY_NOT_COMPARABLE: "une catégorie n'est pas comparable",
     ScoreIssue.CPU_NOT_MEASURED: "CPU single-core et multi-core requis",
@@ -29,6 +31,7 @@ INSTALL_HINTS = {
     # Debian/Ubuntu découpent glmark2 : glmark2-x11 fournit /usr/bin/glmark2
     "glmark2": "sudo dnf install glmark2  |  sudo apt install glmark2-wayland glmark2-x11",
     "vkmark": "sudo dnf install vkmark  |  sudo apt install vkmark",
+    "fio": "sudo dnf install fio  |  sudo apt install fio",
 }
 
 NOT_COMPARABLE = "non comparable"
@@ -54,10 +57,19 @@ def _backend_row(t: Table, s: BackendScore) -> None:
     t.add_row(f"  {s.backend.label()}", Text.assemble(value, (note, "dim")))
 
 
+INFO_NOTE = "  (information, hors score combiné)"
+
+
 def _category_row(t: Table, c: CategoryScore) -> None:
     label = CATEGORY_LABELS[c.category]
+    info = c.category not in COMBINED_CATEGORIES
     if c.points is not None:
-        t.add_row(label, Text(points(c.points), style="bold"))
+        t.add_row(
+            label, Text.assemble((points(c.points), "bold"), (INFO_NOTE if info else "", "dim"))
+        )
+    elif info and c.issue is ScoreIssue.NOT_IN_REFERENCE:
+        # pas encore dans la référence : les valeurs brutes des benchs font foi
+        t.add_row(label, Text("valeurs brutes (pas encore dans la référence)", "dim"))
     else:
         t.add_row(label, _not_comparable(c.issue))
     if c.issue is ScoreIssue.BACKENDS_DIFFER:
@@ -101,7 +113,7 @@ def render_scores(scores: Scores) -> Panel:
     t = Table.grid(padding=(0, 2))
     t.add_column(style="bold cyan", no_wrap=True)
     t.add_column()
-    for category in (Category.CPU_SINGLE, Category.CPU_MULTI, Category.GPU):
+    for category in Category:
         cat = next((c for c in scores.categories if c.category is category), None)
         rows = [s for s in scores.backends if s.category is category]
         if cat is not None:

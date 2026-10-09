@@ -15,7 +15,7 @@ from hwbench.export import MachineExport
 from hwbench.results import BackendId, Category, Result, driver_key, gpu_key
 from hwbench.scoring import CategoryScore, CombinedScore, ScoreIssue
 
-CATEGORY_ORDER = (Category.CPU_SINGLE, Category.CPU_MULTI, Category.GPU)
+CATEGORY_ORDER = tuple(Category)
 
 
 class Incomparable(StrEnum):

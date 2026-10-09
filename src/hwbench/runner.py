@@ -16,6 +16,8 @@ DEFAULT_MAX_WARMUP_S = {
     Category.CPU_SINGLE: 30.0,
     Category.CPU_MULTI: 90.0,
     Category.GPU: 90.0,
+    Category.MEMORY: 30.0,
+    Category.DISK: 60.0,  # un run fio dure ~10 s (4 tests de 2 s)
 }
 
 

@@ -17,7 +17,7 @@ from hwbench.export import (
     to_dict,
     write_export,
 )
-from hwbench.results import BenchWarning, Category
+from hwbench.results import COMBINED_CATEGORIES, BenchWarning
 from hwbench.scoring import score_results
 
 NOW = datetime(2026, 9, 30, 8, 0, tzinfo=UTC)
@@ -45,7 +45,7 @@ def test_roundtrip_through_a_file(laptop_export, tmp_path) -> None:
     loaded = load_export(path)
     assert loaded == laptop_export  # dataclasses reconstruites, enums et clés compris
     assert loaded.combined is not None
-    assert loaded.combined.weights == {c: pytest.approx(1 / 3) for c in Category}
+    assert loaded.combined.weights == {c: pytest.approx(1 / 3) for c in COMBINED_CATEGORIES}
     assert loaded.results[0].warnings == [BenchWarning.HOT_START]
 
 

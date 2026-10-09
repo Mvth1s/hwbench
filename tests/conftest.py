@@ -252,12 +252,17 @@ def make_result(
     presentation: str | None = None,
     **overrides: Any,
 ) -> Result:
-    """Result minimal ; backend et catégorie déduits du nom (« native-cpu-multi », « vkmark »)."""
+    """Result minimal ; backend et catégorie déduits du nom (« native-cpu-multi », « vkmark »,
+    « sysbench-memory-single », « fio-disk »)."""
     if backend is None:
         backend = "native" if name.startswith("native-") else name.split("-")[0]
     if category is None:
         category = (
-            Category.CPU_SINGLE
+            Category.MEMORY
+            if "-memory-" in name
+            else Category.DISK
+            if name.startswith("fio")
+            else Category.CPU_SINGLE
             if name.endswith("single")
             else Category.CPU_MULTI
             if name.endswith("multi")

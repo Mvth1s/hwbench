@@ -9,6 +9,14 @@ class Category(StrEnum):
     CPU_SINGLE = "cpu_single"
     CPU_MULTI = "cpu_multi"
     GPU = "gpu"
+    # Catégories d'information : notées contre la référence si elle les contient, jamais dans le
+    # score combiné ni dans le classement (COMBINED_CATEGORIES).
+    MEMORY = "memory"
+    DISK = "disk"
+
+
+# Catégories du score combiné et du classement, dans l'ordre d'affichage.
+COMBINED_CATEGORIES = (Category.CPU_SINGLE, Category.CPU_MULTI, Category.GPU)
 
 
 class BenchWarning(StrEnum):
@@ -68,7 +76,8 @@ def gpu_key(renderer: str | None) -> str | None:
 @dataclass(frozen=True)
 class BackendId:
     """Ce qui rend deux mesures comparables : même bench, même version, même version d'outil,
-    même mode de présentation (hors écran, headless, à l'écran)."""
+    même mode de présentation (GPU : hors écran, headless, à l'écran ; disque : taille du
+    fichier de test)."""
 
     name: str
     version: str
@@ -138,7 +147,7 @@ class Result:
     backend: str
     version: str
     tool_version: str | None  # version de l'outil externe (None pour le natif)
-    presentation: str | None  # GPU : offscreen, headless, immediate-requested
+    presentation: str | None  # GPU : offscreen, headless… ; disque : taille du fichier (1GiB)
     unit: str
     higher_is_better: bool
     value: float  # médiane des runs

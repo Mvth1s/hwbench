@@ -204,7 +204,10 @@ def test_weights() -> None:
     assert combined.weights == {Category.CPU_SINGLE: 0.25, Category.CPU_MULTI: 0.75}
 
 
-@pytest.mark.parametrize("text", ["cpu-single=-1", "gpu", "ram=1", "cpu-single=0,cpu-multi=0"])
+@pytest.mark.parametrize(
+    "text",
+    ["cpu-single=-1", "gpu", "ram=1", "cpu-single=0,cpu-multi=0", "memory=1", "disk=2"],
+)
 def test_invalid_weights(text: str) -> None:
     with pytest.raises(ValueError):
         parse_weights(text)
@@ -373,3 +376,59 @@ def test_scores_panel_other_gpu_shows_driver_without_warning() -> None:
 def test_gpu_name_keeps_original_case(renderer, expected) -> None:
     assert gpu_name(renderer) == expected
     assert gpu_key(renderer) == (expected.lower() if expected else None)
+
+
+# --- Mémoire et disque : catégories d'information, hors score combiné ----------------------
+
+FIO = dict(tool_version="3.38", presentation="1GiB")
+
+
+def info_results(factor: float = 1.0) -> list[Result]:
+    return [
+        make_result("native-memory-single", 10_000.0 * factor),
+        make_result("native-memory-multi", 40_000.0 * factor),
+        make_result("sysbench-memory-single", 12_000.0 * factor, **SYSBENCH),
+        make_result("fio-disk", 5_000.0 * factor, **FIO),
+    ]
+
+
+def test_memory_and_disk_stay_raw_without_reference_entries() -> None:
+    scores = score_results(machine(2.0) + info_results(), REFERENCE)
+    by_cat = {c.category: c for c in scores.categories}
+    assert by_cat[Category.MEMORY].points is None
+    assert by_cat[Category.MEMORY].issue is ScoreIssue.NOT_IN_REFERENCE
+    assert by_cat[Category.DISK].issue is ScoreIssue.NOT_IN_REFERENCE
+    # le combiné ne bouge pas
+    assert scores.combined is not None and scores.combined.points == pytest.approx(2000)
+    assert set(scores.combined.weights) == {Category.CPU_SINGLE, Category.CPU_MULTI, Category.GPU}
+
+
+def test_memory_and_disk_scored_when_in_reference_but_never_combined() -> None:
+    reference = reference_from_dict(
+        build_reference(reference_results() + info_results(), snapshot(), [])
+    )
+    results = machine(2.0) + [
+        make_result("native-memory-single", 20_000.0),  # 2000 pts
+        make_result("native-memory-multi", 320_000.0),  # 8000 pts
+        make_result("sysbench-memory-single", 1.0, **SYSBENCH),  # information
+        make_result("fio-disk", 500.0, **FIO),  # 100 pts
+    ]
+    scores = score_results(results, reference)
+    by_cat = {c.category: c for c in scores.categories}
+    assert by_cat[Category.MEMORY].points == pytest.approx(4000)  # √(2000 × 8000)
+    assert by_cat[Category.DISK].points == pytest.approx(100)
+    sysbench_memory = next(b for b in scores.backends if b.backend.name == "sysbench-memory-single")
+    assert not sysbench_memory.official
+    assert scores.combined is not None and scores.combined.points == pytest.approx(2000)
+
+
+def test_disk_size_is_part_of_the_identity() -> None:
+    reference = reference_from_dict(build_reference(info_results(), snapshot(), []))
+    other_size = make_result("fio-disk", 5_000.0, tool_version="3.38", presentation="4GiB")
+    score = normalize(other_size, reference)
+    assert (score.points, score.issue) == (None, ScoreIssue.PRESENTATION_MISMATCH)
+
+
+def test_memory_only_has_no_combined_score() -> None:
+    scores = score_results(info_results(), REFERENCE)
+    assert scores.combined is None

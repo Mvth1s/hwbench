@@ -7,7 +7,7 @@ from test_scoring import REFERENCE, machine, payload, snapshot
 
 from hwbench.compare import CompareWarning, Incomparable, compare
 from hwbench.export import MachineExport, build_export
-from hwbench.results import Category, Result
+from hwbench.results import COMBINED_CATEGORIES, Category, Result
 from hwbench.scoring import (
     DEFAULT_WEIGHTS,
     Reference,
@@ -105,7 +105,7 @@ def test_scores_compared_when_same_reference_and_composition() -> None:
     combined = score_row(c, None).cells
     assert [cell.value for cell in combined] == [pytest.approx(1000), pytest.approx(2000)]
     assert combined[1].delta_percent == pytest.approx(100.0)
-    assert [r.category for r in c.scores] == [*Category, None]
+    assert [r.category for r in c.scores] == [*COMBINED_CATEGORIES, None]
 
 
 def test_gpu_score_over_another_backend_list_is_not_comparable() -> None:

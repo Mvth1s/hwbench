@@ -104,6 +104,8 @@ def test_default_caps_per_category() -> None:
     assert settings.warmup_cap(Category.CPU_SINGLE) == 30.0
     assert settings.warmup_cap(Category.CPU_MULTI) == 90.0
     assert RunSettings(max_warmup_s=12).warmup_cap(Category.CPU_MULTI) == 12
+    assert settings.warmup_cap(Category.MEMORY) == 30.0
+    assert settings.warmup_cap(Category.DISK) == 60.0
 
 
 def test_single_core_cap_applies() -> None:
