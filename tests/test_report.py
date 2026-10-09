@@ -1,8 +1,12 @@
 """Rapport HTML : snapshot, aller-retour JSON, hors ligne, vie privée, sections partielles.
 
-Snapshot : tests/fixtures/report/session.html, rendu de session.json (session réelle du Dell,
-schéma 3, complétée par mémoire et disque). Pour l'accepter après un changement voulu du
-gabarit : HWBENCH_UPDATE_SNAPSHOTS=1 .venv/bin/pytest tests/test_report.py
+Snapshot : tests/fixtures/report/session.html, rendu de session.json. Dans cette session, CPU,
+GPU, composants et états machine sont réels (export du Dell, results/dell-latitude-5420.json,
+passé au schéma 3) ; les résultats mémoire et disque sont synthétiques, des valeurs construites
+pour couvrir ces sections (voir tests/fixtures/report/README.md).
+
+Pour accepter le snapshot après un changement voulu du gabarit :
+HWBENCH_UPDATE_SNAPSHOTS=1 .venv/bin/pytest tests/test_report.py
 """
 
 import json
@@ -142,3 +146,25 @@ def test_settings_of_the_session_are_cited() -> None:
     session = load_export(SESSION)
     strict = replace(session, settings=replace(session.settings, high_variance_cv_percent=2.0))
     assert "au-delà du seuil de 2 %" in render_report(strict)
+
+
+def test_conditions_tile_says_why() -> None:
+    html = render_report(load_export(RESULTS / "dell-latitude-5420.json"))
+    assert (
+        '<div class="label">Conditions de mesure</div><div class="value"><span class="status '
+        'status-check">À vérifier</span></div><div class="small muted">4 départs chauds</div>'
+    ) in html
+    b850 = render_report(load_export(RESULTS / "asrock-b850-riptide-wifi.json"))
+    assert 'Fiable</span></div><div class="small muted">secteur, meilleur réglage' in b850
+
+
+def test_start_temperature_row_gives_the_range() -> None:
+    html = render_report(load_export(RESULTS / "dell-latitude-5420.json"))
+    assert "<td>51 à 72 °C</td>" in html
+    assert "4 tests ont démarré à 70 °C ou plus (seuil de départ chaud)." in html
+
+
+@pytest.mark.parametrize("path", [SESSION, *sorted(RESULTS.glob("*.json"))])
+def test_no_ambiguous_plural_or_strict_threshold_wording(path: Path) -> None:
+    html = render_report(load_export(path))
+    assert "(s)" not in html and "au-dessus du seuil" not in html

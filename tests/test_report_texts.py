@@ -119,6 +119,7 @@ def test_every_code_and_status_has_a_text() -> None:
     assert (
         "à 81 °C" in texts[FindingCode.HOT_START]
         and "juste après" not in texts[FindingCode.HOT_START]
+        and texts[FindingCode.HOT_START].startswith("1 test a démarré à 70 °C ou plus")
     )
     assert (
         "CV de 17,0 %" in texts[FindingCode.HIGH_VARIANCE]
@@ -136,8 +137,8 @@ def test_every_code_and_status_has_a_text() -> None:
     ):
         assert texts[code].startswith("Température CPU maximale relevée avant et après chaque test")
     assert texts[FindingCode.CONDITIONS_OK] == (
-        "Conditions conformes pendant tous les tests : sur secteur (pas de batterie) et EPP "
-        "« performance », au meilleur réglage disponible."
+        "Alimentation et réglages d'énergie conformes : sur secteur (pas de batterie) et EPP "
+        "« performance », au meilleur réglage disponible, avant et après chaque test."
     )
 
 
@@ -161,8 +162,9 @@ def test_dell_synthesis() -> None:
         "Mesures instables pour 2 tests : GPU OpenGL (glmark2) avec un CV de 8,8 % et GPU "
         "Vulkan (vkmark) avec un CV de 17,0 %, au-delà du seuil de 5 %. Ces scores sont à "
         "confirmer.",
-        "Conditions conformes pendant tous les tests : sur secteur, profil plateforme "
-        "« performance » et EPP « performance », au meilleur réglage disponible.",
+        "Alimentation et réglages d'énergie conformes : sur secteur, profil plateforme "
+        "« performance » et EPP « performance », au meilleur réglage disponible, avant et "
+        "après chaque test.",
     ]
     assert sentences[3] == (
         "Température CPU maximale relevée avant et après chaque test : 72 °C, sous le seuil "
