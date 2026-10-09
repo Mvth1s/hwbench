@@ -128,7 +128,7 @@ def _page(title: str, body: str, generated: datetime) -> str:
 def _reference_block(reference: Reference) -> str:
     rows = "".join(
         f"<tr><td>{e(entry.id.name)}</td><td>v{e(entry.id.version)}</td>"
-        f"<td>{e(entry.id.tool_version or '—')}</td><td>{e(entry.id.presentation or '—')}</td>"
+        f"<td>{e(entry.tool_version or '—')}</td><td>{e(entry.id.presentation or '—')}</td>"
         f"<td>{e(CATEGORY_LABELS[entry.category])}</td></tr>"
         for entry in reference.entries
     )

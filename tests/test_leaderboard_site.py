@@ -280,3 +280,16 @@ def test_no_re_export_note_without_stale_file(tmp_path) -> None:
     out = tmp_path / "_site"
     build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW)
     assert "à ré-exporter" not in (out / "index.html").read_text()
+
+
+def test_reference_table_lists_recorded_tool_versions() -> None:
+    from test_scoring import _fio_reference
+
+    from hwbench.leaderboard.site import _reference_block
+
+    block = _reference_block(REFERENCE)
+    assert "<td>2023.01</td>" in block and "<td>1.0.20</td>" in block
+    # fio : version hors identité, mais relevée et affichée
+    assert "<td>fio-disk</td><td>v1</td><td>3.42</td><td>1GiB</td>" in _reference_block(
+        _fio_reference()
+    )

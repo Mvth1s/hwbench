@@ -108,6 +108,22 @@ def driver_info(bench: str, driver: str | None, reference_driver: str | None) ->
     return f"{bench} : pilote {driver}{reference}"
 
 
+def tool_notice(s: BackendScore) -> str:
+    """Même disque que la référence, autre version de l'outil : avertissement, jamais bloquant."""
+    return (
+        f"⚠ {s.backend.name} : outil {s.tool_version} (référence : {s.reference_tool_version}, "
+        "même disque). Score calculé quand même ; un changement de version de l'outil peut faire "
+        "varier le résultat."
+    )
+
+
+def tool_info(s: BackendScore) -> str:
+    """Autre disque que la référence : la version de l'outil est une simple information."""
+    reference = s.reference_tool_version
+    suffix = f" (référence : {reference}, autre disque)" if reference else ""
+    return f"{s.backend.name} : outil {s.tool_version}{suffix}"
+
+
 def render_scores(scores: Scores) -> Panel:
     ref = scores.reference
     t = Table.grid(padding=(0, 2))
@@ -137,6 +153,10 @@ def render_scores(scores: Scores) -> Panel:
             parts.append(
                 Text(driver_info(s.backend.name, s.driver, s.reference_driver), style="dim")
             )
+        if s.tool_differs:
+            parts.append(Text(tool_notice(s), style="yellow"))
+        elif s.tool_info:
+            parts.append(Text(tool_info(s), style="dim"))
     if ref.forced:
         parts.append(
             Text(

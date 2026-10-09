@@ -67,6 +67,24 @@ def gpu_name(renderer: str | None) -> str | None:
     return name or None
 
 
+def disk_key(model: str | None) -> str | None:
+    """Clé de comparaison d'un disque : modèle (lsblk) en minuscules, espaces normalisées."""
+    key = " ".join(model.split()).lower() if model else ""
+    return key or None
+
+
+# Benchs dont la version de l'outil est une information, hors identité (comme le pilote GPU) :
+# relevée, affichée, signalée pour un même disque mesuré avec une autre version, mais sans
+# empêcher la notation. fio : options du protocole toutes explicites, comportement inchangé de
+# 3.40 à 3.42 ; le noyau, le système de fichiers et le firmware pèsent bien plus que fio.
+TOOL_VERSION_NOT_IN_IDENTITY = frozenset({"fio-disk"})
+
+
+def identity_tool_version(name: str, tool_version: str | None) -> str | None:
+    """Version de l'outil telle qu'elle entre dans BackendId (None si simple information)."""
+    return None if name in TOOL_VERSION_NOT_IN_IDENTITY else tool_version
+
+
 def gpu_key(renderer: str | None) -> str | None:
     """Clé de comparaison d'un GPU : gpu_name en minuscules (« amd radeon rx 9070 xt »)."""
     name = gpu_name(renderer)
@@ -75,9 +93,9 @@ def gpu_key(renderer: str | None) -> str | None:
 
 @dataclass(frozen=True)
 class BackendId:
-    """Ce qui rend deux mesures comparables : même bench, même version, même version d'outil,
-    même mode de présentation (GPU : hors écran, headless, à l'écran ; disque : taille du
-    fichier de test)."""
+    """Ce qui rend deux mesures comparables : même bench, même version, même version d'outil
+    (sauf TOOL_VERSION_NOT_IN_IDENTITY), même mode de présentation (GPU : hors écran, headless,
+    à l'écran ; disque : taille du fichier de test)."""
 
     name: str
     version: str
@@ -169,7 +187,12 @@ class Result:
 
     @property
     def backend_id(self) -> BackendId:
-        return BackendId(self.name, self.version, self.tool_version, self.presentation)
+        return BackendId(
+            self.name,
+            self.version,
+            identity_tool_version(self.name, self.tool_version),
+            self.presentation,
+        )
 
     @property
     def cv_percent(self) -> float:
