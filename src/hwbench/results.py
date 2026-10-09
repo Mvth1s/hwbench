@@ -128,14 +128,14 @@ class MachineState:
         """
         issues: list[str] = []
         profile = self.platform_profile
-        if profile is not None and profile != "custom" and profile != self._best_profile():
+        if profile is not None and profile != "custom" and profile != self.best_profile():
             issues.append("platform_profile")
         epp = self.energy_performance_preference
         if epp is not None and epp != "performance":
             issues.append("energy_performance_preference")
         return issues
 
-    def _best_profile(self) -> str:
+    def best_profile(self) -> str:
         known = [c for c in self.platform_profile_choices if c in PLATFORM_PROFILE_ORDER]
         return max(known, key=PLATFORM_PROFILE_ORDER.index, default="performance")
 

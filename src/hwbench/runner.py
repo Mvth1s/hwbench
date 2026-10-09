@@ -28,6 +28,7 @@ class RunSettings:
     warmup_tolerance_percent: float = 3.0
     high_variance_cv_percent: float = 5.0
     hot_start_c: float = 70.0
+    reliable_cv_percent: float = 1.0  # rapport : « très reproductible » sous ce CV
 
     def __post_init__(self) -> None:
         if self.runs < MIN_RUNS:

@@ -4,68 +4,23 @@ from rich.table import Table
 from rich.text import Text
 
 from hwbench.display.fmt import measure, num
+from hwbench.labels import (  # noqa: F401 — réexportés pour display/
+    CATEGORY_LABELS,
+    DETAIL_LABELS,
+    ENVIRONMENT_LABELS,
+    PRESENTATION_LABELS,
+    PROFILE_LABELS,
+    UNIT_LABELS,
+    disk_size_label,
+    unit_label,
+)
 from hwbench.results import BenchWarning, Category, MachineState, Result
-
-CATEGORY_LABELS = {
-    Category.CPU_SINGLE: "CPU single-core",
-    Category.CPU_MULTI: "CPU multi-core",
-    Category.GPU: "GPU",
-    Category.MEMORY: "Mémoire",
-    Category.DISK: "Disque",
-}
-
-DETAIL_LABELS = {
-    "sha256": "SHA-256",
-    "zlib": "Compression zlib (niveau 6)",
-    "lzma": "Compression LZMA (preset 1)",
-    "powmod": "Exponentiation modulaire 2048 bits",
-    "seq_read": "Lecture séquentielle (1 Mio, QD8)",
-    "seq_write": "Écriture séquentielle (1 Mio, QD8)",
-    "rand_read_4k": "Lecture aléatoire 4K (QD32)",
-    "rand_write_4k": "Écriture aléatoire 4K (QD32)",
-}
-
-# « index » : moyenne géométrique de débits, sans unité. Les points (référence = 1000) sont
-# calculés par le scoring et affichés à part (display/scores.py).
-UNIT_LABELS = {"MiB/s": "Mio/s", "index": "indice brut"}
-
-PROFILE_LABELS = {"platform_profile": "profil plateforme", "energy_performance_preference": "EPP"}
-
-# Conditions des benchs externes : libellé français devant la valeur brute.
-ENVIRONMENT_LABELS = {
-    "binary": "binaire",
-    "session": "session",
-    "resolution": "résolution",
-    "renderer": "rendu",
-    "driver": "pilote",
-    "cpu-max-prime": "cpu-max-prime",
-    "time": "durée",
-    "block-size": "bloc",
-    "operation": "opération",
-    "filesystem": "système de fichiers",
-    "device": "disque",
-    "ioengine": "moteur d'E/S",
-}
-
-PRESENTATION_LABELS = {
-    "offscreen": "hors écran (sans vsync)",
-    "headless": "headless, sans affichage (sans vsync)",
-    "immediate-requested": "fenêtre, mode immediate demandé (non vérifiable)",
-}
 
 NA = Text("non disponible", style="dim")
 
 
 def _unit(unit: str) -> str:
-    return UNIT_LABELS.get(unit, unit)
-
-
-def disk_size_label(presentation: str) -> str:
-    """« 1GiB » -> « 1 Gio », « 512MiB » -> « 512 Mio » (taille du fichier du bench disque)."""
-    for suffix, label in (("GiB", "Gio"), ("MiB", "Mio")):
-        if presentation.endswith(suffix):
-            return f"{presentation.removesuffix(suffix)} {label}"
-    return presentation
+    return unit_label(unit)
 
 
 def warning_message(

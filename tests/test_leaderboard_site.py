@@ -1,15 +1,24 @@
 import json
 import re
+from dataclasses import replace
 from datetime import UTC, datetime
 
-from conftest import make_result
+from conftest import COOL_AC_STATE, make_result
 from test_compare import disk, export
-from test_scoring import REFERENCE, machine
+from test_scoring import REFERENCE, machine, snapshot
 
-from hwbench.export import to_dict, write_export
+from hwbench.export import build_export, to_dict, write_export
 from hwbench.leaderboard import __main__ as cli
-from hwbench.leaderboard.site import build_site, category_points, load_entries, ranking
+from hwbench.leaderboard.site import (
+    build_site,
+    category_points,
+    load_entries,
+    ranking,
+    settings_note,
+)
 from hwbench.results import Category
+from hwbench.runner import RunSettings
+from hwbench.scoring import score_results
 
 NOW = datetime(2026, 10, 5, 12, 0, tzinfo=UTC)
 EVIL = '<script>alert("x")</script> & <img src=x onerror=alert(1)>'
@@ -145,7 +154,7 @@ def test_gpu_column_and_dates(tmp_path) -> None:
     assert '<td class="small muted">03/10/2026</td>' in index  # date d'export
     assert "(mesurée le 29/09/2026," in index  # date de la référence
     page = (out / "machines" / "rapide.html").read_text()
-    assert "<td>03/10/2026</td>" in page  # « Exporté le »
+    assert "mesuré le 03/10/2026" in page  # en-tête : date de l'export
     assert "Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)" in page  # détail : renderer complet
 
 
@@ -177,4 +186,51 @@ def test_memory_and_disk_are_information_columns(tmp_path) -> None:
     assert 'id="tab-memory"' not in index and 'id="tab-disk"' not in index
     page = (out / "machines" / "infos.html").read_text()
     assert "Mémoire (information)" in page
-    assert "Lecture aléatoire 4K (QD32)" in page and "fichier de 1 Gio" in page
+    assert "Lecture aléatoire 4K (QD32)" in page and "<td>1 Gio</td>" in page
+
+
+def test_machine_page_reuses_the_report_sections(tmp_path) -> None:
+    out = tmp_path / "_site"
+    build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW)
+    page = (out / "machines" / "rapide.html").read_text()
+    for section in ("classement", "synthese", "conditions", "cpu", "fiabilite", "annexe"):
+        assert f'<section id="{section}">' in page, section
+    # pas de recommandations ni de JSON embarqué sur le site
+    assert '<section id="recommandations">' not in page
+    assert "<script" not in page
+
+
+def _with_settings(tmp_path, settings: RunSettings | None) -> str:
+    d = tmp_path / "results"
+    d.mkdir(parents=True)
+    hot = replace(COOL_AC_STATE, cpu_temp_c=66.0)
+    results = [replace(r, state_before=hot) for r in machine(1.0)]
+    scores = score_results(results, REFERENCE)
+    ex = build_export(snapshot(), "Seuils", results, scores, settings=settings)
+    write_export(ex, d / "seuils.json")
+    out = tmp_path / "_site"
+    build_site(d, out, REFERENCE, generated=NOW)
+    return (out / "machines" / "seuils.html").read_text()
+
+
+def test_site_always_applies_the_default_thresholds(tmp_path) -> None:
+    # mesuré avec --hot-start 60 : 66 °C au départ y était « chaud »
+    page = _with_settings(tmp_path, RunSettings(hot_start_c=60.0, high_variance_cv_percent=2.0))
+    assert "Les seuils de la mesure diffèrent des seuils par défaut" in page
+    assert "départ chaud 60 °C au lieu de 70 °C" in page
+    assert "seuil de CV 2 % au lieu de 5 %" in page
+    # le site juge avec 70 °C : aucun départ chaud signalé
+    assert "seuil de départ chaud)" not in page
+    assert "Sous le seuil de départ chaud 70 °C." in page
+
+
+def test_site_notes_default_or_missing_settings(tmp_path) -> None:
+    assert "identiques à ceux de la mesure" in _with_settings(tmp_path / "a", RunSettings())
+    assert "non enregistrés dans ce fichier" in _with_settings(tmp_path / "b", None)
+
+
+def test_settings_note() -> None:
+    assert settings_note(RunSettings()) == "Seuils par défaut, identiques à ceux de la mesure."
+    note = settings_note(RunSettings(runs=5, max_warmup_s=180.0))
+    assert "runs 5 au lieu de 3" in note
+    assert "plafond du warm-up 180 s au lieu de défaut" in note

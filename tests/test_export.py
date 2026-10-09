@@ -1,10 +1,11 @@
 import json
 import re
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 from conftest import make_result
-from test_scoring import REFERENCE, machine
+from test_scoring import REFERENCE, machine, snapshot
 
 from hwbench import privacy
 from hwbench.collect import collect_snapshot
@@ -18,6 +19,7 @@ from hwbench.export import (
     write_export,
 )
 from hwbench.results import COMBINED_CATEGORIES, BenchWarning
+from hwbench.runner import RunSettings
 from hwbench.scoring import score_results
 
 NOW = datetime(2026, 9, 30, 8, 0, tzinfo=UTC)
@@ -51,7 +53,7 @@ def test_roundtrip_through_a_file(laptop_export, tmp_path) -> None:
 
 def test_schema_header(laptop_export) -> None:
     data = to_dict(laptop_export)
-    assert data["schema_version"] == EXPORT_SCHEMA_VERSION == 2
+    assert data["schema_version"] == EXPORT_SCHEMA_VERSION == 3
     assert data["created"] == "2026-09-30T08:00:00+00:00"
     assert data["reference"]["digest"] == REFERENCE.digest
     assert data["categories"][0]["category"] == "cpu_single"  # enums en chaînes
@@ -99,3 +101,39 @@ def test_load_errors_name_the_file(tmp_path) -> None:
         load_export(broken)
     with pytest.raises(ExportError, match="absent.json"):
         load_export(tmp_path / "absent.json")
+
+
+# --- schéma 3 : réglages des mesures ; schéma 2 toujours relu -------------------------------
+
+RESULTS = Path(__file__).parents[1] / "results"
+
+
+def test_settings_roundtrip(tmp_path) -> None:
+    settings = RunSettings(runs=5, hot_start_c=65.0, reliable_cv_percent=0.5)
+    ex = build_export(snapshot(), "m", machine(1.0), None, settings=settings)
+    path = tmp_path / "m.json"
+    write_export(ex, path)
+    assert json.loads(path.read_text())["settings"]["hot_start_c"] == 65.0
+    assert load_export(path).settings == settings
+
+
+def test_schema_2_files_are_still_read_without_settings() -> None:
+    for path in RESULTS.glob("*.json"):
+        assert json.loads(path.read_text())["schema_version"] == 2
+        ex = load_export(path)
+        assert ex.settings is None
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"schema_version": 4}, "schéma d'export 4 non pris en charge (attendu : 2, 3)"),
+        ({"schema_version": True}, "non pris en charge"),
+        ({"settings": {"runs": 1}}, "au moins 3 runs"),
+        ({"schema_version": 2, "settings": {}}, "inattendu dans un schéma 2"),
+    ],
+)
+def test_invalid_schema_or_settings(change: dict, message: str) -> None:
+    data = to_dict(build_export(snapshot(), "m", machine(1.0), None, settings=RunSettings()))
+    with pytest.raises(ExportError, match=re.escape(message)):
+        from_dict(data | change)

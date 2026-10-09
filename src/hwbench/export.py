@@ -17,10 +17,15 @@ from typing import Any, Union, get_args, get_origin, get_type_hints
 from hwbench import __version__, privacy
 from hwbench.models import MachineSnapshot
 from hwbench.results import Result
+from hwbench.runner import RunSettings
 from hwbench.scoring import BackendScore, CategoryScore, CombinedScore, ReferenceInfo, Scores
 
 # 2 : empreinte de référence complète (sha256, 64 hex) au lieu de 12 caractères
-EXPORT_SCHEMA_VERSION = 2
+# 3 : réglages des mesures (RunSettings : seuils, runs, warm-up) dans le champ « settings »
+EXPORT_SCHEMA_VERSION = 3
+# Schémas relus. Un export de schéma 2 n'a pas de réglages : settings vaut None, et le rapport
+# utilise les réglages par défaut en le signalant.
+READABLE_SCHEMA_VERSIONS = (2, 3)
 
 
 class ExportError(ValueError):
@@ -39,6 +44,7 @@ class MachineExport:
     backend_scores: list[BackendScore] = field(default_factory=list)
     categories: list[CategoryScore] = field(default_factory=list)
     combined: CombinedScore | None = None
+    settings: RunSettings | None = None  # None : export de schéma 2, réglages non enregistrés
 
 
 def build_export(
@@ -47,6 +53,7 @@ def build_export(
     results: list[Result],
     scores: Scores | None,
     now: datetime | None = None,
+    settings: RunSettings | None = None,
 ) -> MachineExport:
     return MachineExport(
         schema_version=EXPORT_SCHEMA_VERSION,
@@ -59,6 +66,7 @@ def build_export(
         backend_scores=scores.backends if scores else [],
         categories=scores.categories if scores else [],
         combined=scores.combined if scores else None,
+        settings=settings,
     )
 
 
@@ -123,7 +131,10 @@ def _build(tp: Any, value: Any, where: str) -> Any:
                 kwargs[f.name] = _build(hints[f.name], value[f.name], f"{where}.{f.name}")
             elif f.default is dataclasses.MISSING and f.default_factory is dataclasses.MISSING:
                 raise ExportError(f"{where}.{f.name} : champ manquant")
-        return tp(**kwargs)
+        try:
+            return tp(**kwargs)
+        except ValueError as exc:  # validation du modèle (RunSettings.__post_init__)
+            raise ExportError(f"{where} : {exc}") from exc
     if isinstance(tp, type) and issubclass(tp, Enum):
         try:
             return tp(value)
@@ -146,10 +157,11 @@ def from_dict(payload: Any) -> MachineExport:
     if not isinstance(payload, dict):
         raise ExportError("export invalide : objet JSON attendu")
     version = payload.get("schema_version")
-    if version != EXPORT_SCHEMA_VERSION:
-        raise ExportError(
-            f"schéma d'export {version!r} non pris en charge (attendu : {EXPORT_SCHEMA_VERSION})"
-        )
+    if version not in READABLE_SCHEMA_VERSIONS or isinstance(version, bool):
+        expected = ", ".join(str(v) for v in READABLE_SCHEMA_VERSIONS)
+        raise ExportError(f"schéma d'export {version!r} non pris en charge (attendu : {expected})")
+    if version == 2 and "settings" in payload:
+        raise ExportError("export : champ « settings » inattendu dans un schéma 2")
     return _build(MachineExport, payload, "export")
 
 
