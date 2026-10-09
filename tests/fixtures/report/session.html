@@ -1,0 +1,1367 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+<title>Rapport hwbench · Dell Inc. Latitude 5420</title>
+<style>
+:root { color-scheme: light dark; --fg: #1d2129; --bg: #fff; --muted: #5f6b7a;
+  --line: #d9dee5; --accent: #0b6bcb; --row: #f4f6f9; --data: #0b6bcb;
+  --fix: #b42318; --check: #9a6700; --ok: #1a7f37; --info: #5f6b7a; }
+@media (prefers-color-scheme: dark) { :root { --fg: #e6e9ee; --bg: #14171c;
+  --muted: #9aa5b4; --line: #2c323b; --accent: #5aa9ff; --row: #1b1f26; --data: #5aa9ff;
+  --fix: #ff7b72; --check: #e3b341; --ok: #56d364; --info: #9aa5b4; } }
+* { box-sizing: border-box; }
+body { margin: 0 auto; max-width: 1100px; padding: 24px 16px; font: 15px/1.5 system-ui,
+  sans-serif; color: var(--fg); background: var(--bg); }
+h1 { margin: 0 0 4px; } h2 { margin-top: 32px; } h3 { margin-top: 20px; }
+a { color: var(--accent); }
+.muted { color: var(--muted); } .small { font-size: 13px; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line);
+  vertical-align: top; }
+tbody tr:nth-child(odd) { background: var(--row); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+code, pre { font: 13px/1.4 ui-monospace, monospace; }
+pre { padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; overflow-x: auto; }
+abbr[title] { text-decoration: underline dotted; cursor: help; }
+.tabs > input { position: absolute; opacity: 0; }
+.tabs > label { display: inline-block; padding: 6px 14px; margin: 0 4px 0 0;
+  border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.tabs > input:checked + label { background: var(--accent); color: var(--bg);
+  border-color: var(--accent); }
+.tabs > input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+.panel { display: none; }
+#tab-combined:checked ~ #panel-combined, #tab-cpu_single:checked ~ #panel-cpu_single,
+#tab-cpu_multi:checked ~ #panel-cpu_multi, #tab-gpu:checked ~ #panel-gpu { display: block; }
+.status { display: inline-block; padding: 0 8px; border: 1px solid currentColor;
+  border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.status-fix { color: var(--fix); } .status-check { color: var(--check); }
+.status-ok { color: var(--ok); } .status-info { color: var(--info); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px; margin: 16px 0; }
+.tile { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.tile .label { color: var(--muted); font-size: 13px; }
+.tile .value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+ul.findings { list-style: none; padding: 0; }
+ul.findings li { margin: 8px 0; }
+figure { margin: 12px 0; }
+figure svg { width: 100%; height: auto; max-width: 720px; }
+figcaption { color: var(--muted); font-size: 13px; }
+svg text { fill: var(--fg); font: 12px system-ui, sans-serif; }
+svg .bar { fill: var(--data); } svg .grid { stroke: var(--line); }
+svg .temp { stroke: var(--data); stroke-width: 2; fill: none; }
+svg .dot { fill: var(--data); } svg .band { fill: var(--row); }
+svg .limit { stroke: var(--fix); stroke-dasharray: 4 3; }
+table.values { width: auto; font-size: 13px; }
+@media print { body { max-width: none; padding: 0; color: #000; background: #fff; }
+  a { color: inherit; text-decoration: none; } .tile, pre { break-inside: avoid; }
+  h2 { break-after: avoid; } figure { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<header><h1>Dell Inc. Latitude 5420</h1><p class="muted">11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz · Mesa Intel(R) Iris(R) Xe Graphics · mesuré le 09/10/2026 · hwbench 0.5.0 · 5 min de tests</p></header>
+<div class="tiles"><div class="tile"><div class="label">Score combiné</div><div class="value">212 pts</div><div class="small muted">référence ASRock B850 Riptide WiFi = 1000</div></div><div class="tile"><div class="label">CPU single-core</div><div class="value">702 pts</div></div><div class="tile"><div class="label">CPU multi-core</div><div class="value">234 pts</div></div><div class="tile"><div class="label">GPU</div><div class="value">58 pts</div></div><div class="tile"><div class="label">Conditions</div><div class="value"><span class="status status-check">À vérifier</span></div></div></div>
+<section id="synthese"><h2>Synthèse</h2><ul class="findings"><li><span class="status status-check">À vérifier</span> 4 tests ont démarré à 70 °C ou plus (seuil de départ chaud), chacun juste après un autre test : CPU single-core (sysbench) à 71 °C, CPU multi-core (sysbench) à 72 °C, GPU OpenGL (glmark2) à 72 °C et GPU Vulkan (vkmark) à 70 °C.</li><li><span class="status status-check">À vérifier</span> Mesures instables pour 2 tests : GPU OpenGL (glmark2) avec un CV de 8,8 % et GPU Vulkan (vkmark) avec un CV de 17,0 %, au-delà du seuil de 5 %. Ces scores sont à confirmer.</li><li><span class="status status-ok">Fiable</span> Conditions conformes pendant tous les tests : sur secteur, profil plateforme « performance » et EPP « performance », au meilleur réglage disponible.</li><li><span class="status status-ok">Fiable</span> Température CPU maximale relevée avant et après chaque test : 72 °C, sous le seuil haut du capteur (100 °C).</li><li><span class="status status-info">Information</span> Le processeur (bench natif) va 3,0 fois plus vite sur 8 processus que sur un seul (4 cœurs / 8 threads).</li></ul></section>
+<section id="conditions"><h2>Conditions de mesure</h2><table><thead><tr><th>Élément</th><th>Valeur</th><th>Statut</th><th>Constat</th></tr></thead><tbody><tr><td>Alimentation</td><td>secteur</td><td><span class="status status-ok">Fiable</span></td><td>Sur secteur avant et après chaque test.</td></tr><tr><td>Profil plateforme</td><td>performance</td><td><span class="status status-ok">Fiable</span></td><td>Meilleur réglage disponible.</td></tr><tr><td>EPP</td><td>performance</td><td><span class="status status-ok">Fiable</span></td><td>Meilleur réglage disponible.</td></tr><tr><td>Governor</td><td>performance</td><td><span class="status status-info">Information</span></td><td>Affiché pour information, non jugé seul.</td></tr><tr><td>Température de départ</td><td>51 °C</td><td><span class="status status-check">À vérifier</span></td><td>4 test(s) ont démarré au-dessus du seuil de départ chaud 70 °C.</td></tr></tbody></table><p class="muted small">Seuils appliqués : CV 5 % (mesures instables), 1 % (très reproductibles), départ chaud 70 °C, tolérance du warm-up 3 %, 3 runs.</p></section>
+<section id="cpu"><h2>Processeur</h2><table><thead><tr><th>Test</th><th class="num">Valeur (médiane)</th><th class="num">Points</th><th class="num">CV</th><th class="num">Processus / threads</th></tr></thead><tbody><tr><td>CPU single-core (natif)</td><td class="num">86,2 indice brut</td><td class="num">702 pts</td><td class="num">4,5 %</td><td class="num">—</td></tr><tr><td>CPU single-core (sysbench)</td><td class="num">3282,4 events/s</td><td class="num">591 pts</td><td class="num">0,8 %</td><td class="num">—</td></tr><tr><td>CPU multi-core (natif)</td><td class="num">262,5 indice brut</td><td class="num">234 pts</td><td class="num">2,3 %</td><td class="num">8</td></tr><tr><td>CPU multi-core (sysbench)</td><td class="num">10461 events/s</td><td class="num">232 pts</td><td class="num">2,6 %</td><td class="num">8</td></tr></tbody></table><p>Le processeur (bench natif) va 3,0 fois plus vite sur 8 processus que sur un seul (4 cœurs / 8 threads).</p><p>Le processeur (sysbench) va 3,2 fois plus vite sur 8 threads que sur un seul (4 cœurs / 8 threads).</p><h3>CPU single-core (natif) : détail (Mio/s)</h3><figure><svg viewBox="0 0 720 86" role="img" aria-label="CPU single-core (natif) : détail (Mio/s)"><title>CPU single-core (natif) : détail (Mio/s)</title><text x="252" y="21.0" text-anchor="end">SHA-256</text><rect class="bar" x="260" y="8.0" width="350.0" height="18"/><text x="616.0" y="21.0">1566,2 Mio/s</text><text x="252" y="47.0" text-anchor="end">Compression zlib (niveau 6)</text><rect class="bar" x="260" y="34.0" width="17.4" height="18"/><text x="283.4" y="47.0">77,8 Mio/s</text><text x="252" y="73.0" text-anchor="end">Compression LZMA (preset 1)</text><rect class="bar" x="260" y="60.0" width="2.6" height="18"/><text x="268.6" y="73.0">11,4 Mio/s</text></svg></figure><table class="values"><thead><tr><th>Mesure</th><th class="num">Valeur</th></tr></thead><tbody><tr><td>SHA-256</td><td class="num">1566,2 Mio/s</td></tr><tr><td>Compression zlib (niveau 6)</td><td class="num">77,8 Mio/s</td></tr><tr><td>Compression LZMA (preset 1)</td><td class="num">11,4 Mio/s</td></tr></tbody></table><h3>CPU single-core (natif) : détail (op/s)</h3><figure><svg viewBox="0 0 720 34" role="img" aria-label="CPU single-core (natif) : détail (op/s)"><title>CPU single-core (natif) : détail (op/s)</title><text x="252" y="21.0" text-anchor="end">Exponentiation modulaire 2048 bits</text><rect class="bar" x="260" y="8.0" width="350.0" height="18"/><text x="616.0" y="21.0">41,1 op/s</text></svg></figure><table class="values"><thead><tr><th>Mesure</th><th class="num">Valeur</th></tr></thead><tbody><tr><td>Exponentiation modulaire 2048 bits</td><td class="num">41,1 op/s</td></tr></tbody></table><h3>CPU multi-core (natif) : détail (Mio/s)</h3><figure><svg viewBox="0 0 720 86" role="img" aria-label="CPU multi-core (natif) : détail (Mio/s)"><title>CPU multi-core (natif) : détail (Mio/s)</title><text x="252" y="21.0" text-anchor="end">SHA-256</text><rect class="bar" x="260" y="8.0" width="350.0" height="18"/><text x="616.0" y="21.0">5093,3 Mio/s</text><text x="252" y="47.0" text-anchor="end">Compression zlib (niveau 6)</text><rect class="bar" x="260" y="34.0" width="15.3" height="18"/><text x="281.3" y="47.0">222,3 Mio/s</text><text x="252" y="73.0" text-anchor="end">Compression LZMA (preset 1)</text><rect class="bar" x="260" y="60.0" width="1.9" height="18"/><text x="267.9" y="73.0">27,6 Mio/s</text></svg></figure><table class="values"><thead><tr><th>Mesure</th><th class="num">Valeur</th></tr></thead><tbody><tr><td>SHA-256</td><td class="num">5093,3 Mio/s</td></tr><tr><td>Compression zlib (niveau 6)</td><td class="num">222,3 Mio/s</td></tr><tr><td>Compression LZMA (preset 1)</td><td class="num">27,6 Mio/s</td></tr></tbody></table><h3>CPU multi-core (natif) : détail (op/s)</h3><figure><svg viewBox="0 0 720 34" role="img" aria-label="CPU multi-core (natif) : détail (op/s)"><title>CPU multi-core (natif) : détail (op/s)</title><text x="252" y="21.0" text-anchor="end">Exponentiation modulaire 2048 bits</text><rect class="bar" x="260" y="8.0" width="350.0" height="18"/><text x="616.0" y="21.0">154,0 op/s</text></svg></figure><table class="values"><thead><tr><th>Mesure</th><th class="num">Valeur</th></tr></thead><tbody><tr><td>Exponentiation modulaire 2048 bits</td><td class="num">154,0 op/s</td></tr></tbody></table></section>
+<section id="gpu"><h2>Carte graphique</h2><h3>GPU OpenGL (glmark2)</h3><table><tbody><tr><th>Score (médiane)</th><td>261,0 fps</td></tr><tr><th>Points</th><td>72 pts</td></tr><tr><th>Outil</th><td>glmark2 2023.01</td></tr><tr><th>Résolution</th><td>3840x2160</td></tr><tr><th>Présentation</th><td>hors écran (sans vsync)</td></tr><tr><th>Pilote</th><td>Mesa 26.2.3</td></tr><tr><th>Rendu</th><td>Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)</td></tr></tbody></table><figure><svg viewBox="0 0 720 216" role="img" aria-label="GPU OpenGL (glmark2) : fps par scène"><title>GPU OpenGL (glmark2) : fps par scène</title><text x="252" y="21.0" text-anchor="end">effect2d-edge</text><rect class="bar" x="260" y="8.0" width="341.1" height="18"/><text x="607.1" y="21.0">459,0 fps</text><text x="252" y="47.0" text-anchor="end">effect2d-blur</text><rect class="bar" x="260" y="34.0" width="161.3" height="18"/><text x="427.3" y="47.0">217,0 fps</text><text x="252" y="73.0" text-anchor="end">desktop-blur</text><rect class="bar" x="260" y="60.0" width="151.6" height="18"/><text x="417.6" y="73.0">204,0 fps</text><text x="252" y="99.0" text-anchor="end">desktop-shadow</text><rect class="bar" x="260" y="86.0" width="234.8" height="18"/><text x="500.8" y="99.0">316,0 fps</text><text x="252" y="125.0" text-anchor="end">jellyfish</text><rect class="bar" x="260" y="112.0" width="350.0" height="18"/><text x="616.0" y="125.0">471,0 fps</text><text x="252" y="151.0" text-anchor="end">terrain</text><rect class="bar" x="260" y="138.0" width="36.4" height="18"/><text x="302.4" y="151.0">49,0 fps</text><text x="252" y="177.0" text-anchor="end">shadow</text><rect class="bar" x="260" y="164.0" width="236.3" height="18"/><text x="502.3" y="177.0">318,0 fps</text><text x="252" y="203.0" text-anchor="end">refract</text><rect class="bar" x="260" y="190.0" width="52.0" height="18"/><text x="318.0" y="203.0">70,0 fps</text></svg></figure><table class="values"><thead><tr><th>Mesure</th><th class="num">Valeur</th></tr></thead><tbody><tr><td>effect2d-edge</td><td class="num">459,0 fps</td></tr><tr><td>effect2d-blur</td><td class="num">217,0 fps</td></tr><tr><td>desktop-blur</td><td class="num">204,0 fps</td></tr><tr><td>desktop-shadow</td><td class="num">316,0 fps</td></tr><tr><td>jellyfish</td><td class="num">471,0 fps</td></tr><tr><td>terrain</td><td class="num">49,0 fps</td></tr><tr><td>shadow</td><td class="num">318,0 fps</td></tr><tr><td>refract</td><td class="num">70,0 fps</td></tr></tbody></table><h3>GPU Vulkan (vkmark)</h3><table><tbody><tr><th>Score (médiane)</th><td>510,0 fps</td></tr><tr><th>Points</th><td>48 pts</td></tr><tr><th>Outil</th><td>vkmark 2025.01</td></tr><tr><th>Résolution</th><td>3840x2160</td></tr><tr><th>Présentation</th><td>headless, sans affichage (sans vsync)</td></tr><tr><th>Pilote</th><td>TGL 26.2.3</td></tr><tr><th>Rendu</th><td>Intel(R) Iris(R) Xe Graphics (TGL GT2)</td></tr></tbody></table><figure><svg viewBox="0 0 720 60" role="img" aria-label="GPU Vulkan (vkmark) : fps par scène"><title>GPU Vulkan (vkmark) : fps par scène</title><text x="252" y="21.0" text-anchor="end">effect2d-blur</text><rect class="bar" x="260" y="8.0" width="107.0" height="18"/><text x="373.0" y="21.0">252,0 fps</text><text x="252" y="47.0" text-anchor="end">effect2d-edge</text><rect class="bar" x="260" y="34.0" width="350.0" height="18"/><text x="616.0" y="47.0">824,0 fps</text></svg></figure><table class="values"><thead><tr><th>Mesure</th><th class="num">Valeur</th></tr></thead><tbody><tr><td>effect2d-blur</td><td class="num">252,0 fps</td></tr><tr><td>effect2d-edge</td><td class="num">824,0 fps</td></tr></tbody></table><p class="muted small">Les scores de deux outils différents ne se comparent pas entre eux.</p></section>
+<section id="memoire"><h2>Mémoire</h2><p class="muted small">Catégorie d&#x27;information : elle n&#x27;entre pas dans le score combiné ni le classement.</p><table><thead><tr><th>Test</th><th class="num">Valeur (médiane)</th><th class="num">Points</th><th class="num">CV</th><th class="num">Processus / threads</th></tr></thead><tbody><tr><td>Mémoire single (natif)</td><td class="num">13729 Mio/s</td><td class="num">—</td><td class="num">0,2 %</td><td class="num">—</td></tr><tr><td>Mémoire multi (natif)</td><td class="num">13545 Mio/s</td><td class="num">—</td><td class="num">0,5 %</td><td class="num">8</td></tr><tr><td>Mémoire single (sysbench)</td><td class="num">13535 Mio/s</td><td class="num">—</td><td class="num">0,1 %</td><td class="num">—</td></tr></tbody></table><p>La bande passante mémoire (bench natif) est 1,0 fois plus élevée sur 8 processus que sur un seul (4 cœurs / 8 threads).</p></section>
+<section id="disque"><h2>Disque</h2><p class="muted small">Catégorie d&#x27;information : elle n&#x27;entre pas dans le score combiné ni le classement. Le score disque dépend du système de fichiers (btrfs, ext4…) et du cache des SSD : il ne se compare qu&#x27;à configuration et taille de fichier égales.</p><h3>Disque (fio)</h3><table><tbody><tr><th>Indice (médiane)</th><td>23015 indice brut</td></tr><tr><th>Points</th><td>—</td></tr><tr><th>Outil</th><td>fio 3.40</td></tr><tr><th>Fichier de test</th><td>1 Gio</td></tr><tr><th>Système de fichiers</th><td>btrfs</td></tr><tr><th>Disque</th><td>Samsung SSD 990 EVO Plus 1TB</td></tr></tbody></table><h3>Débits séquentiels</h3><figure><svg viewBox="0 0 720 60" role="img" aria-label="Débits séquentiels"><title>Débits séquentiels</title><text x="252" y="21.0" text-anchor="end">Lecture séquentielle (1 Mio, QD8)</text><rect class="bar" x="260" y="8.0" width="350.0" height="18"/><text x="616.0" y="21.0">3347,0 Mio/s</text><text x="252" y="47.0" text-anchor="end">Écriture séquentielle (1 Mio, QD8)</text><rect class="bar" x="260" y="34.0" width="191.7" height="18"/><text x="457.7" y="47.0">1833,2 Mio/s</text></svg></figure><table class="values"><thead><tr><th>Mesure</th><th class="num">Valeur</th></tr></thead><tbody><tr><td>Lecture séquentielle (1 Mio, QD8)</td><td class="num">3347,0 Mio/s</td></tr><tr><td>Écriture séquentielle (1 Mio, QD8)</td><td class="num">1833,2 Mio/s</td></tr></tbody></table><h3>Accès aléatoires 4K</h3><figure><svg viewBox="0 0 720 60" role="img" aria-label="Accès aléatoires 4K"><title>Accès aléatoires 4K</title><text x="252" y="21.0" text-anchor="end">Lecture aléatoire 4K (QD32)</text><rect class="bar" x="260" y="8.0" width="350.0" height="18"/><text x="616.0" y="21.0">238831 IOPS</text><text x="252" y="47.0" text-anchor="end">Écriture aléatoire 4K (QD32)</text><rect class="bar" x="260" y="34.0" width="29.7" height="18"/><text x="295.7" y="47.0">20251 IOPS</text></svg></figure><table class="values"><thead><tr><th>Mesure</th><th class="num">Valeur</th></tr></thead><tbody><tr><td>Lecture aléatoire 4K (QD32)</td><td class="num">238831 IOPS</td></tr><tr><td>Écriture aléatoire 4K (QD32)</td><td class="num">20251 IOPS</td></tr></tbody></table></section>
+<section id="temperatures"><h2>Températures</h2><p><span class="status status-ok">Fiable</span> Température CPU maximale relevée avant et après chaque test : 72 °C, sous le seuil haut du capteur (100 °C).</p><figure><svg viewBox="0 0 720 220" role="img" aria-label="Températures CPU relevées avant et après chaque test"><title>Températures CPU relevées avant et après chaque test</title><line class="grid" x1="48" x2="704" y1="160.7" y2="160.7"/><text x="42" y="164.7" text-anchor="end">30</text><line class="grid" x1="48" x2="704" y1="141.4" y2="141.4"/><text x="42" y="145.4" text-anchor="end">40</text><line class="grid" x1="48" x2="704" y1="122.1" y2="122.1"/><text x="42" y="126.1" text-anchor="end">50</text><line class="grid" x1="48" x2="704" y1="102.8" y2="102.8"/><text x="42" y="106.8" text-anchor="end">60</text><line class="grid" x1="48" x2="704" y1="83.5" y2="83.5"/><text x="42" y="87.5" text-anchor="end">70</text><line class="grid" x1="48" x2="704" y1="64.2" y2="64.2"/><text x="42" y="68.2" text-anchor="end">80</text><line class="grid" x1="48" x2="704" y1="44.9" y2="44.9"/><text x="42" y="48.9" text-anchor="end">90</text><line class="grid" x1="48" x2="704" y1="25.6" y2="25.6"/><text x="42" y="29.6" text-anchor="end">100</text><rect class="band" x="48.0" y="16" width="25.7" height="164"/><line class="temp" x1="48.0" y1="120.2" x2="73.7" y2="81.6"/><circle class="dot" cx="48.0" cy="120.2" r="3"/><circle class="dot" cx="73.7" cy="81.6" r="3"/><text x="60.9" y="196" text-anchor="middle">1</text><line class="temp" x1="73.7" y1="81.6" x2="126.9" y2="89.3"/><circle class="dot" cx="73.7" cy="81.6" r="3"/><circle class="dot" cx="126.9" cy="89.3" r="3"/><text x="100.3" y="196" text-anchor="middle">2</text><rect class="band" x="126.9" y="16" width="69.0" height="164"/><line class="temp" x1="126.9" y1="89.3" x2="195.9" y2="79.7"/><circle class="dot" cx="126.9" cy="89.3" r="3"/><circle class="dot" cx="195.9" cy="79.7" r="3"/><text x="161.4" y="196" text-anchor="middle">3</text><line class="temp" x1="195.9" y1="79.7" x2="249.0" y2="79.7"/><circle class="dot" cx="195.9" cy="79.7" r="3"/><circle class="dot" cx="249.0" cy="79.7" r="3"/><text x="222.5" y="196" text-anchor="middle">4</text><rect class="band" x="249.0" y="16" width="261.8" height="164"/><line class="temp" x1="249.0" y1="79.7" x2="510.9" y2="83.5"/><circle class="dot" cx="249.0" cy="79.7" r="3"/><circle class="dot" cx="510.9" cy="83.5" r="3"/><text x="380.0" y="196" text-anchor="middle">5</text><line class="temp" x1="510.9" y1="83.5" x2="601.0" y2="79.7"/><circle class="dot" cx="510.9" cy="83.5" r="3"/><circle class="dot" cx="601.0" cy="79.7" r="3"/><text x="556.0" y="196" text-anchor="middle">6</text><rect class="band" x="601.0" y="16" width="25.7" height="164"/><line class="temp" x1="601.0" y1="120.2" x2="626.8" y2="81.6"/><circle class="dot" cx="601.0" cy="120.2" r="3"/><circle class="dot" cx="626.8" cy="81.6" r="3"/><text x="613.9" y="196" text-anchor="middle">7</text><line class="temp" x1="626.8" y1="120.2" x2="652.5" y2="81.6"/><circle class="dot" cx="626.8" cy="120.2" r="3"/><circle class="dot" cx="652.5" cy="81.6" r="3"/><text x="639.7" y="196" text-anchor="middle">8</text><rect class="band" x="652.5" y="16" width="25.7" height="164"/><line class="temp" x1="652.5" y1="120.2" x2="678.3" y2="81.6"/><circle class="dot" cx="652.5" cy="120.2" r="3"/><circle class="dot" cx="678.3" cy="81.6" r="3"/><text x="665.4" y="196" text-anchor="middle">9</text><line class="temp" x1="678.3" y1="120.2" x2="704.0" y2="81.6"/><circle class="dot" cx="678.3" cy="120.2" r="3"/><circle class="dot" cx="704.0" cy="81.6" r="3"/><text x="691.1" y="196" text-anchor="middle">10</text><line class="limit" x1="48" x2="704" y1="25.6" y2="25.6"/><text x="704" y="21.6" text-anchor="end">seuil haut du capteur 100 °C</text><text x="48" y="216">°C, tests dans l'ordre (largeur = durée)</text></svg><figcaption>Température CPU relevée au début et à la fin de chaque test, pas pendant : le trait relie deux relevés et ne montre pas l&#x27;évolution réelle entre eux.</figcaption></figure><table class="values"><thead><tr><th class="num">#</th><th>Test</th><th class="num">Durée</th><th class="num">Avant</th><th class="num">Après</th></tr></thead><tbody><tr><td class="num">1</td><td>CPU single-core (natif)</td><td class="num">12 s</td><td class="num">51 °C</td><td class="num">71 °C</td></tr><tr><td class="num">2</td><td>CPU single-core (sysbench)</td><td class="num">25 s</td><td class="num">71 °C</td><td class="num">67 °C</td></tr><tr><td class="num">3</td><td>CPU multi-core (natif)</td><td class="num">33 s</td><td class="num">67 °C</td><td class="num">72 °C</td></tr><tr><td class="num">4</td><td>CPU multi-core (sysbench)</td><td class="num">25 s</td><td class="num">72 °C</td><td class="num">72 °C</td></tr><tr><td class="num">5</td><td>GPU OpenGL (glmark2)</td><td class="num">123 s</td><td class="num">72 °C</td><td class="num">70 °C</td></tr><tr><td class="num">6</td><td>GPU Vulkan (vkmark)</td><td class="num">42 s</td><td class="num">70 °C</td><td class="num">72 °C</td></tr><tr><td class="num">7</td><td>Mémoire single (natif)</td><td class="num">12 s</td><td class="num">51 °C</td><td class="num">71 °C</td></tr><tr><td class="num">8</td><td>Mémoire multi (natif)</td><td class="num">12 s</td><td class="num">51 °C</td><td class="num">71 °C</td></tr><tr><td class="num">9</td><td>Mémoire single (sysbench)</td><td class="num">12 s</td><td class="num">51 °C</td><td class="num">71 °C</td></tr><tr><td class="num">10</td><td>Disque (fio)</td><td class="num">12 s</td><td class="num">51 °C</td><td class="num">71 °C</td></tr></tbody></table><h3>Capteurs relevés avec les composants</h3><p class="muted small">Un seul relevé, au moment de la collecte des composants.</p><table><thead><tr><th>Puce</th><th>Capteur</th><th class="num">Température</th><th class="num">Seuil haut</th><th class="num">Seuil critique</th></tr></thead><tbody><tr><td>nvme</td><td>Composite</td><td class="num">38 °C</td><td class="num">81 °C</td><td class="num">85 °C</td></tr><tr><td>nvme</td><td>Sensor 1</td><td class="num">40 °C</td><td class="num">—</td><td class="num">—</td></tr><tr><td>nvme</td><td>Sensor 2</td><td class="num">38 °C</td><td class="num">—</td><td class="num">—</td></tr><tr><td>dell_smm</td><td>temp1</td><td class="num">62 °C</td><td class="num">—</td><td class="num">—</td></tr><tr><td>dell_smm</td><td>temp2</td><td class="num">53 °C</td><td class="num">—</td><td class="num">—</td></tr><tr><td>dell_smm</td><td>temp3</td><td class="num">39 °C</td><td class="num">—</td><td class="num">—</td></tr><tr><td>dell_smm</td><td>temp4</td><td class="num">51 °C</td><td class="num">—</td><td class="num">—</td></tr><tr><td>dell_smm</td><td>temp5</td><td class="num">27 °C</td><td class="num">—</td><td class="num">—</td></tr><tr><td>iwlwifi_1</td><td>temp1</td><td class="num">47 °C</td><td class="num">—</td><td class="num">—</td></tr><tr><td>coretemp</td><td>Package id 0</td><td class="num">72 °C</td><td class="num">100 °C</td><td class="num">100 °C</td></tr><tr><td>coretemp</td><td>Core 0</td><td class="num">62 °C</td><td class="num">100 °C</td><td class="num">100 °C</td></tr><tr><td>coretemp</td><td>Core 1</td><td class="num">72 °C</td><td class="num">100 °C</td><td class="num">100 °C</td></tr><tr><td>coretemp</td><td>Core 2</td><td class="num">60 °C</td><td class="num">100 °C</td><td class="num">100 °C</td></tr><tr><td>coretemp</td><td>Core 3</td><td class="num">64 °C</td><td class="num">100 °C</td><td class="num">100 °C</td></tr></tbody></table></section>
+<section id="fiabilite"><h2>Fiabilité des mesures</h2><p class="muted small">CV au-delà de 5 % : à vérifier. Le burst (premier run, à froid) est comparé à la médiane ; il n'entre jamais dans le score.</p><table><thead><tr><th>Test</th><th class="num">CV</th><th>Statut</th><th>Runs</th><th class="num">Burst / médiane</th><th>Warm-up</th></tr></thead><tbody><tr><td>CPU single-core (natif)</td><td class="num">4,5 %</td><td><span class="status status-ok">Fiable</span></td><td>86,2 · 85,6 · 92,6</td><td class="num">-5,1 %</td><td>4 itérations, 7 s</td></tr><tr><td>CPU single-core (sysbench)</td><td class="num">0,8 %</td><td><span class="status status-ok">Fiable</span></td><td>3321,3 · 3272,2 · 3282,4</td><td class="num">+0,4 %</td><td>2 itérations, 10 s</td></tr><tr><td>CPU multi-core (natif)</td><td class="num">2,3 %</td><td><span class="status status-ok">Fiable</span></td><td>271,4 · 259,6 · 262,5</td><td class="num">+21,5 %</td><td>3 itérations, 15 s</td></tr><tr><td>CPU multi-core (sysbench)</td><td class="num">2,6 %</td><td><span class="status status-ok">Fiable</span></td><td>10321 · 10461 · 10850</td><td class="num">+3,8 %</td><td>2 itérations, 10 s</td></tr><tr><td>GPU OpenGL (glmark2)</td><td class="num">8,8 %</td><td><span class="status status-check">À vérifier</span></td><td>261,0 · 237,0 · 283,0</td><td class="num">+5,4 %</td><td>2 itérations, 49 s</td></tr><tr><td>GPU Vulkan (vkmark)</td><td class="num">17,0 %</td><td><span class="status status-check">À vérifier</span></td><td>463,0 · 510,0 · 631,0</td><td class="num">+40,4 %</td><td>4 itérations, 24 s</td></tr><tr><td>Mémoire single (natif)</td><td class="num">0,2 %</td><td><span class="status status-ok">Fiable</span></td><td>13763 · 13729 · 13701</td><td class="num">+0,2 %</td><td>4 itérations, 7 s</td></tr><tr><td>Mémoire multi (natif)</td><td class="num">0,5 %</td><td><span class="status status-ok">Fiable</span></td><td>13612 · 13545 · 13490</td><td class="num">+0,5 %</td><td>4 itérations, 7 s</td></tr><tr><td>Mémoire single (sysbench)</td><td class="num">0,1 %</td><td><span class="status status-ok">Fiable</span></td><td>13540 · 13535 · 13520</td><td class="num">+0,0 %</td><td>4 itérations, 7 s</td></tr><tr><td>Disque (fio)</td><td class="num">0,4 %</td><td><span class="status status-ok">Fiable</span></td><td>23100 · 23015 · 22900</td><td class="num">+0,4 %</td><td>4 itérations, 7 s</td></tr></tbody></table></section>
+<section id="composants"><h2>Composants</h2><table><tbody><tr><th>Machine</th><td>Dell Inc. Latitude 5420</td></tr><tr><th>Carte mère</th><td>Dell Inc. 0M51J7</td></tr><tr><th>BIOS</th><td>1.56.0 30/06/2026</td></tr><tr><th>CPU</th><td>11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz</td></tr><tr><th>Cœurs / threads</th><td>4 / 8</td></tr><tr><th>RAM</th><td>15,3 Gio (barrettes : relancer avec sudo)</td></tr><tr><th>GPU</th><td>Mesa Intel(R) Iris(R) Xe Graphics</td></tr><tr><th>Disques</th><td>Samsung SSD 990 EVO Plus 1TB (932 Gio)</td></tr><tr><th>Batterie</th><td>BAT0 (100 % de la capacité d&#x27;origine)</td></tr></tbody></table></section>
+<section id="recommandations"><h2>Recommandations</h2><ol><li>Laisser refroidir la machine, puis relancer les tests concernés.<pre><code>hwbench bench all</code></pre></li><li>Fermer les autres applications, puis relancer avec plus de runs.<pre><code>hwbench bench gpu --runs 5</code></pre></li><li>Lire les barrettes RAM et la santé SMART avec les droits administrateur. sudo n&#x27;utilise pas le PATH de l&#x27;utilisateur : passer le chemin complet de hwbench (sous fish &lt; 3.4 : sudo (command -v hwbench) info).<pre><code>sudo &quot;$(command -v hwbench)&quot; info</code></pre></li></ol></section>
+<section id="lexique"><h2>Lexique</h2><dl><dt><strong>CV</strong></dt><dd>Coefficient de variation : écart-type des runs divisé par leur médiane. Plus il est bas, plus la mesure est reproductible.</dd><dt><strong>Médiane</strong></dt><dd>Valeur du milieu des runs mesurés : c&#x27;est le score retenu.</dd><dt><strong>Run</strong></dt><dd>Une exécution mesurée d&#x27;un test. Chaque test en compte au moins trois.</dd><dt><strong>Warm-up</strong></dt><dd>Itérations lancées avant les runs mesurés, jusqu&#x27;à un régime stable.</dd><dt><strong>Burst</strong></dt><dd>Premier run, à froid : affiché pour information, jamais compté dans le score.</dd><dt><strong>Points</strong></dt><dd>Score ramené à la machine de référence, qui vaut 1000 points.</dd><dt><strong>Indice brut</strong></dt><dd>Moyenne géométrique de débits de natures différentes, sans unité.</dd><dt><strong>EPP</strong></dt><dd>Energy Performance Preference : préférence d&#x27;énergie du processeur (performance, équilibre, économie).</dd><dt><strong>Profil plateforme</strong></dt><dd>Profil d&#x27;énergie de la machine exposé par le firmware (ACPI platform_profile).</dd><dt><strong>Governor</strong></dt><dd>Politique de fréquence du noyau Linux ; affichée pour information.</dd><dt><strong>fps</strong></dt><dd>Images par seconde.</dd><dt><strong>IOPS</strong></dt><dd>Opérations d&#x27;entrée-sortie par seconde.</dd><dt><strong>QD</strong></dt><dd>Profondeur de file : nombre de requêtes disque en attente simultanément.</dd></dl></section>
+<section id="annexe"><h2>Annexe : résultats bruts</h2><table><thead><tr><th>Bench</th><th>Protocole</th><th>Outil</th><th>Présentation</th><th class="num">Médiane</th><th>Unité</th><th class="num">Écart-type</th><th>Runs</th></tr></thead><tbody><tr><td>native-cpu-single</td><td>v1</td><td>—</td><td>—</td><td class="num">86,2</td><td>indice brut</td><td class="num">3,9</td><td>86,2 · 85,6 · 92,6</td></tr><tr><td>sysbench-cpu-single</td><td>v1</td><td>1.0.20</td><td>—</td><td class="num">3282,4</td><td>events/s</td><td class="num">25,9</td><td>3321,3 · 3272,2 · 3282,4</td></tr><tr><td>native-cpu-multi</td><td>v1</td><td>—</td><td>—</td><td class="num">262,5</td><td>indice brut</td><td class="num">6,1</td><td>271,4 · 259,6 · 262,5</td></tr><tr><td>sysbench-cpu-multi</td><td>v1</td><td>1.0.20</td><td>—</td><td class="num">10461</td><td>events/s</td><td class="num">274,1</td><td>10321 · 10461 · 10850</td></tr><tr><td>glmark2</td><td>v2</td><td>2023.01</td><td>offscreen</td><td class="num">261,0</td><td>fps</td><td class="num">23,0</td><td>261,0 · 237,0 · 283,0</td></tr><tr><td>vkmark</td><td>v2</td><td>2025.01</td><td>headless</td><td class="num">510,0</td><td>fps</td><td class="num">86,7</td><td>463,0 · 510,0 · 631,0</td></tr><tr><td>native-memory-single</td><td>v1</td><td>—</td><td>—</td><td class="num">13729</td><td>Mio/s</td><td class="num">31,0</td><td>13763 · 13729 · 13701</td></tr><tr><td>native-memory-multi</td><td>v1</td><td>—</td><td>—</td><td class="num">13545</td><td>Mio/s</td><td class="num">61,0</td><td>13612 · 13545 · 13490</td></tr><tr><td>sysbench-memory-single</td><td>v1</td><td>1.0.20</td><td>—</td><td class="num">13535</td><td>Mio/s</td><td class="num">10,1</td><td>13540 · 13535 · 13520</td></tr><tr><td>fio-disk</td><td>v1</td><td>3.40</td><td>1GiB</td><td class="num">23015</td><td>indice brut</td><td class="num">100,0</td><td>23100 · 23015 · 22900</td></tr></tbody></table><p class="muted small">Les données complètes de la session sont incluses dans ce fichier, au format JSON (bloc « hwbench-session », invisible à l'affichage).</p><script type="application/json" id="hwbench-session">{
+ "schema_version": 3,
+ "hwbench_version": "0.5.0",
+ "created": "2026-10-09T13:02:16+00:00",
+ "machine": "Dell Inc. Latitude 5420",
+ "snapshot": {
+  "cpu": {
+   "vendor": "GenuineIntel",
+   "model": "11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz",
+   "architecture": "x86_64",
+   "sockets": 1,
+   "physical_cores": 4,
+   "logical_cores": 8,
+   "threads_per_core": 2,
+   "min_mhz": 400.0,
+   "max_mhz": 4400.0,
+   "l1d_cache_kb": 192,
+   "l1i_cache_kb": 128,
+   "l2_cache_kb": 5120,
+   "l3_cache_kb": 8192,
+   "per_cpu": [
+    {
+     "cpu": 0,
+     "current_mhz": 3902.75,
+     "governor": "performance"
+    },
+    {
+     "cpu": 1,
+     "current_mhz": 3094.092,
+     "governor": "performance"
+    },
+    {
+     "cpu": 2,
+     "current_mhz": 4000.0,
+     "governor": "performance"
+    },
+    {
+     "cpu": 3,
+     "current_mhz": 3550.037,
+     "governor": "performance"
+    },
+    {
+     "cpu": 4,
+     "current_mhz": 1175.327,
+     "governor": "performance"
+    },
+    {
+     "cpu": 5,
+     "current_mhz": 955.185,
+     "governor": "performance"
+    },
+    {
+     "cpu": 6,
+     "current_mhz": 3937.522,
+     "governor": "performance"
+    },
+    {
+     "cpu": 7,
+     "current_mhz": 2332.963,
+     "governor": "performance"
+    }
+   ],
+   "scaling_driver": "intel_pstate",
+   "energy_performance_preference": "performance"
+  },
+  "ram": {
+   "total_gb": 15.341110229492188,
+   "installed_gb": null,
+   "modules": null,
+   "modules_unavailable": "needs_root"
+  },
+  "gpu": {
+   "pci_devices": [
+    {
+     "vendor": "Intel Corporation",
+     "model": "TigerLake-LP GT2 [Iris Xe Graphics]"
+    }
+   ],
+   "opengl_vendor": "Intel",
+   "opengl_renderer": "Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)",
+   "opengl_version": "4.6 (Compatibility Profile) Mesa 26.2.3",
+   "vulkan_device_name": "Intel(R) Iris(R) Xe Graphics (TGL GT2)",
+   "nvidia_name": null,
+   "nvidia_driver_version": null,
+   "nvidia_vram_mb": null
+  },
+  "disks": {
+   "disks": [
+    {
+     "name": "nvme0n1",
+     "size_bytes": 1000204886016,
+     "model": "Samsung SSD 990 EVO Plus 1TB",
+     "type": "disk",
+     "rotational": false,
+     "transport": "nvme",
+     "smart_passed": null,
+     "temperature_c": null
+    }
+   ],
+   "smart_unavailable": "needs_root"
+  },
+  "board": {
+   "system_vendor": "Dell Inc.",
+   "product_name": "Latitude 5420",
+   "product_version": null,
+   "board_vendor": "Dell Inc.",
+   "board_name": "0M51J7",
+   "bios_vendor": "Dell Inc.",
+   "bios_version": "1.56.0",
+   "bios_date": "2026-06-30"
+  },
+  "sensors": {
+   "temperatures": [
+    {
+     "chip": "nvme",
+     "label": "Composite",
+     "current_c": 37.85,
+     "high_c": 80.85,
+     "critical_c": 84.85,
+     "instance": null
+    },
+    {
+     "chip": "nvme",
+     "label": "Sensor 1",
+     "current_c": 39.85,
+     "high_c": null,
+     "critical_c": null,
+     "instance": null
+    },
+    {
+     "chip": "nvme",
+     "label": "Sensor 2",
+     "current_c": 37.85,
+     "high_c": null,
+     "critical_c": null,
+     "instance": null
+    },
+    {
+     "chip": "dell_smm",
+     "label": "temp1",
+     "current_c": 62.0,
+     "high_c": null,
+     "critical_c": null,
+     "instance": null
+    },
+    {
+     "chip": "dell_smm",
+     "label": "temp2",
+     "current_c": 53.0,
+     "high_c": null,
+     "critical_c": null,
+     "instance": null
+    },
+    {
+     "chip": "dell_smm",
+     "label": "temp3",
+     "current_c": 39.0,
+     "high_c": null,
+     "critical_c": null,
+     "instance": null
+    },
+    {
+     "chip": "dell_smm",
+     "label": "temp4",
+     "current_c": 51.0,
+     "high_c": null,
+     "critical_c": null,
+     "instance": null
+    },
+    {
+     "chip": "dell_smm",
+     "label": "temp5",
+     "current_c": 27.0,
+     "high_c": null,
+     "critical_c": null,
+     "instance": null
+    },
+    {
+     "chip": "iwlwifi_1",
+     "label": "temp1",
+     "current_c": 47.0,
+     "high_c": null,
+     "critical_c": null,
+     "instance": null
+    },
+    {
+     "chip": "coretemp",
+     "label": "Package id 0",
+     "current_c": 72.0,
+     "high_c": 100.0,
+     "critical_c": 100.0,
+     "instance": null
+    },
+    {
+     "chip": "coretemp",
+     "label": "Core 0",
+     "current_c": 62.0,
+     "high_c": 100.0,
+     "critical_c": 100.0,
+     "instance": null
+    },
+    {
+     "chip": "coretemp",
+     "label": "Core 1",
+     "current_c": 72.0,
+     "high_c": 100.0,
+     "critical_c": 100.0,
+     "instance": null
+    },
+    {
+     "chip": "coretemp",
+     "label": "Core 2",
+     "current_c": 60.0,
+     "high_c": 100.0,
+     "critical_c": 100.0,
+     "instance": null
+    },
+    {
+     "chip": "coretemp",
+     "label": "Core 3",
+     "current_c": 64.0,
+     "high_c": 100.0,
+     "critical_c": 100.0,
+     "instance": null
+    }
+   ],
+   "fans": [
+    {
+     "chip": "dell_smm",
+     "label": "fan1",
+     "rpm": 3855,
+     "instance": null
+    }
+   ]
+  },
+  "power": {
+   "on_ac": true,
+   "batteries": [
+    {
+     "name": "BAT0",
+     "percent": 80,
+     "status": "Not charging",
+     "design_capacity_wh": 59.28,
+     "full_capacity_wh": 59.28,
+     "cycle_count": null
+    }
+   ],
+   "platform_profile": "performance",
+   "platform_profile_choices": [
+    "cool",
+    "quiet",
+    "balanced",
+    "performance"
+   ]
+  }
+ },
+ "results": [
+  {
+   "name": "native-cpu-single",
+   "category": "cpu_single",
+   "backend": "native",
+   "version": "1",
+   "tool_version": null,
+   "presentation": null,
+   "unit": "index",
+   "higher_is_better": true,
+   "value": 86.15859272491939,
+   "stdev": 3.890137689105975,
+   "runs": [
+    86.15859272491939,
+    85.57543707938412,
+    92.58597768225543
+   ],
+   "warmup_runs": 4,
+   "warmup_s": 6.991893075002736,
+   "warmup_stable": true,
+   "burst": 81.77171219526144,
+   "duration_s": 12.125382033002097,
+   "details": {
+    "sha256": 1566.2305769208035,
+    "zlib": 77.83612289780893,
+    "lzma": 11.421985098666172,
+    "powmod": 41.14020721974834
+   },
+   "detail_units": {
+    "sha256": "MiB/s",
+    "zlib": "MiB/s",
+    "lzma": "MiB/s",
+    "powmod": "op/s"
+   },
+   "workers": null,
+   "environment": {
+    "python": "CPython 3.14.8",
+    "openssl": "OpenSSL 3.5.9 29 Sep 2026",
+    "zlib": "1.3.1.zlib-ng",
+    "liblzma": "5.8.2"
+   },
+   "state_before": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 51.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "state_after": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 71.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "warnings": []
+  },
+  {
+   "name": "sysbench-cpu-single",
+   "category": "cpu_single",
+   "backend": "sysbench",
+   "version": "1",
+   "tool_version": "1.0.20",
+   "presentation": null,
+   "unit": "events/s",
+   "higher_is_better": true,
+   "value": 3282.44,
+   "stdev": 25.897259185738854,
+   "runs": [
+    3321.29,
+    3272.2,
+    3282.44
+   ],
+   "warmup_runs": 2,
+   "warmup_s": 10.009942205000698,
+   "warmup_stable": true,
+   "burst": 3294.26,
+   "duration_s": 25.025475995000306,
+   "details": {},
+   "detail_units": {},
+   "workers": null,
+   "environment": {
+    "cpu-max-prime": "10000",
+    "time": "5 s"
+   },
+   "state_before": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 71.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "state_after": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 67.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "warnings": [
+    "hot_start"
+   ]
+  },
+  {
+   "name": "native-cpu-multi",
+   "category": "cpu_multi",
+   "backend": "native",
+   "version": "1",
+   "tool_version": null,
+   "presentation": null,
+   "unit": "index",
+   "higher_is_better": true,
+   "value": 262.5178128833245,
+   "stdev": 6.103663786223196,
+   "runs": [
+    271.35969773110827,
+    259.64972662709334,
+    262.5178128833245
+   ],
+   "warmup_runs": 3,
+   "warmup_s": 15.034909452999273,
+   "warmup_stable": true,
+   "burst": 318.9061841175443,
+   "duration_s": 32.5243719909995,
+   "details": {
+    "sha256": 5093.336381260907,
+    "zlib": 222.30531666492544,
+    "lzma": 27.620849726031533,
+    "powmod": 154.00138538512658
+   },
+   "detail_units": {
+    "sha256": "MiB/s",
+    "zlib": "MiB/s",
+    "lzma": "MiB/s",
+    "powmod": "op/s"
+   },
+   "workers": 8,
+   "environment": {
+    "python": "CPython 3.14.8",
+    "openssl": "OpenSSL 3.5.9 29 Sep 2026",
+    "zlib": "1.3.1.zlib-ng",
+    "liblzma": "5.8.2"
+   },
+   "state_before": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 67.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "state_after": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 72.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "warnings": []
+  },
+  {
+   "name": "sysbench-cpu-multi",
+   "category": "cpu_multi",
+   "backend": "sysbench",
+   "version": "1",
+   "tool_version": "1.0.20",
+   "presentation": null,
+   "unit": "events/s",
+   "higher_is_better": true,
+   "value": 10460.66,
+   "stdev": 274.0522315180083,
+   "runs": [
+    10320.98,
+    10460.66,
+    10849.82
+   ],
+   "warmup_runs": 2,
+   "warmup_s": 10.013595125998108,
+   "warmup_stable": true,
+   "burst": 10853.52,
+   "duration_s": 25.03187900299963,
+   "details": {},
+   "detail_units": {},
+   "workers": 8,
+   "environment": {
+    "cpu-max-prime": "10000",
+    "time": "5 s"
+   },
+   "state_before": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 72.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "state_after": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 72.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "warnings": [
+    "hot_start"
+   ]
+  },
+  {
+   "name": "glmark2",
+   "category": "gpu",
+   "backend": "glmark2",
+   "version": "2",
+   "tool_version": "2023.01",
+   "presentation": "offscreen",
+   "unit": "fps",
+   "higher_is_better": true,
+   "value": 261.0,
+   "stdev": 23.00724523564986,
+   "runs": [
+    261.0,
+    237.0,
+    283.0
+   ],
+   "warmup_runs": 2,
+   "warmup_s": 49.36951891199715,
+   "warmup_stable": true,
+   "burst": 275.0,
+   "duration_s": 123.35549817099673,
+   "details": {
+    "effect2d-edge": 459.0,
+    "effect2d-blur": 217.0,
+    "desktop-blur": 204.0,
+    "desktop-shadow": 316.0,
+    "jellyfish": 471.0,
+    "terrain": 49.0,
+    "shadow": 318.0,
+    "refract": 70.0
+   },
+   "detail_units": {
+    "effect2d-edge": "fps",
+    "effect2d-blur": "fps",
+    "desktop-blur": "fps",
+    "desktop-shadow": "fps",
+    "jellyfish": "fps",
+    "terrain": "fps",
+    "shadow": "fps",
+    "refract": "fps"
+   },
+   "workers": null,
+   "environment": {
+    "resolution": "3840x2160",
+    "binary": "glmark2-wayland",
+    "session": "wayland",
+    "renderer": "Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)",
+    "driver": "Mesa 26.2.3"
+   },
+   "state_before": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 72.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "state_after": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 70.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "warnings": [
+    "hot_start",
+    "high_variance"
+   ]
+  },
+  {
+   "name": "vkmark",
+   "category": "gpu",
+   "backend": "vkmark",
+   "version": "2",
+   "tool_version": "2025.01",
+   "presentation": "headless",
+   "unit": "fps",
+   "higher_is_better": true,
+   "value": 510.0,
+   "stdev": 86.6737176618918,
+   "runs": [
+    463.0,
+    510.0,
+    631.0
+   ],
+   "warmup_runs": 4,
+   "warmup_s": 24.27518642799987,
+   "warmup_stable": true,
+   "burst": 716.0,
+   "duration_s": 42.4823929109989,
+   "details": {
+    "effect2d-blur": 252.0,
+    "effect2d-edge": 824.0
+   },
+   "detail_units": {
+    "effect2d-blur": "fps",
+    "effect2d-edge": "fps"
+   },
+   "workers": null,
+   "environment": {
+    "binary": "vkmark",
+    "session": "headless",
+    "resolution": "3840x2160",
+    "renderer": "Intel(R) Iris(R) Xe Graphics (TGL GT2)",
+    "driver": "TGL 26.2.3"
+   },
+   "state_before": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 70.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "state_after": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 72.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "warnings": [
+    "hot_start",
+    "high_variance"
+   ]
+  },
+  {
+   "name": "native-memory-single",
+   "category": "memory",
+   "backend": "native",
+   "version": "1",
+   "tool_version": null,
+   "presentation": null,
+   "unit": "MiB/s",
+   "higher_is_better": true,
+   "value": 13729.0,
+   "stdev": 31.0,
+   "runs": [
+    13763.0,
+    13729.0,
+    13701.0
+   ],
+   "warmup_runs": 4,
+   "warmup_s": 6.991893075002736,
+   "warmup_stable": true,
+   "burst": 13763.0,
+   "duration_s": 12.125382033002097,
+   "details": {},
+   "detail_units": {},
+   "workers": null,
+   "environment": {
+    "python": "CPython 3.14.8"
+   },
+   "state_before": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 51.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "state_after": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 71.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "warnings": []
+  },
+  {
+   "name": "native-memory-multi",
+   "category": "memory",
+   "backend": "native",
+   "version": "1",
+   "tool_version": null,
+   "presentation": null,
+   "unit": "MiB/s",
+   "higher_is_better": true,
+   "value": 13545.0,
+   "stdev": 61.0,
+   "runs": [
+    13612.0,
+    13545.0,
+    13490.0
+   ],
+   "warmup_runs": 4,
+   "warmup_s": 6.991893075002736,
+   "warmup_stable": true,
+   "burst": 13612.0,
+   "duration_s": 12.125382033002097,
+   "details": {},
+   "detail_units": {},
+   "workers": 8,
+   "environment": {
+    "python": "CPython 3.14.8"
+   },
+   "state_before": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 51.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "state_after": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 71.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "warnings": []
+  },
+  {
+   "name": "sysbench-memory-single",
+   "category": "memory",
+   "backend": "sysbench",
+   "version": "1",
+   "tool_version": "1.0.20",
+   "presentation": null,
+   "unit": "MiB/s",
+   "higher_is_better": true,
+   "value": 13535.48,
+   "stdev": 10.050000000000182,
+   "runs": [
+    13540.1,
+    13535.48,
+    13520.0
+   ],
+   "warmup_runs": 4,
+   "warmup_s": 6.991893075002736,
+   "warmup_stable": true,
+   "burst": 13540.1,
+   "duration_s": 12.125382033002097,
+   "details": {},
+   "detail_units": {},
+   "workers": null,
+   "environment": {
+    "block-size": "128M",
+    "operation": "read, seq",
+    "time": "5 s"
+   },
+   "state_before": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 51.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "state_after": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 71.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "warnings": []
+  },
+  {
+   "name": "fio-disk",
+   "category": "disk",
+   "backend": "fio",
+   "version": "1",
+   "tool_version": "3.40",
+   "presentation": "1GiB",
+   "unit": "index",
+   "higher_is_better": true,
+   "value": 23015.0,
+   "stdev": 100.0,
+   "runs": [
+    23100.0,
+    23015.0,
+    22900.0
+   ],
+   "warmup_runs": 4,
+   "warmup_s": 6.991893075002736,
+   "warmup_stable": true,
+   "burst": 23100.0,
+   "duration_s": 12.125382033002097,
+   "details": {
+    "seq_read": 3346.9591217041016,
+    "seq_write": 1833.1668329238892,
+    "rand_read_4k": 238831.168831,
+    "rand_write_4k": 20250.749251
+   },
+   "detail_units": {
+    "seq_read": "MiB/s",
+    "seq_write": "MiB/s",
+    "rand_read_4k": "IOPS",
+    "rand_write_4k": "IOPS"
+   },
+   "workers": null,
+   "environment": {
+    "ioengine": "libaio",
+    "time": "2 s par test",
+    "filesystem": "btrfs",
+    "device": "Samsung SSD 990 EVO Plus 1TB"
+   },
+   "state_before": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 51.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "state_after": {
+    "governors": [
+     "performance"
+    ],
+    "on_ac": true,
+    "cpu_temp_c": 71.0,
+    "platform_profile": "performance",
+    "platform_profile_choices": [
+     "cool",
+     "quiet",
+     "balanced",
+     "performance"
+    ],
+    "energy_performance_preference": "performance",
+    "has_battery": true
+   },
+   "warnings": []
+  }
+ ],
+ "reference": {
+  "machine": "ASRock B850 Riptide WiFi",
+  "created": "2026-09-29T19:35:45+00:00",
+  "forced": false,
+  "forced_reasons": [],
+  "digest": "sha256:d79ab08a99ef63dbbbcb54d6dbe71eda48c677739992a81d78c49c8cd05ebd64"
+ },
+ "backend_scores": [
+  {
+   "backend": {
+    "name": "native-cpu-single",
+    "version": "1",
+    "tool_version": null,
+    "presentation": null
+   },
+   "category": "cpu_single",
+   "official": true,
+   "points": 702.1211347757799,
+   "issue": null,
+   "reference_backend": null,
+   "driver": null,
+   "reference_driver": null,
+   "gpu": null,
+   "reference_gpu": null
+  },
+  {
+   "backend": {
+    "name": "sysbench-cpu-single",
+    "version": "1",
+    "tool_version": "1.0.20",
+    "presentation": null
+   },
+   "category": "cpu_single",
+   "official": false,
+   "points": 591.0057454190592,
+   "issue": null,
+   "reference_backend": null,
+   "driver": null,
+   "reference_driver": null,
+   "gpu": null,
+   "reference_gpu": null
+  },
+  {
+   "backend": {
+    "name": "native-cpu-multi",
+    "version": "1",
+    "tool_version": null,
+    "presentation": null
+   },
+   "category": "cpu_multi",
+   "official": true,
+   "points": 233.79917496517123,
+   "issue": null,
+   "reference_backend": null,
+   "driver": null,
+   "reference_driver": null,
+   "gpu": null,
+   "reference_gpu": null
+  },
+  {
+   "backend": {
+    "name": "sysbench-cpu-multi",
+    "version": "1",
+    "tool_version": "1.0.20",
+    "presentation": null
+   },
+   "category": "cpu_multi",
+   "official": false,
+   "points": 231.924602211215,
+   "issue": null,
+   "reference_backend": null,
+   "driver": null,
+   "reference_driver": null,
+   "gpu": null,
+   "reference_gpu": null
+  },
+  {
+   "backend": {
+    "name": "glmark2",
+    "version": "2",
+    "tool_version": "2023.01",
+    "presentation": "offscreen"
+   },
+   "category": "gpu",
+   "official": true,
+   "points": 71.5068493150685,
+   "issue": null,
+   "reference_backend": null,
+   "driver": "Mesa 26.2.3",
+   "reference_driver": "Mesa 26.2.3-arch1.1",
+   "gpu": "Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)",
+   "reference_gpu": "AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.7-arch1-1)"
+  },
+  {
+   "backend": {
+    "name": "vkmark",
+    "version": "2",
+    "tool_version": "2025.01",
+    "presentation": "headless"
+   },
+   "category": "gpu",
+   "official": true,
+   "points": 47.708138447146865,
+   "issue": null,
+   "reference_backend": null,
+   "driver": "TGL 26.2.3",
+   "reference_driver": "RADV 26.2.3",
+   "gpu": "Intel(R) Iris(R) Xe Graphics (TGL GT2)",
+   "reference_gpu": "AMD Radeon RX 9070 XT (RADV GFX1201)"
+  },
+  {
+   "backend": {
+    "name": "native-memory-single",
+    "version": "1",
+    "tool_version": null,
+    "presentation": null
+   },
+   "category": "memory",
+   "official": true,
+   "points": null,
+   "issue": "not_in_reference",
+   "reference_backend": null,
+   "driver": null,
+   "reference_driver": null,
+   "gpu": null,
+   "reference_gpu": null
+  },
+  {
+   "backend": {
+    "name": "native-memory-multi",
+    "version": "1",
+    "tool_version": null,
+    "presentation": null
+   },
+   "category": "memory",
+   "official": true,
+   "points": null,
+   "issue": "not_in_reference",
+   "reference_backend": null,
+   "driver": null,
+   "reference_driver": null,
+   "gpu": null,
+   "reference_gpu": null
+  },
+  {
+   "backend": {
+    "name": "sysbench-memory-single",
+    "version": "1",
+    "tool_version": "1.0.20",
+    "presentation": null
+   },
+   "category": "memory",
+   "official": false,
+   "points": null,
+   "issue": "not_in_reference",
+   "reference_backend": null,
+   "driver": null,
+   "reference_driver": null,
+   "gpu": null,
+   "reference_gpu": null
+  },
+  {
+   "backend": {
+    "name": "fio-disk",
+    "version": "1",
+    "tool_version": "3.40",
+    "presentation": "1GiB"
+   },
+   "category": "disk",
+   "official": true,
+   "points": null,
+   "issue": "not_in_reference",
+   "reference_backend": null,
+   "driver": null,
+   "reference_driver": null,
+   "gpu": null,
+   "reference_gpu": null
+  }
+ ],
+ "categories": [
+  {
+   "category": "cpu_single",
+   "points": 702.1211347757798,
+   "backends": [
+    {
+     "name": "native-cpu-single",
+     "version": "1",
+     "tool_version": null,
+     "presentation": null
+    }
+   ],
+   "reference_backends": [
+    {
+     "name": "native-cpu-single",
+     "version": "1",
+     "tool_version": null,
+     "presentation": null
+    }
+   ],
+   "issue": null
+  },
+  {
+   "category": "cpu_multi",
+   "points": 233.79917496517115,
+   "backends": [
+    {
+     "name": "native-cpu-multi",
+     "version": "1",
+     "tool_version": null,
+     "presentation": null
+    }
+   ],
+   "reference_backends": [
+    {
+     "name": "native-cpu-multi",
+     "version": "1",
+     "tool_version": null,
+     "presentation": null
+    }
+   ],
+   "issue": null
+  },
+  {
+   "category": "gpu",
+   "points": 58.407693560374,
+   "backends": [
+    {
+     "name": "glmark2",
+     "version": "2",
+     "tool_version": "2023.01",
+     "presentation": "offscreen"
+    },
+    {
+     "name": "vkmark",
+     "version": "2",
+     "tool_version": "2025.01",
+     "presentation": "headless"
+    }
+   ],
+   "reference_backends": [
+    {
+     "name": "glmark2",
+     "version": "2",
+     "tool_version": "2023.01",
+     "presentation": "offscreen"
+    },
+    {
+     "name": "vkmark",
+     "version": "2",
+     "tool_version": "2025.01",
+     "presentation": "headless"
+    }
+   ],
+   "issue": null
+  },
+  {
+   "category": "memory",
+   "points": null,
+   "backends": [
+    {
+     "name": "native-memory-single",
+     "version": "1",
+     "tool_version": null,
+     "presentation": null
+    },
+    {
+     "name": "native-memory-multi",
+     "version": "1",
+     "tool_version": null,
+     "presentation": null
+    }
+   ],
+   "reference_backends": [],
+   "issue": "not_in_reference"
+  },
+  {
+   "category": "disk",
+   "points": null,
+   "backends": [
+    {
+     "name": "fio-disk",
+     "version": "1",
+     "tool_version": "3.40",
+     "presentation": "1GiB"
+    }
+   ],
+   "reference_backends": [],
+   "issue": "not_in_reference"
+  }
+ ],
+ "combined": {
+  "points": 212.44264132318588,
+  "weights": {
+   "cpu_single": 0.3333333333333333,
+   "cpu_multi": 0.3333333333333333,
+   "gpu": 0.3333333333333333
+  },
+  "backends": [
+   {
+    "name": "native-cpu-single",
+    "version": "1",
+    "tool_version": null,
+    "presentation": null
+   },
+   {
+    "name": "native-cpu-multi",
+    "version": "1",
+    "tool_version": null,
+    "presentation": null
+   },
+   {
+    "name": "glmark2",
+    "version": "2",
+    "tool_version": "2023.01",
+    "presentation": "offscreen"
+   },
+   {
+    "name": "vkmark",
+    "version": "2",
+    "tool_version": "2025.01",
+    "presentation": "headless"
+   }
+  ],
+  "gpu_missing": false,
+  "issue": null
+ },
+ "settings": {
+  "runs": 3,
+  "max_warmup_s": null,
+  "warmup_tolerance_percent": 3.0,
+  "high_variance_cv_percent": 5.0,
+  "hot_start_c": 70.0,
+  "reliable_cv_percent": 1.0
+ }
+}</script></section>
+<footer class="muted small">Rapport généré par hwbench @@HWBENCH_VERSION@@ à partir de la session du 09/10/2026. Fichier autonome, consultable hors ligne.</footer>
+</body>
+</html>
