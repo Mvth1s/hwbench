@@ -1,6 +1,7 @@
 import json
 import math
 import re
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -449,3 +450,66 @@ def test_scores_panel_info_categories() -> None:
     scored = _panel_text(score_results(machine(2.0) + info_results(2.0), reference))
     assert re.search(r"Disque +2000 pts  \(information, hors score combiné\)", scored)
     assert re.search(r"Mémoire +2000 pts  \(information, hors score combiné\)", scored)
+
+
+# --- fio : version de l'outil hors identité, même règle que le pilote GPU ----------------
+
+EVO = "Samsung SSD 990 EVO Plus 1TB"
+SN850 = "WD_BLACK SN850X 2000GB"
+
+
+def _fio(value: float, tool: str | None, device: str | None = EVO) -> Result:
+    env = {"filesystem": "btrfs", **({"device": device} if device else {})}
+    return make_result("fio-disk", value, tool_version=tool, presentation="1GiB", environment=env)
+
+
+def _fio_reference(tool: str = "3.42", device: str | None = EVO):
+    return reference_from_dict(build_reference([_fio(2000.0, tool, device)], snapshot(), []))
+
+
+def test_fio_tool_version_is_recorded_but_not_part_of_the_identity() -> None:
+    reference = _fio_reference()
+    entry = reference.find("fio-disk")
+    assert entry.id == BackendId("fio-disk", "1", None, "1GiB")
+    assert (entry.tool_version, entry.device) == ("3.42", EVO)
+    result = _fio(1000.0, "3.40")
+    assert result.tool_version == "3.40" and result.backend_id.tool_version is None
+
+
+def test_sysbench_memory_tool_version_stays_in_the_identity() -> None:
+    ref_result = make_result("sysbench-memory-single", 9000.0, tool_version="1.0.20")
+    reference = reference_from_dict(build_reference([ref_result], snapshot(), []))
+    assert reference.find("sysbench-memory-single").id.tool_version == "1.0.20"
+    score = normalize(replace(ref_result, tool_version="1.1.0"), reference)
+    assert (score.points, score.issue) == (None, ScoreIssue.TOOL_VERSION_MISMATCH)
+
+
+def test_same_disk_other_fio_version_is_scored_and_flagged() -> None:
+    score = normalize(_fio(3000.0, "3.40"), _fio_reference())
+    assert (score.points, score.issue) == (pytest.approx(1500), None)
+    assert score.same_device and score.tool_differs and not score.tool_info
+    out = _panel(score_results([_fio(3000.0, "3.40")], _fio_reference()))
+    assert "⚠ fio-disk : outil 3.40 (référence : 3.42, même disque)" in out
+
+
+@pytest.mark.parametrize("device", [f"  {EVO.lower()} ", EVO])
+def test_same_disk_same_fio_version_says_nothing(device) -> None:
+    score = normalize(_fio(2000.0, "3.42", device), _fio_reference())
+    assert score.same_device and not score.tool_differs and not score.tool_info
+    assert "outil" not in _panel(score_results([_fio(2000.0, "3.42", device)], _fio_reference()))
+
+
+@pytest.mark.parametrize("device", [SN850, None])
+def test_other_disk_shows_fio_version_as_information(device) -> None:
+    score = normalize(_fio(1000.0, "3.40", device), _fio_reference())
+    assert score.points == pytest.approx(500)
+    assert not score.same_device and not score.tool_differs and score.tool_info
+    out = _panel(score_results([_fio(1000.0, "3.40", device)], _fio_reference()))
+    assert "fio-disk : outil 3.40 (référence : 3.42, autre disque)" in out
+    assert "⚠ fio-disk" not in out
+
+
+def test_tool_rule_does_not_apply_to_gpu_backends() -> None:
+    score = normalize(_glmark2(2000.0, "Mesa 26.2.3"), _reference("Mesa 26.2.3"))
+    assert not score.tool_differs and not score.tool_info
+    assert score.tool_version is None and score.device is None

@@ -1,0 +1,8 @@
+{
+   "filesystems": [
+      {
+         "source": "/dev/nvme1n1p4",
+         "fstype": "ext4"
+      }
+   ]
+}

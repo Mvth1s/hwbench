@@ -8,7 +8,12 @@ from test_scoring import REFERENCE, machine, payload
 
 from hwbench.export import to_dict
 from hwbench.leaderboard import __main__ as cli
-from hwbench.leaderboard.validate import MAX_BYTES, current_versions, validate_file
+from hwbench.leaderboard.validate import (
+    MAX_BYTES,
+    current_versions,
+    stale_reference,
+    validate_file,
+)
 from hwbench.scoring import reference_from_dict
 
 
@@ -75,6 +80,45 @@ def test_other_reference(tmp_path) -> None:
     other = reference_from_dict(payload(["power_unknown"]))
     found = problems(tmp_path, to_dict(export(machine(1.0), reference=other)))
     assert any("autre référence que celle du paquet" in p for p in found)
+
+
+def stale_payload() -> dict:
+    """Export noté contre une référence antérieure (autre empreinte), sans autre problème."""
+    older = reference_from_dict(payload([]) | {"created": "2026-01-01T00:00:00+00:00"})
+    assert older.digest != REFERENCE.digest
+    return to_dict(export(machine(1.0), reference=older))
+
+
+def test_stale_reference_is_detected() -> None:
+    older = reference_from_dict(payload([]) | {"created": "2026-01-01T00:00:00+00:00"})
+    assert stale_reference(export(machine(1.0), reference=older), REFERENCE)
+    assert not stale_reference(export(machine(1.0)), REFERENCE)
+    assert not stale_reference(export(machine(1.0), reference=None), REFERENCE)
+
+
+def test_stale_reference_is_tolerated_only_on_request(tmp_path) -> None:
+    path = submit(tmp_path, stale_payload())
+    assert any("autre référence que celle du paquet" in p for p in validate_file(path, REFERENCE))
+    assert validate_file(path, REFERENCE, tolerate_stale_reference=True) == []
+
+
+def test_tolerating_a_stale_reference_keeps_every_other_check(tmp_path) -> None:
+    data = stale_payload()
+    data["results"][0]["version"] = "0"
+    data["snapshot"]["hostname"] = "mon-pc"
+    found = validate_file(submit(tmp_path, data), REFERENCE, tolerate_stale_reference=True)
+    assert not any("autre référence" in p for p in found)
+    assert any("protocole v0" in p for p in found)
+    assert any("hostname" in p for p in found)
+
+
+def test_cli_refuses_a_stale_reference(tmp_path, capsys, monkeypatch) -> None:
+    """La validation des soumissions (results.yml) ne tolère jamais une référence périmée."""
+    monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    stale = submit(tmp_path, stale_payload(), "ancien.json")
+    assert cli.main(["validate", str(stale)]) == 1
+    out = capsys.readouterr()
+    assert f"✗ {stale}" in out.out and "autre référence que celle du paquet" in out.out
 
 
 def test_forced_reference(tmp_path) -> None:

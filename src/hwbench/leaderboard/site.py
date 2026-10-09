@@ -20,6 +20,7 @@ from hwbench.leaderboard.validate import (
     SubmissionError,
     read_bounded,
     resolves_to_itself,
+    stale_reference,
     strict_json,
 )
 from hwbench.report.html import e, page
@@ -38,6 +39,15 @@ class Entry:
     slug: str  # nom du fichier sans .json (validé : minuscules, chiffres, tirets)
     export: MachineExport
     scores: Scores
+    stale: bool = False  # noté contre une référence antérieure : à ré-exporter
+
+
+STALE_BADGE = '<span class="status status-check">à ré-exporter</span>'
+STALE_NOTE = (
+    "noté contre une référence antérieure à la référence actuelle. Les points affichés sont "
+    "recalculés contre la référence actuelle à partir de ses résultats bruts ; les benchs dont "
+    "la version d'outil ou de protocole a changé depuis ne sont pas notés."
+)
 
 
 def load_entries(results_dir: Path, reference: Reference) -> tuple[list[Entry], list[str]]:
@@ -51,7 +61,8 @@ def load_entries(results_dir: Path, reference: Reference) -> tuple[list[Entry], 
         except (SubmissionError, ExportError, UnicodeDecodeError, ValueError) as exc:
             skipped.append(f"{path.name} : {exc}")
             continue
-        entries.append(Entry(path.stem, export, score_results(export.results, reference)))
+        scores = score_results(export.results, reference)
+        entries.append(Entry(path.stem, export, scores, stale_reference(export, reference)))
     return entries, skipped
 
 
@@ -117,7 +128,7 @@ def _page(title: str, body: str, generated: datetime) -> str:
 def _reference_block(reference: Reference) -> str:
     rows = "".join(
         f"<tr><td>{e(entry.id.name)}</td><td>v{e(entry.id.version)}</td>"
-        f"<td>{e(entry.id.tool_version or '—')}</td><td>{e(entry.id.presentation or '—')}</td>"
+        f"<td>{e(entry.tool_version or '—')}</td><td>{e(entry.id.presentation or '—')}</td>"
         f"<td>{e(CATEGORY_LABELS[entry.category])}</td></tr>"
         for entry in reference.entries
     )
@@ -138,7 +149,9 @@ def _ranking_table(ranked: list[tuple[Entry, float]]) -> str:
         ex = entry.export
         rows.append(
             f'<tr><td class="num">{rank}</td>'
-            f'<td><a href="machines/{e(entry.slug)}.html">{e(ex.machine)}</a></td>'
+            f'<td><a href="machines/{e(entry.slug)}.html">{e(ex.machine)}</a>'
+            + (f" {STALE_BADGE}" if entry.stale else "")
+            + "</td>"
             # nom normalisé (sans pilote, noyau ni DRM), casse d'origine
             f"<td>{e(ex.snapshot.cpu.model or '?')}</td><td>{e(gpu_name(_gpu(ex)) or '?')}</td>"
             f'<td class="num"><strong>{e(num(points, 0))}</strong></td>'
@@ -192,12 +205,18 @@ def render_index(
         if skipped
         else ""
     )
+    stale_html = (
+        f'<p class="muted small">{STALE_BADGE} : fichier {STALE_NOTE}</p>'
+        if any(entry.stale for entry in entries)
+        else ""
+    )
     count = plural(len(entries), "machine", "machines")
     body = f"""<h1>hwbench · classement</h1>
 <p class="muted">{count}. Benchmarks CPU et GPU notés contre une machine de
 référence (1000 points). Score combiné : moyenne géométrique des trois catégories. Mémoire et
 disque : information, hors classement.</p>
 <div class="tabs">{radios}{"".join(panels)}</div>
+{stale_html}
 {_reference_block(reference)}
 {skipped_html}"""
     return _page("hwbench · classement", body, generated)
@@ -276,6 +295,8 @@ def render_machine(entry: Entry, reference: Reference, generated: datetime) -> s
         f'<p class="muted">Fichier <code>results/{e(entry.slug)}.json</code> · points recalculés '
         f"contre la référence {e(reference.machine)} (1000 points).</p>"
     )
+    if entry.stale:
+        intro += f"<p>{STALE_BADGE} Ce fichier a été {STALE_NOTE}</p>"
     sections = render_sections(
         ctx, with_recommendations=False, embed_json=False, after_header=_ranking_block(entry)
     )

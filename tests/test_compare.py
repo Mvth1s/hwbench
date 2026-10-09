@@ -7,7 +7,7 @@ from rich.console import Console
 from test_scoring import REFERENCE, machine, payload, snapshot
 
 from hwbench.compare import CompareWarning, Incomparable, compare
-from hwbench.display.compare import render_bench_rows
+from hwbench.display.compare import notice_message, render_bench_rows, render_comparison
 from hwbench.export import MachineExport, build_export
 from hwbench.results import COMBINED_CATEGORIES, Category, Result
 from hwbench.scoring import (
@@ -267,3 +267,64 @@ def test_disk_detail_rows_are_rendered_under_the_bench() -> None:
     text = console.export_text()
     assert "↳ Lecture séquentielle (1 Mio, QD8)" in text and "Mio/s" in text
     assert "↳ Lecture aléatoire 4K (QD32)" in text and "IOPS" in text
+
+
+# --- fio : version de l'outil hors identité --------------------------------------------------
+
+EVO = "Samsung SSD 990 EVO Plus 1TB"
+
+
+def fio_on(seq: float, rand: float, tool: str | None, device: str | None) -> Result:
+    env = {"device": device} if device else {}
+    return replace(disk(seq, rand), tool_version=tool, environment=env)
+
+
+def tool_notices(c):
+    codes = (CompareWarning.TOOL_VERSION_DIFFERS, CompareWarning.TOOL_VERSION_INFO)
+    return [(w.code, w.subject, w.values) for w in c.warnings if w.code in codes]
+
+
+def test_same_disk_other_fio_version_is_flagged_but_still_compared() -> None:
+    a = machine(1.0) + [fio_on(3000.0, 200_000.0, "3.42", EVO)]
+    b = machine(1.0) + [fio_on(3300.0, 200_000.0, "3.40", EVO.upper())]
+    c = compare([export(a, "a"), export(b, "b")])
+    disk_rows = [r for r in c.benches if r.name == "fio-disk"]
+    assert all(r.cells[1].issue is None for r in disk_rows)  # indice et détails comparés
+    assert disk_rows[1].cells[1].delta_percent == pytest.approx(10.0)  # seq_read
+    assert tool_notices(c) == [(CompareWarning.TOOL_VERSION_DIFFERS, "fio-disk", ["3.42", "3.40"])]
+    assert not any(w.code is CompareWarning.BENCH_VERSION_DIFFERS for w in c.warnings)
+    text = notice_message(c.warnings[0], ["a.json", "b.json"])
+    assert text.startswith("fio-disk : même disque, versions de l'outil différentes")
+    assert "a.json : 3.42, b.json : 3.40" in text
+
+
+@pytest.mark.parametrize("other", ["WD_BLACK SN850X 2000GB", None])
+def test_other_disk_other_fio_version_is_information(other) -> None:
+    a = machine(1.0) + [fio_on(3000.0, 200_000.0, "3.42", EVO)]
+    b = machine(1.0) + [fio_on(1500.0, 90_000.0, "3.40", other)]
+    c = compare([export(a), export(b)])
+    assert row(c, "fio-disk").cells[1].issue is None
+    assert tool_notices(c) == [(CompareWarning.TOOL_VERSION_INFO, "fio-disk", ["3.42", "3.40"])]
+    out = Console(width=200, record=True)
+    out.print(render_comparison(c, ["a", "b"]))
+    text = out.export_text()
+    assert "fio-disk : version de l'outil (a : 3.42, b : 3.40)." in text
+    assert "⚠ fio-disk" not in text
+
+
+def test_same_fio_version_says_nothing() -> None:
+    a = machine(1.0) + [fio_on(3000.0, 200_000.0, "3.42", EVO)]
+    b = machine(1.0) + [fio_on(1500.0, 90_000.0, "3.42", "WD_BLACK SN850X 2000GB")]
+    assert tool_notices(compare([export(a), export(b)])) == []
+
+
+def test_only_files_sharing_the_disk_are_flagged() -> None:
+    files = [
+        machine(1.0) + [fio_on(3000.0, 200_000.0, "3.42", EVO)],
+        machine(1.0) + [fio_on(1500.0, 90_000.0, "3.38", "WD_BLACK SN850X 2000GB")],
+        machine(1.0) + [fio_on(3000.0, 200_000.0, "3.40", EVO)],
+    ]
+    c = compare([export(f) for f in files])
+    assert tool_notices(c) == [
+        (CompareWarning.TOOL_VERSION_DIFFERS, "fio-disk", ["3.42", None, "3.40"])
+    ]

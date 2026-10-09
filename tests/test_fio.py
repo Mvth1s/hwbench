@@ -50,9 +50,16 @@ def test_size_label() -> None:
 # --- sorties -------------------------------------------------------------------------------
 
 
-def test_parse_real_output() -> None:
-    out = fio.parse_output(tool_output("fio_disk.json"))
-    assert out.version == "3.40"
+@pytest.mark.parametrize(
+    ("name", "version"),
+    [
+        ("fio_disk.json", "3.40"),  # Dell Latitude 5420 (Fedora, btrfs)
+        ("fio_disk_b850.json", "3.42"),  # desktop B850 (Arch, ext4), machine de référence
+    ],
+)
+def test_parse_real_output(name: str, version: str) -> None:
+    out = fio.parse_output(tool_output(name))
+    assert out.version == version
     assert list(out.rates) == ["seq_read", "seq_write", "rand_read_4k", "rand_write_4k"]
     assert all(v > 0 for v in out.rates.values())
     # séquentiel en Mio/s, aléatoire en IOPS (bien plus grands sur un SSD NVMe)
@@ -92,6 +99,11 @@ def test_parse_output_errors(text: str, message: str) -> None:
 def test_mount_and_disk_model() -> None:
     assert fio.parse_mount(tool_output("findmnt_cache.json")) == ("/dev/nvme0n1p3", "btrfs")
     assert fio.parse_disk_model(tool_output("lsblk_inverse.json")) == "Samsung SSD 990 EVO Plus 1TB"
+    b850 = tool_output("findmnt_cache_b850.json")
+    assert fio.parse_mount(b850) == ("/dev/nvme1n1p4", "ext4")
+    assert (
+        fio.parse_disk_model(tool_output("lsblk_inverse_b850.json")) == "Lexar SSD NM1090 PRO 1TB"
+    )
     assert fio.parse_mount("{}") == (None, None)
     assert fio.parse_disk_model("pas du json") is None
 

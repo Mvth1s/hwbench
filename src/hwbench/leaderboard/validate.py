@@ -108,7 +108,22 @@ def _points_problems(export: MachineExport, reference: Reference) -> list[str]:
     ]
 
 
-def validate_payload(raw: Any, reference: Reference) -> list[str]:
+class StaleReferenceWarning(UserWarning):
+    """Export du dépôt noté contre une référence antérieure (tests de results/ uniquement)."""
+
+
+def stale_reference(export: MachineExport, reference: Reference) -> bool:
+    """Noté contre une autre référence que celle du paquet (régénérée depuis l'export) : les
+    points se recalculent, mais le fichier est à ré-exporter."""
+    return export.reference is not None and export.reference.digest != reference.digest
+
+
+def validate_payload(
+    raw: Any, reference: Reference, *, tolerate_stale_reference: bool = False
+) -> list[str]:
+    """Problèmes de l'export. tolerate_stale_reference ne sert qu'aux tests des exemples du
+    dépôt (test_results_dir) : la validation des soumissions ne l'active jamais. Les points d'un
+    export ainsi toléré ne sont pas vérifiés (l'ancienne référence n'est plus disponible)."""
     problems = []
     if privacy.scrub(raw) != raw:
         found = identifier_problems(raw)
@@ -125,7 +140,7 @@ def validate_payload(raw: Any, reference: Reference) -> list[str]:
     if export.reference is None:
         problems.append("exporté sans référence : relancer hwbench export avec la version actuelle")
     else:
-        if export.reference.digest != reference.digest:
+        if stale_reference(export, reference) and not tolerate_stale_reference:
             problems.append(
                 "noté contre une autre référence que celle du paquet actuel : "
                 "relancer hwbench export avec la dernière version de hwbench"
@@ -147,7 +162,9 @@ def validate_payload(raw: Any, reference: Reference) -> list[str]:
     return problems
 
 
-def validate_file(path: Path, reference: Reference) -> list[str]:
+def validate_file(
+    path: Path, reference: Reference, *, tolerate_stale_reference: bool = False
+) -> list[str]:
     """Liste des problèmes du fichier ; vide s'il est accepté."""
     if path.parent.name != RESULTS_DIR or not resolves_to_itself(path.parent):
         # rien n'est ouvert : un dossier results/ remplacé par un lien pointerait ailleurs
@@ -166,7 +183,9 @@ def validate_file(path: Path, reference: Reference) -> list[str]:
         raw = strict_json(data)
     except (UnicodeDecodeError, ValueError) as exc:
         return [*problems, f"JSON invalide : {exc}"]
-    return problems + validate_payload(raw, reference)
+    return problems + validate_payload(
+        raw, reference, tolerate_stale_reference=tolerate_stale_reference
+    )
 
 
 def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:

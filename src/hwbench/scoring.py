@@ -28,11 +28,14 @@ from typing import Any
 
 from hwbench.results import (
     COMBINED_CATEGORIES,
+    TOOL_VERSION_NOT_IN_IDENTITY,
     BackendId,
     Category,
     Result,
+    disk_key,
     driver_key,
     gpu_key,
+    identity_tool_version,
 )
 
 REFERENCE_POINTS = 1000.0
@@ -70,6 +73,10 @@ class ReferenceEntry:
     # pilote et GPU (renderer) de la référence : information, hors BackendId
     driver: str | None = None
     gpu: str | None = None
+    # version de l'outil telle que relevée (dans id seulement si elle fait partie de l'identité)
+    # et modèle du disque mesuré (fio)
+    tool_version: str | None = None
+    device: str | None = None
 
 
 @dataclass(frozen=True)
@@ -116,6 +123,37 @@ class BackendScore:
     reference_driver: str | None = None
     gpu: str | None = None
     reference_gpu: str | None = None
+    # Version de l'outil hors identité (TOOL_VERSION_NOT_IN_IDENTITY, fio) et modèle du disque,
+    # mesurés / de la référence : même règle que le pilote, signalée sur le disque de la référence.
+    tool_version: str | None = None
+    reference_tool_version: str | None = None
+    device: str | None = None
+    reference_device: str | None = None
+
+    @property
+    def same_device(self) -> bool:
+        ours, theirs = disk_key(self.device), disk_key(self.reference_device)
+        return ours is not None and ours == theirs
+
+    @property
+    def tool_differs(self) -> bool:
+        """Même disque que la référence, autre version d'un outil hors identité : à signaler."""
+        return (
+            self.backend.name in TOOL_VERSION_NOT_IN_IDENTITY
+            and self.same_device
+            and self.tool_version is not None
+            and self.reference_tool_version is not None
+            and self.tool_version != self.reference_tool_version
+        )
+
+    @property
+    def tool_info(self) -> bool:
+        """Autre disque (ou inconnu) : la version de l'outil est une information neutre."""
+        return (
+            self.backend.name in TOOL_VERSION_NOT_IN_IDENTITY
+            and self.tool_version is not None
+            and not self.same_device
+        )
 
     @property
     def same_gpu(self) -> bool:
@@ -178,7 +216,12 @@ def reference_from_dict(payload: Mapping[str, Any]) -> Reference:
     try:
         entries = [
             ReferenceEntry(
-                id=BackendId(b["name"], b["version"], b.get("tool_version"), b.get("presentation")),
+                id=BackendId(
+                    b["name"],
+                    b["version"],
+                    identity_tool_version(b["name"], b.get("tool_version")),
+                    b.get("presentation"),
+                ),
                 backend=b["backend"],
                 category=Category(b["category"]),
                 unit=b["unit"],
@@ -186,6 +229,8 @@ def reference_from_dict(payload: Mapping[str, Any]) -> Reference:
                 value=float(b["value"]),
                 driver=(b.get("environment") or {}).get("driver"),
                 gpu=(b.get("environment") or {}).get("renderer"),
+                tool_version=b.get("tool_version"),
+                device=(b.get("environment") or {}).get("device"),
             )
             for b in payload["benchmarks"]
         ]
@@ -235,6 +280,13 @@ def normalize(result: Result, reference: Reference) -> BackendScore:
         "gpu": result.environment.get("renderer"),
         "reference_gpu": entry.gpu,
     }
+    if ours.name in TOOL_VERSION_NOT_IN_IDENTITY:
+        drivers |= {
+            "tool_version": result.tool_version,
+            "reference_tool_version": entry.tool_version,
+            "device": result.environment.get("device"),
+            "reference_device": entry.device,
+        }
     if entry.id.version != ours.version:
         issue = ScoreIssue.VERSION_MISMATCH
     elif entry.id.tool_version != ours.tool_version:

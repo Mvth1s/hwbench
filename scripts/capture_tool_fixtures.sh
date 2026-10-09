@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# Capture les sorties réelles de sysbench, glmark2 et vkmark pour tests/fixtures/tools/.
+# Capture les sorties réelles de sysbench, glmark2, vkmark et fio pour tests/fixtures/tools/
 #
-# Usage : scripts/capture_tool_fixtures.sh   (sans sudo, depuis une session graphique)
+# Usage : scripts/capture_tool_fixtures.sh [--suffix SUFFIXE] [--only GROUPES]
+#   (sans sudo, depuis une session graphique pour le groupe gpu)
+#   --suffix _b850     ajouté au nom de chaque fichier (fio_disk_b850.json) : capture d'une
+#                      autre machine sans écraser les fixtures existantes
+#   --only memory,disk groupes à capturer parmi cpu, memory, gpu, disk (défaut : tous)
 #   Les lignes de commande viennent des backends eux-mêmes (hwbench.benchmarks.external),
 #   seules les durées sont raccourcies (scènes 1 s, sysbench memory 2 s, fio 1 s par test sur
 #   un fichier de 64 Mio, supprimé ensuite) : les fixtures suivent le vrai protocole.
@@ -10,6 +14,21 @@
 # Bash obligatoire : les tableaux gardent intacts les arguments contenant « ; » ou « : ».
 set -euo pipefail
 export LC_ALL=C
+
+SUFFIX=""
+ONLY="cpu,memory,gpu,disk"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --suffix) SUFFIX="$2"; shift 2 ;;
+        --only) ONLY="$2"; shift 2 ;;
+        *) echo "option inconnue : $1" >&2; exit 2 ;;
+    esac
+done
+[[ "$SUFFIX" =~ ^[a-z0-9_-]*$ ]] || { echo "suffixe invalide : $SUFFIX" >&2; exit 2; }
+for group in ${ONLY//,/ }; do
+    [[ "$group" =~ ^(cpu|memory|gpu|disk)$ ]] || { echo "groupe inconnu : $group" >&2; exit 2; }
+done
+wanted() { [[ ",$ONLY," == *",$1,"* ]]; }
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$REPO/tests/fixtures/tools"
@@ -21,7 +40,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 # Ligne de commande d'un backend, un argument par ligne, durées raccourcies.
 backend_command() {
-    "$PYTHON" - "$1" <<'EOF'
+    "$PYTHON" - "$@" <<'EOF'
 import sys
 from hwbench.benchmarks.external.glmark2 import Glmark2
 from hwbench.benchmarks.external.sysbench import SysbenchMemoryMulti, SysbenchMemorySingle
@@ -44,9 +63,9 @@ for arg in bench.command():
 EOF
 }
 
-# capture <fichier> <commande...>
+# capture <fichier> <commande...>   (le suffixe s'insère avant l'extension)
 capture() {
-    local out="$1"; shift
+    local out="${1%.*}${SUFFIX}.${1##*.}"; shift
     if have "$1"; then
         "$@" >"$OUT/$out" 2>&1 || echo "  !!  $out : code $? (sortie conservée)"
         echo "  ok  $out"
@@ -55,14 +74,21 @@ capture() {
     fi
 }
 
-echo "sysbench :"
+if wanted cpu; then
+echo "sysbench cpu :"
 capture sysbench_cpu_1thread.txt sysbench cpu --threads=1 --time=2 --cpu-max-prime=10000 run
 capture sysbench_cpu_multi.txt sysbench cpu --threads="$(nproc)" --time=2 --cpu-max-prime=10000 run
+fi
+
+if wanted memory; then
+echo "sysbench memory :"
 mapfile -t cmd < <(backend_command sysbench-memory-single)
 capture sysbench_memory_1thread.txt "${cmd[@]}"
 mapfile -t cmd < <(backend_command sysbench-memory-multi)
 capture sysbench_memory_multi.txt "${cmd[@]}"
+fi
 
+if wanted gpu; then
 echo "glmark2 (binaire choisi selon la session) :"
 mapfile -t cmd < <(backend_command glmark2)
 capture "${cmd[0]}_offscreen.txt" "${cmd[@]}"
@@ -81,7 +107,10 @@ if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
     capture vkmark_wayland_immediate.txt vkmark --winsys wayland --present-mode immediate \
         --size 3840x2160 "${scenes[@]}"
 fi
+sed -i -E 's/(Device UUID: +)[0-9a-fA-F]{32}/\100000000000000000000000000000000/' "$OUT"/vkmark_*.txt
+fi
 
+if wanted disk; then
 echo "fio (fichier de 64 Mio dans ~/.cache/hwbench, supprimé ensuite) :"
 # pas /tmp : souvent un tmpfs, qui refuse les E/S directes (direct=1)
 FIO_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/hwbench"
@@ -94,6 +123,6 @@ rm -f -- "$FIO_DIR/$FIO_FILE"
 capture findmnt_cache.json findmnt -J -T "$FIO_DIR" -o SOURCE,FSTYPE
 source="$(findmnt -n -T "$FIO_DIR" -o SOURCE | sed 's/\[.*\]$//')"
 capture lsblk_inverse.json lsblk -J -s -o NAME,MODEL,TYPE "$source"
+fi
 
-sed -i -E 's/(Device UUID: +)[0-9a-fA-F]{32}/\100000000000000000000000000000000/' "$OUT"/vkmark_*.txt
 echo "Fixtures écrites dans $OUT"
