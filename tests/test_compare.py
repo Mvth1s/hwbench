@@ -3,9 +3,11 @@ from datetime import UTC, datetime
 
 import pytest
 from conftest import make_result
+from rich.console import Console
 from test_scoring import REFERENCE, machine, payload, snapshot
 
 from hwbench.compare import CompareWarning, Incomparable, compare
+from hwbench.display.compare import render_bench_rows
 from hwbench.export import MachineExport, build_export
 from hwbench.results import COMBINED_CATEGORIES, Category, Result
 from hwbench.scoring import (
@@ -203,3 +205,65 @@ def test_only_files_sharing_the_gpu_are_listed() -> None:
         ]
     )
     assert driver_notices(c) == [("glmark2", ["Mesa 26.2.3-arch1.1", None, "Mesa 26.2.4-arch1.1"])]
+
+
+# --- Mémoire et disque ---------------------------------------------------------------------
+
+DISK_UNITS = {"seq_read": "MiB/s", "rand_read_4k": "IOPS"}
+
+
+def disk(seq: float, rand: float, presentation: str = "1GiB") -> Result:
+    return make_result(
+        "fio-disk",
+        (seq * rand) ** 0.5,
+        tool_version="3.40",
+        presentation=presentation,
+        details={"seq_read": seq, "rand_read_4k": rand},
+        detail_units=DISK_UNITS,
+    )
+
+
+def test_disk_details_are_information_rows() -> None:
+    a = machine(1.0) + [make_result("native-memory-multi", 20_000.0), disk(3000.0, 200_000.0)]
+    b = machine(1.0) + [make_result("native-memory-multi", 40_000.0), disk(1500.0, 400_000.0)]
+    c = compare([export(a, "a"), export(b, "b")])
+    rows = [(r.name, r.detail, r.unit) for r in c.benches if r.category is Category.DISK]
+    assert rows == [
+        ("fio-disk", None, "index"),
+        ("fio-disk", "seq_read", "MiB/s"),
+        ("fio-disk", "rand_read_4k", "IOPS"),
+    ]
+    seq = next(r for r in c.benches if r.detail == "seq_read")
+    assert seq.cells[1].delta_percent == pytest.approx(-50.0) and seq.cells[1].better is False
+    memory = row(c, "native-memory-multi")
+    assert memory.category is Category.MEMORY
+    assert memory.cells[1].delta_percent == pytest.approx(100.0)
+    # catégories d'information : présentes, sans points tant que la référence ne les a pas
+    assert score_row(c, Category.MEMORY).cells[0].issue is Incomparable.NOT_SCORED
+    assert c.warnings == []
+
+
+def test_other_disk_size_is_not_compared_and_warned_once() -> None:
+    a = [disk(3000.0, 200_000.0)]
+    b = [disk(1500.0, 400_000.0, presentation="4GiB")]
+    c = compare([export(a, "a", reference=None), export(b, "b", reference=None)])
+    assert all(
+        r.cells[1].issue is Incomparable.IDENTITY_DIFFERS
+        for r in c.benches
+        if r.category is Category.DISK
+    )
+    assert [n.subject for n in c.warnings] == ["fio-disk"]
+
+
+def test_disk_detail_rows_are_rendered_under_the_bench() -> None:
+    a = [disk(3000.0, 200_000.0)]
+    b = [disk(1500.0, 400_000.0)]
+    console = Console(width=200, record=True)
+    console.print(
+        render_bench_rows(
+            compare([export(a, reference=None), export(b, reference=None)]), ["a", "b"]
+        )
+    )
+    text = console.export_text()
+    assert "↳ Lecture séquentielle (1 Mio, QD8)" in text and "Mio/s" in text
+    assert "↳ Lecture aléatoire 4K (QD32)" in text and "IOPS" in text

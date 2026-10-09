@@ -3,7 +3,7 @@ from rich.table import Table
 from rich.text import Text
 
 from hwbench.compare import Cell, CompareWarning, Comparison, Incomparable, Notice
-from hwbench.display.bench import CATEGORY_LABELS, UNIT_LABELS
+from hwbench.display.bench import CATEGORY_LABELS, DETAIL_LABELS, UNIT_LABELS
 from hwbench.display.fmt import compact, measure, num
 from hwbench.display.scores import ISSUE_LABELS
 from hwbench.export import MachineExport
@@ -100,7 +100,10 @@ def render_bench_rows(comparison: Comparison, labels: list[str]) -> Table:
     t = _table(labels, "Bench (valeur brute)")
     for row in comparison.benches:
         unit = UNIT_LABELS.get(row.unit, row.unit)
-        t.add_row(Text(row.name), *(_cell(c, f"{measure(c.value or 0)} {unit}") for c in row.cells))
+        label = Text(row.name)
+        if row.detail is not None:
+            label = Text(f"  ↳ {DETAIL_LABELS.get(row.detail, row.detail)}", style="dim")
+        t.add_row(label, *(_cell(c, f"{measure(c.value or 0)} {unit}") for c in row.cells))
     return t
 
 

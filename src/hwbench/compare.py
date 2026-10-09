@@ -8,6 +8,7 @@ Rien n'est comparé « à peu près » :
   combiné, les mêmes pondérations).
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -54,6 +55,7 @@ class BenchRow:
     cells: list[Cell]
     drivers: list[str | None] = field(default_factory=list)  # pilote GPU par fichier (brut)
     gpus: list[str | None] = field(default_factory=list)  # renderer GPU par fichier (brut)
+    detail: str | None = None  # sous-mesure d'un bench (disque : seq_read…), ligne d'information
 
 
 @dataclass(frozen=True)
@@ -99,33 +101,54 @@ def _bench_rows(exports: list[MachineExport]) -> list[BenchRow]:
     rows = []
     for name in names:
         results = [f.get(name) for f in by_file]
-        base = results[0]
-        cells = []
-        for i, r in enumerate(results):
-            if r is None:
-                cells.append(Cell(None, issue=Incomparable.MISSING))
-            elif i == 0:
-                cells.append(Cell(r.value))
-            elif base is None:
-                cells.append(Cell(r.value, issue=Incomparable.MISSING))
-            elif r.backend_id != base.backend_id:
-                cells.append(Cell(r.value, issue=Incomparable.IDENTITY_DIFFERS))
-            else:
-                delta, better = _delta(r.value, base.value, r.higher_is_better)
-                cells.append(Cell(r.value, delta, better))
         ref = first[name]
+        identities = [r.backend_id if r else None for r in results]
         rows.append(
             BenchRow(
                 name,
                 ref.category,
                 ref.unit,
-                [r.backend_id if r else None for r in results],
-                cells,
+                identities,
+                _cells(results, lambda r: r.value),
                 [r.environment.get("driver") if r else None for r in results],
                 [r.environment.get("renderer") if r else None for r in results],
             )
         )
+        # disque : débits et IOPS de chaque test, sous l'indice (mêmes règles d'identité)
+        if ref.category is Category.DISK:
+            for key in ref.details:
+                rows.append(
+                    BenchRow(
+                        name,
+                        ref.category,
+                        ref.detail_units.get(key, ""),
+                        identities,
+                        _cells(results, lambda r, key=key: r.details.get(key)),
+                        detail=key,
+                    )
+                )
     return rows
+
+
+def _cells(results: list[Result | None], value_of: Callable[[Result], float | None]) -> list[Cell]:
+    """Valeur de chaque fichier et écart à la base, si l'identité du bench est la même."""
+    base = results[0]
+    base_value = value_of(base) if base is not None else None
+    cells = []
+    for i, r in enumerate(results):
+        value = value_of(r) if r is not None else None
+        if r is None or value is None:
+            cells.append(Cell(None, issue=Incomparable.MISSING))
+        elif i == 0:
+            cells.append(Cell(value))
+        elif base is None or base_value is None:
+            cells.append(Cell(value, issue=Incomparable.MISSING))
+        elif r.backend_id != base.backend_id:
+            cells.append(Cell(value, issue=Incomparable.IDENTITY_DIFFERS))
+        else:
+            delta, better = _delta(value, base_value, r.higher_is_better)
+            cells.append(Cell(value, delta, better))
+    return cells
 
 
 def _composition(score: CategoryScore | CombinedScore) -> list[BackendId]:
@@ -201,7 +224,7 @@ def _warnings(exports: list[MachineExport], benches: list[BenchRow]) -> list[Not
     warnings = [
         Notice(CompareWarning.BENCH_VERSION_DIFFERS, row.name)
         for row in benches
-        if len({i for i in row.identities if i is not None}) > 1
+        if row.detail is None and len({i for i in row.identities if i is not None}) > 1
     ]
     for row in benches:
         warnings += _driver_notices(row)
