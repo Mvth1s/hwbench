@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 from test_analysis import RESULTS
 
 from hwbench import labels
@@ -11,6 +12,7 @@ from hwbench.export import load_export
 from hwbench.leaderboard import site
 from hwbench.report import texts
 from hwbench.report.texts import (
+    MULTI_GAIN_MIN,
     STATUS_LABELS,
     bench_label,
     finding_text,
@@ -219,3 +221,50 @@ def test_power_profile_recommendation_uses_the_best_available_profile() -> None:
 def test_no_recommendation_for_information() -> None:
     assert recommendation(Finding(FindingCode.REPRODUCIBLE, Status.OK)) is None
     assert recommendation(Finding(FindingCode.NO_REFERENCE, Status.INFO)) is None
+
+
+def _factor(kind: str, single: float, multi: float, backend: str = "native") -> str:
+    return finding_text(
+        Finding(
+            FindingCode.MULTI_FACTOR,
+            Status.INFO,
+            {
+                "kind": kind,
+                "backend": backend,
+                "factor": multi / single,
+                "single_value": single,
+                "multi_value": multi,
+                "unit": "MiB/s" if kind == "memory" else "index",
+                "workers": 8,
+                "cores": 4,
+                "threads": 8,
+            },
+        )
+    )
+
+
+def test_multi_factor_below_one_never_claims_a_gain() -> None:
+    text = _factor("memory", 13729.0, 13545.0)
+    assert text == (
+        "La bande passante mémoire (bench natif) ne progresse pas en multi-processus : 13545 "
+        "Mio/s sur 8 processus contre 13729 sur un seul (4 cœurs / 8 threads)."
+    )
+
+
+@pytest.mark.parametrize("multi", [100.0, 105.0, 109.9])
+def test_multi_factor_close_to_one_never_claims_a_gain(multi: float) -> None:
+    for kind, backend in (("cpu", "native"), ("cpu", "sysbench"), ("memory", "native")):
+        text = _factor(kind, 100.0, multi, backend)
+        assert "ne progresse pas" in text
+        assert "fois" not in text and "plus élevée" not in text and "plus vite" not in text
+    assert "en multi-thread : " in _factor("cpu", 100.0, multi, "sysbench")
+
+
+def test_multi_factor_above_the_threshold_keeps_the_gain_sentence() -> None:
+    assert MULTI_GAIN_MIN == 1.1
+    assert _factor("cpu", 100.0, 300.0) == (
+        "Le processeur (bench natif) va 3,0 fois plus vite sur 8 processus que sur un seul "
+        "(4 cœurs / 8 threads)."
+    )
+    assert "1,5 fois plus élevée" in _factor("memory", 10_000.0, 15_000.0)
+    assert "1,1 fois plus vite" in _factor("cpu", 100.0, 110.0)  # seuil inclus

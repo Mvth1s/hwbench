@@ -5,8 +5,14 @@ les valeurs mesurées et les seuils de la session. Aucune cause non mesurée.
 from dataclasses import dataclass
 
 from hwbench.analysis import Finding, FindingCode, Status
-from hwbench.display.fmt import num
-from hwbench.labels import CATEGORY_LABELS, PROFILE_LABELS, bench_label, disk_size_label
+from hwbench.display.fmt import measure, num
+from hwbench.labels import (
+    CATEGORY_LABELS,
+    PROFILE_LABELS,
+    bench_label,
+    disk_size_label,
+    unit_label,
+)
 from hwbench.results import Category
 
 STATUS_LABELS = {
@@ -29,6 +35,10 @@ def _list(parts: list[str]) -> str:
 def _celsius(value: float | None) -> str:
     return "?" if value is None else f"{num(value, 0)} °C"
 
+
+# Facteur multi / single sous lequel aucun gain n'est annoncé : la phrase dit « ne progresse
+# pas » et cite les deux valeurs mesurées, jamais « N fois plus ».
+MULTI_GAIN_MIN = 1.1
 
 # hwbench relève la température CPU au début et à la fin de chaque test, pas pendant : le
 # maximum cité est celui de ces relevés.
@@ -137,20 +147,29 @@ def finding_text(finding: Finding) -> str:
         case FindingCode.MULTI_FACTOR:
             native = p["backend"] == "native"
             tool = "bench natif" if native else p["backend"]
+            unit = "processus" if native else "threads"
             if p["kind"] == "cpu":
                 subject, verb, gain = f"Le processeur ({tool})", "va", "plus vite"
             else:
                 subject, verb, gain = f"La bande passante mémoire ({tool})", "est", "plus élevée"
-            unit = "processus" if native else "threads"
-            where = (
-                f"sur {p['workers']} {unit} que sur un seul"
-                if p["workers"]
-                else "en parallèle qu'en un seul flux"
-            )
             cores = (
                 f" ({p['cores']} cœurs / {p['threads']} threads)"
                 if p["cores"] and p["threads"]
                 else ""
+            )
+            if p["factor"] < MULTI_GAIN_MIN:
+                # pas de gain mesurable : jamais « N fois plus » ni « plus élevée »
+                mode = "multi-processus" if native else "multi-thread"
+                where = f"sur {p['workers']} {unit}" if p["workers"] else "en parallèle"
+                return (
+                    f"{subject} ne progresse pas en {mode} : "
+                    f"{measure(p['multi_value'])} {unit_label(p['unit'])} {where} contre "
+                    f"{measure(p['single_value'])} sur un seul{cores}."
+                )
+            where = (
+                f"sur {p['workers']} {unit} que sur un seul"
+                if p["workers"]
+                else "en parallèle qu'en un seul flux"
             )
             return f"{subject} {verb} {num(p['factor'])} fois {gain} {where}{cores}."
         case FindingCode.GPU_NOT_MEASURED:
