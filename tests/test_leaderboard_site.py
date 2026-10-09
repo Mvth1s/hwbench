@@ -250,3 +250,33 @@ def test_real_site_has_no_ambiguous_plural(tmp_path) -> None:
     build_site(Path(__file__).parents[1] / "results", out, REFERENCE, generated=NOW)
     for page in [out / "index.html", *(out / "machines").glob("*.html")]:
         assert "(s)" not in page.read_text(), page.name
+
+
+def test_stale_reference_is_flagged_for_re_export(tmp_path) -> None:
+    from test_leaderboard_validate import stale_payload
+
+    d = results_dir(tmp_path)
+    (d / "ancien.json").write_text(json.dumps(stale_payload() | {"machine": "Desktop ancien"}))
+    entries = {e.slug: e for e in load_entries(d, REFERENCE)[0]}
+    assert entries["ancien"].stale and not entries["moyen"].stale
+    # points recalculés contre la référence actuelle : l'ancien fichier reste classé
+    assert round(category_points(entries["ancien"], None)) == 1000
+    out = tmp_path / "_site"
+    build_site(d, out, REFERENCE, generated=NOW)
+    index = (out / "index.html").read_text()
+
+    def row(name: str) -> str:  # une seule ligne <tr>…</tr> (premier onglet)
+        return re.search(rf"<tr>(?:(?!</tr>).)*{name}.*?</tr>", index).group(0)
+
+    assert "à ré-exporter" in row("Desktop ancien")
+    assert "à ré-exporter" not in row("Desktop moyen")
+    assert "noté contre une référence antérieure" in index
+    page = (out / "machines" / "ancien.html").read_text()
+    assert "à ré-exporter" in page and "référence antérieure" in page
+    assert "à ré-exporter" not in (out / "machines" / "moyen.html").read_text()
+
+
+def test_no_re_export_note_without_stale_file(tmp_path) -> None:
+    out = tmp_path / "_site"
+    build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW)
+    assert "à ré-exporter" not in (out / "index.html").read_text()
