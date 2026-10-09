@@ -34,6 +34,7 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/hwbench info            # essai réel (sudo pour dmidecode/smartctl)
 .venv/bin/hwbench bench cpu-single   # ~7 s ; multi-cœur jusqu'à ~90 s de warm-up sur portable
 .venv/bin/hwbench bench gpu          # ~2 min 30 (glmark2 ~2 min, vkmark ~30 s)
+.venv/bin/hwbench bench memory       # ~1 min (natif ~10 s, sysbench memory 5 s par run) ; disk : ~1 à 2 min, écrit 1 Gio dans ~/.cache/hwbench
 .venv/bin/hwbench backends
 scripts/capture_tool_fixtures.sh     # bash : sorties réelles de sysbench/glmark2/vkmark
 python3 scripts/discord_notify.py --help   # notifications Discord (workflows uniquement)
@@ -119,6 +120,18 @@ CI (`.github/workflows/ci.yml`) : ruff + pytest sur Python 3.11 à 3.14 (ubuntu-
 - **Secrets et Dependabot** (doc GitHub vérifiée le 09/10/2026) : les runs déclenchés par Dependabot via `push`, `pull_request`, `pull_request_review` et `pull_request_review_comment` sont traités comme venant d'un fork (jeton en lecture seule, **secrets Dependabot seulement**). `workflow_run` n'est pas dans cette liste, et sa documentation précise que le workflow lancé « is able to access secrets and write tokens, even if the previous workflow was not » : le job `dependabot` de `notify.yml` reçoit donc les **secrets Actions**. `DISCORD_WEBHOOK_DEPENDABOT` existe aussi en secret Dependabot, sous le même nom, par précaution : `secrets.DISCORD_WEBHOOK_DEPENDABOT` se résout dans les deux cas. En cas de rotation du webhook, mettre à jour les deux. À confirmer sur la première PR Dependabot après la release (un avertissement « secret absent » dans le run Notify indiquerait le contraire).
 - **`workflow_run` et `schedule` ne tournent que depuis main**, la branche par défaut (vérifié : `gh repo view --json defaultBranchRef`). Doc GitHub : ces événements ne déclenchent un workflow que si son fichier existe sur la branche par défaut, `workflow_run` prend `GITHUB_SHA` = dernier commit de la branche par défaut, et les workflows planifiés tournent sur le dernier commit de la branche par défaut. Conséquences : `notify.yml`, `veille.yml` et `hebdo.yml` ne s'activent qu'après la release qui les amène sur main ; une modification de ces fichiers sur dev n'a aucun effet avant la release suivante ; un run de CI sur dev déclenche la version de `notify.yml` présente sur main (et le script extrait est celui de main). Tester une version de dev : `gh workflow run veille.yml --ref dev` (possible une fois le fichier présent sur main).
 
+## Conventions établies (phase C : mémoire et disque)
+
+- Catégories `Category.MEMORY` et `Category.DISK` : **information**, jamais dans le combiné ni le classement. `results.COMBINED_CATEGORIES` (CPU single, CPU multi, GPU) est la seule liste des catégories du combiné, des pondérations (`parse_weights` refuse `memory=`/`disk=`) et des onglets du site. `bench all`, `export` et `reference` incluent mémoire et disque.
+- Scoring : `is_official` = GPU et disque (tous backends), natif ailleurs (mémoire : native single + multi en moyenne géométrique, sysbench memory pour information). Mémoire et disque sont notés si la référence contient leurs benchs, sinon `NOT_IN_REFERENCE`, affiché « valeurs brutes (pas encore dans la référence) ». Le schéma d'export reste 2 : ajouter des valeurs d'enum ne change pas la forme des modèles, les exports existants restent lisibles et valides.
+- `Benchmark.cleanup()` : appelé par `runner.run_benchmark` dans un `finally` (erreur, Ctrl+C). `Benchmark.notice()` : message affiché par la CLI avant le bench (texte via `rich.text.Text`, le chemin vient de l'utilisateur).
+- Mémoire native (`benchmarks/native/memory.py`) : `MemoryCopy` a la même interface qu'une charge CPU (`key`, `prepare`, `execute`), exécutée par `run_workloads` et `cpu.run_parallel` (spawn, barrière). Copie `dst[:] = src` sur `memoryview` (memcpy en C), 128 Mio en single, 32 Mio par processus en multi, pages touchées hors chrono, Mio/s copiés. Empreinte des paramètres dans `tests/test_native_memory.py` : la changer impose d'incrémenter `NATIVE_MEMORY_VERSION`. Tests : `conftest.TINY_MEMORY`, à patcher dans `memory.SINGLE` et `memory.MULTI` partout où `bench all --backend native` tourne.
+- sysbench memory : `--memory-scope=local --memory-oper=read --memory-access-mode=seq`, blocs 128M (single) et 32M (multi, par thread), `SYSBENCH_MEMORY_VERSION` séparée de `SYSBENCH_VERSION`.
+- fio (`benchmarks/external/fio.py`, bench `fio-disk`) : une invocation par run, 4 tests `--stonewall` de 2 s, `direct=1`, `libaio`. Valeur = indice (moyenne géométrique de 2 Mio/s et 2 IOPS), détails `seq_read`, `seq_write`, `rand_read_4k`, `rand_write_4k`. Taille du fichier = `BenchOptions.disk_size` (`--disk-size`, `parse_size`, min 64M), portée dans `presentation` (`size_label` : « 1GiB ») donc dans l'identité ; seule la taille par défaut est notée contre la référence. Dossier `BenchOptions.disk_path` (`--disk-path`), défaut `$XDG_CACHE_HOME/hwbench` ou `~/.cache/hwbench`. Espace libre vérifié (taille + 256 Mio) avant `temp_file` ; fichier supprimé par `cleanup()`. `environment` : type de fs (`findmnt -J -T`) et modèle du disque (`lsblk -J -s`), **jamais le chemin** (nom d'utilisateur). Accès système par `_run` (`home`, `make_dirs`, `disk_free`, `temp_file`, `remove`), simulés par `FakeTools(free_bytes=…)` qui enregistre `temp_files` et `removed`.
+- Compare : les détails d'un bench disque deviennent des lignes d'information (`BenchRow.detail`), mêmes règles d'identité ; l'avertissement de version n'est émis qu'une fois par bench. Site : colonnes « Mémoire » et « Disque » (`info_value` : points sinon brut), détail fio sur la page machine.
+- Fixtures `sysbench_memory_*.txt`, `fio_disk.json`, `findmnt_cache.json`, `lsblk_inverse.json` : capturées sur le portable Dell (`scripts/capture_tool_fixtures.sh`, fio sur 64 Mio dans `~/.cache/hwbench`, nom de fichier relatif pour qu'aucun chemin personnel n'entre dans la fixture ; pas `/tmp`, tmpfs sans E/S directes).
+- Référence : `tests/test_reference_file.py` exige les benchs CPU et GPU et accepte mémoire et disque (`OPTIONAL`), vérifiés à leur version dès qu'ils y sont. Régénérer sur le B850 avec fio et sysbench installés ; cela change l'empreinte : re-exporter ensuite les fichiers de `results/`.
+
 ## Architecture
 
 ```
@@ -134,7 +147,7 @@ src/hwbench/
 ├── benchmarks/
 │   ├── base.py         # Benchmark (name, category, backend, version, unit, is_available(), run() -> Measurement) + registre @register
 │   ├── native/          # tests maison
-│   └── external/        # sysbench, glmark2, vkmark ; _run.py = seul accès système, _gpu.py = conditions GPU
+│   └── external/        # sysbench, glmark2, vkmark, fio ; _run.py = seul accès système, _gpu.py = conditions GPU
 ├── results.py          # Category, BenchWarning, Measurement, MachineState, Result
 ├── runner.py           # warm-up, runs, médiane/écart-type, avertissements -> Result
 ├── machine_state.py    # governor, secteur, température : seul pont benchmarks -> collecteurs
@@ -190,7 +203,9 @@ Natifs :
 - CPU multi-core : la même charge sur N workers avec `multiprocessing` (surtout pas `threading`, à cause du GIL), N = nombre de CPU logiques par défaut.
 - GPU natif : hors périmètre pour l'instant. Le GPU passe par les backends externes.
 
-Externes, chacun avec `is_available()` : `sysbench cpu` (single et multi), `glmark2` ou `glmark2-wayland`, `vkmark`. Parsing robuste, tests sur fixtures.
+Externes, chacun avec `is_available()` : `sysbench cpu` et `sysbench memory` (single et multi), `glmark2` ou `glmark2-wayland`, `vkmark`, `fio` (disque). Parsing robuste, tests sur fixtures.
+
+Mémoire (natif : copie de gros buffers, single et multi-processus) et disque (fio) : catégories d'information, hors score combiné (voir phase C).
 
 Fiabilité des mesures :
 - warm-up puis au moins 3 runs, score = médiane, écart-type conservé dans le résultat
@@ -212,7 +227,7 @@ Fiabilité des mesures :
 
 ```
 hwbench info [--json] [--show-serials]
-hwbench bench [cpu-single|cpu-multi|gpu|all] [--backend ...] [--runs N] [--weights ...]
+hwbench bench [cpu-single|cpu-multi|gpu|memory|disk|all] [--backend ...] [--runs N] [--weights ...] [--disk-size 1G] [--disk-path DIR]
 hwbench backends          # liste les backends et leur disponibilité
 hwbench reference -o FILE [--force]   # machine de référence uniquement
 hwbench export -o FILE
