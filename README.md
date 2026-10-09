@@ -47,7 +47,8 @@ Pour ajouter une machine aux fixtures de test (sorties réelles, identifiants an
 
 ```sh
 scripts/capture_fixtures.sh [nom]     # sans sudo : il le demande lui-même pour dmidecode/smartctl
-scripts/capture_tool_fixtures.sh      # sorties de sysbench, glmark2 et vkmark (protocole réel)
+scripts/capture_tool_fixtures.sh      # sorties de sysbench, glmark2, vkmark et fio (protocole réel)
+scripts/capture_tool_fixtures.sh --suffix _b850 --only memory,disk   # autre machine, sans écraser
 ```
 
 ### Autocomplétion du shell
@@ -271,7 +272,8 @@ référence, et qu'il a le même environnement d'outils que les fixtures de test
 
 - Un backend n'est noté que s'il a la même identité que dans la référence : même bench, même
   version du protocole, même version de l'outil, même mode de présentation. Sinon il est
-  déclaré « non comparable », avec la raison.
+  déclaré « non comparable », avec la raison. Exception : la version de fio, traitée comme le
+  pilote GPU (voir plus bas).
 - **CPU single et multi** : seul le backend natif compte. sysbench est noté à côté, pour
   information.
 - **GPU** : moyenne géométrique de glmark2 et vkmark. Chaque score de catégorie garde la liste
@@ -307,6 +309,15 @@ même GPU. Sur un autre GPU, le pilote est affiché comme simple information. La
 paquet est ignorée : « Mesa 26.2.4-arch1.1 », « Mesa 26.2.4-arch1.2 » et « Mesa 26.2.4 »
 (Fedora) sont le même pilote. Le GPU est reconnu par son nom, sans les détails du renderer qui
 changent avec le noyau.
+
+La version de **fio** suit la même règle : elle est relevée et affichée, mais ne fait pas
+partie de l'identité du bench disque. Le protocole fixe toutes ses options (`libaio`,
+`direct=1`, taille de bloc, profondeur de file, durée), dont le comportement n'a pas changé de
+fio 3.40 à 3.42, alors que chaque distribution livre une version différente. Un avertissement
+non bloquant n'apparaît que pour **le même modèle de disque** mesuré avec une autre version de
+fio (`hwbench bench` sur le disque de la référence, `hwbench compare` entre fichiers du même
+disque) ; sur un autre disque, la version est une simple information. sysbench, lui, garde sa
+version dans l'identité.
 
 La commande refuse d'écrire le fichier si la machine n'est pas sur secteur, si le profil
 d'énergie n'est pas « performance » (vérifié avant les mesures) ou si un warm-up ne se
@@ -384,7 +395,9 @@ puis une pull request, voir [CONTRIBUTING.md](https://github.com/Mvth1s/hwbench/
 Chaque fichier soumis est validé en CI (schéma connu, aucun identifiant, référence actuelle,
 versions de bench à jour, points cohérents avec les résultats bruts). Le site recalcule les
 points à partir des résultats bruts ; le score combiné n'est classé que s'il porte sur les trois
-catégories, comme la référence. Mémoire et disque apparaissent en colonnes d'information (points
+catégories, comme la référence. Après une régénération de la référence, un fichier noté contre
+l'ancienne reste classé (points recalculés) avec la mention « à ré-exporter » ; une nouvelle
+soumission, elle, doit être notée contre la référence actuelle. Mémoire et disque apparaissent en colonnes d'information (points
 si la référence les contient, sinon valeurs brutes), hors classement. Les résultats sont
 déclaratifs.
 
