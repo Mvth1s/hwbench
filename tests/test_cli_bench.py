@@ -1,7 +1,8 @@
 import re
+from pathlib import Path
 
 import pytest
-from conftest import TINY, TINY_MEMORY
+from conftest import TINY, TINY_MEMORY, tool_output
 from rich.console import Console
 from typer.testing import CliRunner
 
@@ -47,6 +48,61 @@ def test_bench_all_with_workers() -> None:
     assert "Mémoire · native v1" in result.output
     assert re.search(r"Processus +2 ", result.output)
     assert "GPU : le backend « native » ne couvre pas cette catégorie." in result.output
+
+
+def test_bench_memory_native() -> None:
+    result = runner.invoke(cli.app, ["bench", "memory", "--backend", "native"], env=WIDE)
+    assert result.exit_code == 0, result.output
+    assert "Mémoire · native v1" in result.output and "Mio/s" in result.output
+    assert "CPU single-core" not in result.output
+
+
+def test_bench_disk_with_fio(fake_tools) -> None:
+    tools = fake_tools(
+        outputs={
+            "fio": tool_output("fio_disk.json"),
+            "findmnt": tool_output("findmnt_cache.json"),
+            "lsblk": tool_output("lsblk_inverse.json"),
+        }
+    )
+    result = runner.invoke(cli.app, ["bench", "disk", "--disk-path", "/mnt/data"], env=WIDE)
+    assert result.exit_code == 0, result.output
+    out = result.output
+    assert "Disque · fio : fichier de test de 1 Gio dans /mnt/data, supprimé à la fin" in out
+    assert "Disque · fio v1 · outil 3.40" in out
+    assert re.search(r"Fichier de test +1 Gio", out)
+    assert "Lecture aléatoire 4K (QD32)" in out and "IOPS" in out
+    assert "système de fichiers btrfs" in out and "Samsung SSD 990 EVO Plus 1TB" in out
+    # fichier supprimé après les runs
+    assert tools.temp_files == [Path("/mnt/data/hwbench-fio-0.tmp")]
+    assert tools.removed == tools.temp_files
+
+
+def test_bench_disk_size_option(fake_tools) -> None:
+    tools = fake_tools(outputs={"fio": tool_output("fio_disk.json")})
+    result = runner.invoke(cli.app, ["bench", "disk", "--disk-size", "512M"], env=WIDE)
+    assert result.exit_code == 0, result.output
+    assert f"--size={512 * 1024**2}" in tools.calls[-1]
+    assert re.search(r"Fichier de test +512 Mio", result.output)
+
+
+@pytest.mark.parametrize("size", ["32M", "1T", "beaucoup"])
+def test_bench_disk_size_is_validated(size: str) -> None:
+    result = runner.invoke(cli.app, ["bench", "disk", "--disk-size", size])
+    assert result.exit_code == 2
+    assert "--disk-size" in result.output
+
+
+def test_bench_disk_without_fio_fails() -> None:
+    result = runner.invoke(cli.app, ["bench", "disk"], env=WIDE)
+    assert result.exit_code == 1
+    assert "Disque · fio : indisponible (outil absent), ignoré." in result.output
+
+
+def test_memory_weight_is_refused() -> None:
+    result = runner.invoke(cli.app, ["bench", "cpu-single", "--weights", "memory=1"])
+    assert result.exit_code == 2
+    assert "ne fait pas partie du score combiné" in result.output
 
 
 def test_runs_below_three_is_rejected() -> None:

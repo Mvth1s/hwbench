@@ -172,6 +172,13 @@ class Fio(Benchmark):
     def environment(self) -> dict[str, str]:
         return {"ioengine": IOENGINE, "time": f"{RUN_SECONDS} s par test", **self._environment}
 
+    def notice(self) -> str:
+        size = size_label(self.options.disk_size).replace("GiB", " Gio").replace("MiB", " Mio")
+        return (
+            f"fichier de test de {size} dans {self.directory()}, "
+            "supprimé à la fin (même en cas d'erreur ou de Ctrl+C)"
+        )
+
     def directory(self) -> Path:
         if self.options.disk_path is not None:
             return self.options.disk_path

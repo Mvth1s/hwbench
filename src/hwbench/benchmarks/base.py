@@ -57,6 +57,10 @@ class Benchmark(ABC):
     def environment(self) -> dict[str, str]:
         return {}
 
+    def notice(self) -> str | None:
+        """Message affiché avant le bench (ex. fichier que le bench disque va écrire)."""
+        return None
+
     def warnings(self) -> list[BenchWarning]:
         """Avertissements propres au backend, connus après les runs (ex. vsync non coupée)."""
         return []
