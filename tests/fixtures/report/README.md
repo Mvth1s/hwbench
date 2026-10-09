@@ -4,7 +4,7 @@
 (snapshot de `tests/test_report.py`).
 
 - **Réels** : résultats CPU et GPU, composants (snapshot), états machine et référence. Ils
-  viennent de l'export du portable Dell (`results/dell-latitude-5420.json`), passé au schéma 3
+  viennent de l'export du portable Dell (copie figée `tests/fixtures/exports/dell-latitude-5420-schema2.json`, identique au `results/dell-latitude-5420.json` de la 0.6.0), passé au schéma 3
   avec les réglages par défaut (`RunSettings()`).
 - **Synthétiques** : les résultats mémoire (`native-memory-single`, `native-memory-multi`,
   `sysbench-memory-single`) et disque (`fio-disk`). Ce sont des valeurs construites pour couvrir
