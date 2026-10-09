@@ -10,7 +10,14 @@ from hwbench.display import bench, compare, scores
 from hwbench.export import load_export
 from hwbench.leaderboard import site
 from hwbench.report import texts
-from hwbench.report.texts import STATUS_LABELS, bench_label, finding_text, synthesis
+from hwbench.report.texts import (
+    STATUS_LABELS,
+    bench_label,
+    finding_text,
+    recommendation,
+    recommendations,
+    synthesis,
+)
 from hwbench.results import Category
 
 
@@ -177,3 +184,36 @@ def test_one_label_table_for_terminal_report_and_site() -> None:
     assert texts.bench_label is labels.bench_label
     assert labels.CATEGORY_LABELS[Category.CPU_MULTI] == "CPU multi-core"
     assert all("cœur" not in label for label in labels.BENCH_LABELS.values())
+
+
+def test_recommendations_give_exact_commands() -> None:
+    findings = analyze(load_export(RESULTS / "dell-latitude-5420.json"))
+    recs = recommendations(findings)
+    commands = [c for r in recs for c in r.commands]
+    # tests chauds dans plusieurs catégories : toutes ; instables : les deux GPU
+    assert commands == [
+        "hwbench bench all",
+        "hwbench bench gpu --runs 5",
+        'sudo "$(command -v hwbench)" info',
+    ]
+    assert not any(c.startswith("sudo hwbench") for c in commands)
+
+
+def test_power_profile_recommendation_uses_the_best_available_profile() -> None:
+    f = Finding(
+        FindingCode.POWER_PROFILE,
+        Status.FIX,
+        {
+            "settings": ["platform_profile"],
+            "platform_profile": "balanced",
+            "energy_performance_preference": None,
+            "best_profile": "balanced-performance",
+        },
+    )
+    rec = recommendation(f)
+    assert rec is not None and rec.commands[0] == "powerprofilesctl set balanced-performance"
+
+
+def test_no_recommendation_for_information() -> None:
+    assert recommendation(Finding(FindingCode.REPRODUCIBLE, Status.OK)) is None
+    assert recommendation(Finding(FindingCode.NO_REFERENCE, Status.INFO)) is None

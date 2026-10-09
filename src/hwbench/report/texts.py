@@ -2,6 +2,8 @@
 les valeurs mesurées et les seuils de la session. Aucune cause non mesurée.
 """
 
+from dataclasses import dataclass
+
 from hwbench.analysis import Finding, FindingCode, Status
 from hwbench.display.fmt import num
 from hwbench.labels import CATEGORY_LABELS, PROFILE_LABELS, bench_label, disk_size_label
@@ -186,3 +188,90 @@ def synthesis(findings: list[Finding], limit: int = 5) -> list[str]:
         or (f.params["kind"] == "cpu" and f.params["backend"] == "native")
     ]
     return [finding_text(f) for f in kept[:limit]]
+
+
+# --- Recommandations (rapport seulement) -------------------------------------------------------
+
+# Catégorie (valeur de Category) -> cible de `hwbench bench`
+BENCH_TARGETS = {
+    "cpu_single": "cpu-single",
+    "cpu_multi": "cpu-multi",
+    "gpu": "gpu",
+    "memory": "memory",
+    "disk": "disk",
+}
+# sudo utilise son propre PATH (secure_path) : hwbench installé par pipx n'y est pas (README).
+SUDO_INFO = 'sudo "$(command -v hwbench)" info'
+
+
+@dataclass(frozen=True)
+class Recommendation:
+    text: str
+    commands: list[str]
+
+
+def _targets(finding: Finding) -> str:
+    targets = []
+    for item in finding.items:
+        target = BENCH_TARGETS.get(item.get("category", ""))
+        if target and target not in targets:
+            targets.append(target)
+    return targets[0] if len(targets) == 1 else "all"
+
+
+def recommendation(finding: Finding) -> Recommendation | None:
+    """Action à mener pour un constat, avec les commandes exactes ; None s'il n'y en a pas."""
+    match finding.code:
+        case FindingCode.ON_BATTERY:
+            return Recommendation(
+                "Brancher la machine sur secteur, puis relancer les tests.", ["hwbench bench"]
+            )
+        case FindingCode.POWER_PROFILE:
+            return Recommendation(
+                f"Passer au profil « {finding.params['best_profile']} » avant de relancer les "
+                "tests (commande de power-profiles-daemon, s'il est installé).",
+                [f"powerprofilesctl set {finding.params['best_profile']}", "hwbench bench"],
+            )
+        case FindingCode.SOFTWARE_RENDERING:
+            return Recommendation(
+                "Vérifier le pilote graphique : le renderer doit nommer la carte graphique, pas "
+                "llvmpipe ou lavapipe.",
+                ["glxinfo -B", "vulkaninfo --summary"],
+            )
+        case FindingCode.HOT_START:
+            return Recommendation(
+                "Laisser refroidir la machine, puis relancer les tests concernés.",
+                [f"hwbench bench {_targets(finding)}"],
+            )
+        case FindingCode.HIGH_VARIANCE:
+            return Recommendation(
+                "Fermer les autres applications, puis relancer avec plus de runs.",
+                [f"hwbench bench {_targets(finding)} --runs 5"],
+            )
+        case FindingCode.WARMUP_UNSTABLE:
+            return Recommendation(
+                "Relancer avec un plafond de warm-up plus long.",
+                [f"hwbench bench {_targets(finding)} --max-warmup 180"],
+            )
+        case FindingCode.VSYNC_UNVERIFIED:
+            return Recommendation(
+                "Installer le plugin headless de vkmark pour un rendu sans affichage, puis "
+                "relancer le test GPU.",
+                ["hwbench bench gpu"],
+            )
+        case FindingCode.TEMPERATURE_REACHED:
+            return Recommendation(
+                "Laisser refroidir la machine avant de relancer les tests.", ["hwbench bench"]
+            )
+        case FindingCode.NEEDS_ROOT:
+            return Recommendation(
+                "Lire les barrettes RAM et la santé SMART avec les droits administrateur. sudo "
+                "n'utilise pas le PATH de l'utilisateur : passer le chemin complet de hwbench "
+                "(sous fish < 3.4 : sudo (command -v hwbench) info).",
+                [SUDO_INFO],
+            )
+    return None
+
+
+def recommendations(findings: list[Finding]) -> list[Recommendation]:
+    return [r for f in findings if (r := recommendation(f)) is not None]
