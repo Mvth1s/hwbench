@@ -67,7 +67,13 @@ def test_sysbench_missing_and_failing(fake_tools) -> None:
 
 
 @pytest.mark.parametrize(
-    ("name", "threads"), [("sysbench_memory_1thread.txt", 1), ("sysbench_memory_multi.txt", 8)]
+    ("name", "threads"),
+    [
+        ("sysbench_memory_1thread.txt", 1),  # Dell Latitude 5420 (Fedora)
+        ("sysbench_memory_multi.txt", 8),
+        ("sysbench_memory_1thread_b850.txt", 1),  # desktop B850 (Arch), machine de référence
+        ("sysbench_memory_multi_b850.txt", 16),
+    ],
 )
 def test_sysbench_memory_parsing(name: str, threads: int) -> None:
     text = tool_output(name)
