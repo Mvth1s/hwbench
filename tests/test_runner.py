@@ -33,6 +33,9 @@ class ScriptedBench(Benchmark):
     def clock(self) -> float:
         return self.now
 
+    def cleanup(self) -> None:
+        self.cleaned = getattr(self, "cleaned", 0) + 1
+
     def run(self) -> Measurement:
         self.calls += 1
         self.now += self.run_s
@@ -104,6 +107,28 @@ def test_default_caps_per_category() -> None:
     assert settings.warmup_cap(Category.CPU_SINGLE) == 30.0
     assert settings.warmup_cap(Category.CPU_MULTI) == 90.0
     assert RunSettings(max_warmup_s=12).warmup_cap(Category.CPU_MULTI) == 12
+    assert settings.warmup_cap(Category.MEMORY) == 30.0
+    assert settings.warmup_cap(Category.DISK) == 60.0
+
+
+def test_cleanup_once_after_the_runs() -> None:
+    bench = ScriptedBench([10.0] * 10)
+    run(bench)
+    assert bench.cleaned == 1
+
+
+@pytest.mark.parametrize("error", [RuntimeError("outil en échec"), KeyboardInterrupt()])
+def test_cleanup_even_on_error_or_interrupt(error: BaseException) -> None:
+    class Failing(ScriptedBench):
+        def run(self) -> Measurement:
+            if self.calls == 2:
+                raise error
+            return super().run()
+
+    bench = Failing([10.0] * 10)
+    with pytest.raises(type(error)):
+        run(bench)
+    assert bench.cleaned == 1
 
 
 def test_single_core_cap_applies() -> None:

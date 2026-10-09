@@ -9,12 +9,14 @@ from test_fixtures_privacy import _live_identifiers
 from test_scoring import snapshot
 
 from hwbench import privacy
+from hwbench.benchmarks.external.fio import FIO_VERSION
 from hwbench.benchmarks.external.glmark2 import GLMARK2_VERSION
-from hwbench.benchmarks.external.sysbench import SYSBENCH_VERSION
+from hwbench.benchmarks.external.sysbench import SYSBENCH_MEMORY_VERSION, SYSBENCH_VERSION
 from hwbench.benchmarks.external.vkmark import VKMARK_VERSION
 from hwbench.benchmarks.native.cpu import NATIVE_CPU_VERSION
+from hwbench.benchmarks.native.memory import NATIVE_MEMORY_VERSION
 from hwbench.reference import build_reference
-from hwbench.results import Category
+from hwbench.results import COMBINED_CATEGORIES, Category
 from hwbench.scoring import load_reference
 
 EXPECTED = {
@@ -27,6 +29,19 @@ EXPECTED = {
 }
 
 
+# Mémoire et disque : ajoutés à la référence à sa prochaine régénération sur le desktop B850.
+# Tant qu'ils n'y sont pas, ces catégories restent en valeurs brutes ; une fois présents, ils
+# doivent être à la version actuelle de leur protocole.
+OPTIONAL: dict[str, tuple[Category, str, str | None]] = {
+    "native-memory-single": (Category.MEMORY, NATIVE_MEMORY_VERSION, None),
+    "native-memory-multi": (Category.MEMORY, NATIVE_MEMORY_VERSION, None),
+    "sysbench-memory-single": (Category.MEMORY, SYSBENCH_MEMORY_VERSION, None),
+    "sysbench-memory-multi": (Category.MEMORY, SYSBENCH_MEMORY_VERSION, None),
+    # taille par défaut du fichier de test : seule taille notée contre la référence
+    "fio-disk": (Category.DISK, FIO_VERSION, "1GiB"),
+}
+
+
 def raw_reference() -> str:
     return resources.files("hwbench").joinpath("data/reference.json").read_text(encoding="utf-8")
 
@@ -36,16 +51,20 @@ def test_reference_loads_with_all_categories_and_benches() -> None:
     assert reference is not None
     assert reference.machine == "ASRock B850 Riptide WiFi"
     assert not reference.forced and reference.forced_reasons == []
-    assert {e.category for e in reference.entries} == set(Category)
-    assert {e.id.name for e in reference.entries} == set(EXPECTED)
+    assert {e.category for e in reference.entries} >= set(COMBINED_CATEGORIES)
+    names = {e.id.name for e in reference.entries}
+    assert names >= set(EXPECTED)
+    assert names <= set(EXPECTED) | set(OPTIONAL), names - set(EXPECTED) - set(OPTIONAL)
 
 
 def test_reference_matches_current_protocol_versions() -> None:
     """Incrémenter la version d'un bench impose de régénérer la référence."""
     reference = load_reference()
     assert reference is not None
-    for name, (category, version, presentation) in EXPECTED.items():
+    for name, (category, version, presentation) in (EXPECTED | OPTIONAL).items():
         entry = reference.find(name)
+        if name in OPTIONAL and entry is None:
+            continue
         assert entry is not None
         assert (entry.category, entry.id.version, entry.id.presentation) == (
             category,

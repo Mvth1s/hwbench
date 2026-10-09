@@ -2,6 +2,7 @@ import json
 from dataclasses import replace
 
 import pytest
+from conftest import make_result
 from test_compare import export
 from test_scoring import REFERENCE, machine, payload
 
@@ -223,3 +224,20 @@ def test_non_standard_constants_are_refused(tmp_path) -> None:
 def test_invalid_export_date_is_refused(tmp_path, created) -> None:
     data = good_payload() | {"created": created}
     assert "created : date d'export invalide (ISO 8601 attendu)" in problems(tmp_path, data)
+
+
+def test_export_with_memory_and_disk_is_accepted(tmp_path) -> None:
+    results = machine(1.2) + [
+        make_result("native-memory-single", 12_000.0),
+        make_result("native-memory-multi", 30_000.0),
+        make_result("sysbench-memory-single", 13_000.0, tool_version="1.0.20"),
+        make_result(
+            "fio-disk",
+            9_000.0,
+            tool_version="3.40",
+            presentation="1GiB",
+            details={"seq_read": 3000.0, "rand_read_4k": 200_000.0},
+            detail_units={"seq_read": "MiB/s", "rand_read_4k": "IOPS"},
+        ),
+    ]
+    assert problems(tmp_path, to_dict(export(results, "Avec disque"))) == []

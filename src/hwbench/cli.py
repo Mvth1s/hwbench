@@ -10,6 +10,7 @@ from rich.text import Text
 
 from hwbench import __version__, privacy
 from hwbench.benchmarks.base import BenchOptions, known_backends, select
+from hwbench.benchmarks.external.fio import parse_size
 from hwbench.collect import collect_snapshot
 from hwbench.compare import compare
 from hwbench.display.bench import CATEGORY_LABELS, render_result, warning_message
@@ -106,6 +107,8 @@ class Target(StrEnum):
     CPU_SINGLE = "cpu-single"
     CPU_MULTI = "cpu-multi"
     GPU = "gpu"
+    MEMORY = "memory"
+    DISK = "disk"
     ALL = "all"
 
 
@@ -113,6 +116,8 @@ TARGET_CATEGORIES = {
     Target.CPU_SINGLE: [Category.CPU_SINGLE],
     Target.CPU_MULTI: [Category.CPU_MULTI],
     Target.GPU: [Category.GPU],
+    Target.MEMORY: [Category.MEMORY],
+    Target.DISK: [Category.DISK],
     Target.ALL: list(Category),
 }
 
@@ -138,9 +143,37 @@ MaxWarmupOption = Annotated[
     typer.Option(
         "--max-warmup",
         min=0,
-        help="Plafond du warm-up en secondes (défaut : 30 single-core, 90 multi-cœur et GPU).",
+        help=(
+            "Plafond du warm-up en secondes (défaut : 30 single-core et mémoire, "
+            "90 multi-cœur et GPU, 60 disque)."
+        ),
     ),
 ]
+DiskSizeOption = Annotated[
+    str,
+    typer.Option(
+        "--disk-size",
+        help="Taille du fichier de test du bench disque (ex. 1G, 512M ; minimum 64M). Une "
+        "autre taille que 1G n'est pas comparable à la référence.",
+    ),
+]
+DiskPathOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--disk-path",
+        file_okay=False,
+        help="Dossier du fichier de test du bench disque (défaut : ~/.cache/hwbench).",
+    ),
+]
+
+
+def _bench_options(workers: int | None, disk_size: str, disk_path: Path | None) -> BenchOptions:
+    try:
+        size = parse_size(disk_size)
+    except ValueError as exc:
+        typer.echo(f"Erreur : --disk-size : {exc}.", err=True)
+        raise typer.Exit(code=2) from None
+    return BenchOptions(workers=workers, disk_size=size, disk_path=disk_path)
 
 
 def _run_all(
@@ -156,6 +189,9 @@ def _run_all(
             reason = AVAILABILITY_LABELS[availability].plain
             console.print(f"[yellow]{label} : indisponible ({reason}), ignoré.[/yellow]")
             continue
+        if (notice := instance.notice()) is not None:
+            # le chemin vient de l'utilisateur : jamais interprété comme balisage rich
+            console.print(Text(f"{label} : {notice}.", style="dim"))
         try:
             with console.status(f"{label} : préparation…") as status:
                 cap = settings.warmup_cap(cls.category)
@@ -225,7 +261,7 @@ def _bench_session(
     target: Target,
     backend: str,
     settings: RunSettings,
-    workers: int | None,
+    options: BenchOptions,
     weights: str | None,
 ) -> tuple[list[Result], Scores | None]:
     """Benchs + scores, partagé par `bench` et `export`."""
@@ -258,7 +294,7 @@ def _bench_session(
     for warning in start_warnings(initial, settings):
         console.print(f"[yellow]⚠ {warning_message(warning, initial)}[/yellow]")
 
-    results = _run_all(console, classes, settings, BenchOptions(workers=workers))
+    results = _run_all(console, classes, settings, options)
     if not results:
         raise typer.Exit(code=1)
 
@@ -286,10 +322,13 @@ def bench(
     max_cv: MaxCvOption = DEFAULTS.high_variance_cv_percent,
     hot_start: HotStartOption = DEFAULTS.hot_start_c,
     weights: WeightsOption = None,
+    disk_size: DiskSizeOption = "1G",
+    disk_path: DiskPathOption = None,
 ) -> None:
     """Lance les benchmarks notés."""
     settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start)
-    _bench_session(Console(), target, backend, settings, workers, weights)
+    options = _bench_options(workers, disk_size, disk_path)
+    _bench_session(Console(), target, backend, settings, options, weights)
 
 
 @app.command()
@@ -306,6 +345,8 @@ def export(
     max_cv: MaxCvOption = DEFAULTS.high_variance_cv_percent,
     hot_start: HotStartOption = DEFAULTS.hot_start_c,
     weights: WeightsOption = None,
+    disk_size: DiskSizeOption = "1G",
+    disk_path: DiskPathOption = None,
 ) -> None:
     """Lance les benchmarks et exporte le tout en JSON pour `hwbench compare`.
 
@@ -313,7 +354,8 @@ def export(
     """
     console = Console()
     settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start)
-    results, scores = _bench_session(console, target, backend, settings, workers, weights)
+    options = _bench_options(workers, disk_size, disk_path)
+    results, scores = _bench_session(console, target, backend, settings, options, weights)
     snapshot, _ = collect_snapshot()
     write_export(build_export(snapshot, machine_label(snapshot), results, scores), output)
     console.print(f"Export écrit : {output} ({len(results)} benchs)")

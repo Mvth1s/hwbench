@@ -6,9 +6,14 @@ from conftest import tool_output
 from hwbench.benchmarks.base import BenchOptions
 from hwbench.benchmarks.external import _gpu, _run, glmark2, sysbench, vkmark
 from hwbench.benchmarks.external.glmark2 import Glmark2
-from hwbench.benchmarks.external.sysbench import SysbenchCpuMulti, SysbenchCpuSingle
+from hwbench.benchmarks.external.sysbench import (
+    SysbenchCpuMulti,
+    SysbenchCpuSingle,
+    SysbenchMemoryMulti,
+    SysbenchMemorySingle,
+)
 from hwbench.benchmarks.external.vkmark import Vkmark
-from hwbench.results import Availability, BenchWarning, MachineState
+from hwbench.results import Availability, BenchWarning, Category, MachineState
 from hwbench.runner import RunSettings, run_benchmark
 
 WAYLAND = {"WAYLAND_DISPLAY": "wayland-0", "DISPLAY": ":1"}
@@ -56,6 +61,53 @@ def test_sysbench_missing_and_failing(fake_tools) -> None:
     fake_tools(failing={"sysbench": "FATAL: invalid option"})
     with pytest.raises(_run.ToolError, match="invalid option"):
         SysbenchCpuSingle().run()
+
+
+# sysbench memory : sorties réelles du portable Dell (i5-1145G7, DDR4-3200)
+
+
+@pytest.mark.parametrize(
+    ("name", "threads"), [("sysbench_memory_1thread.txt", 1), ("sysbench_memory_multi.txt", 8)]
+)
+def test_sysbench_memory_parsing(name: str, threads: int) -> None:
+    text = tool_output(name)
+    assert f"Number of threads: {threads}" in text
+    assert sysbench.parse_version(text) == "1.0.20"
+    assert sysbench.parse_mib_per_second(text) > 1000
+    assert sysbench.parse_total_time(text) == pytest.approx(2.0, abs=0.1)
+
+
+def test_sysbench_memory_missing_value_is_an_error() -> None:
+    with pytest.raises(_run.ToolError, match="MiB/sec"):
+        sysbench.parse_mib_per_second(tool_output("sysbench_cpu_1thread.txt"))
+
+
+def test_sysbench_memory_single_run(fake_tools) -> None:
+    tools = fake_tools(outputs={"sysbench": tool_output("sysbench_memory_1thread.txt")})
+    bench = SysbenchMemorySingle()
+    m = bench.run()
+    assert m.value == sysbench.parse_mib_per_second(tool_output("sysbench_memory_1thread.txt"))
+    args = tools.calls[0]
+    assert args[:2] == ["sysbench", "memory"] and args[-1] == "run"
+    for option in (
+        "--threads=1",
+        "--memory-block-size=128M",
+        "--memory-scope=local",
+        "--memory-oper=read",
+        "--memory-access-mode=seq",
+    ):
+        assert option in args
+    assert bench.category is Category.MEMORY and bench.unit == "MiB/s"
+    assert bench.tool_version() == "1.0.20" and bench.workers is None
+    assert bench.environment()["block-size"] == "128M"
+
+
+def test_sysbench_memory_multi_uses_workers(fake_tools) -> None:
+    tools = fake_tools(outputs={"sysbench": tool_output("sysbench_memory_multi.txt")})
+    bench = SysbenchMemoryMulti(BenchOptions(workers=8))
+    bench.run()
+    assert "--threads=8" in tools.calls[0] and "--memory-block-size=32M" in tools.calls[0]
+    assert bench.workers == 8
 
 
 # --- glmark2 -----------------------------------------------------------------------------

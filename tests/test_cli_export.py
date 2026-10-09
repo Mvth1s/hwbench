@@ -16,11 +16,16 @@ def test_export_writes_a_loadable_file(fake_runs, monkeypatch, tmp_path) -> None
     out = tmp_path / "machine.json"
     result = runner.invoke(cli.app, ["export", "-o", str(out), "--backend", "native"], env=WIDE)
     assert result.exit_code == 0, result.output
-    assert f"Export écrit : {out} (2 benchs)" in result.output.replace("\n", "")
+    assert f"Export écrit : {out} (4 benchs)" in result.output.replace("\n", "")
     assert "Scores · référence" in result.output  # même affichage que bench
     export = load_export(out)
     assert export.machine == "Dell Inc. Latitude 5420"
-    assert [r.name for r in export.results] == ["native-cpu-single", "native-cpu-multi"]
+    assert [r.name for r in export.results] == [
+        "native-cpu-single",
+        "native-cpu-multi",
+        "native-memory-single",
+        "native-memory-multi",
+    ]
     assert export.reference is not None and export.reference.digest == REFERENCE.digest
     assert export.combined is not None and export.combined.gpu_missing
     assert export.snapshot.cpu.model is not None

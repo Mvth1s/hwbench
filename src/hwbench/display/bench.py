@@ -10,6 +10,8 @@ CATEGORY_LABELS = {
     Category.CPU_SINGLE: "CPU single-core",
     Category.CPU_MULTI: "CPU multi-core",
     Category.GPU: "GPU",
+    Category.MEMORY: "Mémoire",
+    Category.DISK: "Disque",
 }
 
 DETAIL_LABELS = {
@@ -17,6 +19,10 @@ DETAIL_LABELS = {
     "zlib": "Compression zlib (niveau 6)",
     "lzma": "Compression LZMA (preset 1)",
     "powmod": "Exponentiation modulaire 2048 bits",
+    "seq_read": "Lecture séquentielle (1 Mio, QD8)",
+    "seq_write": "Écriture séquentielle (1 Mio, QD8)",
+    "rand_read_4k": "Lecture aléatoire 4K (QD32)",
+    "rand_write_4k": "Écriture aléatoire 4K (QD32)",
 }
 
 # « index » : moyenne géométrique de débits, sans unité. Les points (référence = 1000) sont
@@ -34,6 +40,11 @@ ENVIRONMENT_LABELS = {
     "driver": "pilote",
     "cpu-max-prime": "cpu-max-prime",
     "time": "durée",
+    "block-size": "bloc",
+    "operation": "opération",
+    "filesystem": "système de fichiers",
+    "device": "disque",
+    "ioengine": "moteur d'E/S",
 }
 
 PRESENTATION_LABELS = {
@@ -47,6 +58,14 @@ NA = Text("non disponible", style="dim")
 
 def _unit(unit: str) -> str:
     return UNIT_LABELS.get(unit, unit)
+
+
+def disk_size_label(presentation: str) -> str:
+    """« 1GiB » -> « 1 Gio », « 512MiB » -> « 512 Mio » (taille du fichier du bench disque)."""
+    for suffix, label in (("GiB", "Gio"), ("MiB", "Mio")):
+        if presentation.endswith(suffix):
+            return f"{presentation.removesuffix(suffix)} {label}"
+    return presentation
 
 
 def warning_message(
@@ -147,7 +166,9 @@ def render_result(result: Result) -> Panel:
     if result.workers is not None:
         # le natif lance des processus (GIL) ; les outils externes, des threads
         t.add_row("Processus" if result.backend == "native" else "Threads", str(result.workers))
-    if result.presentation is not None:
+    if result.presentation is not None and result.category is Category.DISK:
+        t.add_row("Fichier de test", disk_size_label(result.presentation))
+    elif result.presentation is not None:
         t.add_row("Présentation", PRESENTATION_LABELS.get(result.presentation, result.presentation))
     _state_rows(t, result)
 

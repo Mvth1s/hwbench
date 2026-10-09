@@ -58,7 +58,12 @@ def test_reference_written_when_conditions_are_met(fake_runs, tmp_path) -> None:
     out = tmp_path / "reference.json"
     result = runner.invoke(cli.app, ["reference", "-o", str(out)], env=WIDE)
     assert result.exit_code == 0, result.output
-    assert fake_runs.ran == ["native-cpu-single", "native-cpu-multi"]
+    assert fake_runs.ran == [
+        "native-cpu-single",
+        "native-cpu-multi",
+        "native-memory-single",
+        "native-memory-multi",
+    ]
     assert "sysbench-cpu-single : absent de la référence" in result.output
     data = json.loads(out.read_text())
     assert data["forced"] is False and data["forced_reasons"] == []
