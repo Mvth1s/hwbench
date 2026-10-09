@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 
 from hwbench import __version__, cli
 from hwbench.collect import collect_snapshot
-from hwbench.display.fmt import compact, num
+from hwbench.display.fmt import compact, fr_date, num
 from hwbench.display.info import render_power, render_ram
 from hwbench.models import Battery, PowerData, RamData, RamModule
 
@@ -229,3 +229,21 @@ def test_shell_completion_options() -> None:
     # de terminal où rich découpe « --install-completion » en segments colorés.
     params = {p.name for p in typer.main.get_command(cli.app).params}
     assert {"install_completion", "show_completion"} <= params
+
+
+@pytest.mark.parametrize(
+    ("iso", "expected"),
+    [
+        ("2024-12-18", "18/12/2024"),
+        ("2026-10-05T12:00:00+00:00", "05/10/2026"),
+        (None, None),
+        ("", None),
+    ],
+)
+def test_fr_date(iso, expected) -> None:
+    assert fr_date(iso) == expected
+
+
+def test_fr_date_never_raises() -> None:
+    assert fr_date("garbage") == "garbage"
+    assert fr_date("2026-13-45T00:00:00") == "2026-13-45T00:00:00"

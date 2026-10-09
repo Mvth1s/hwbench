@@ -146,6 +146,24 @@ def test_cli_reports_each_file_and_fails_on_any_problem(tmp_path, capsys, monkey
     assert "1 fichier(s) refusé(s) sur 2" in out.err
 
 
+def test_cli_annotates_problems_under_github_actions(tmp_path, capsys, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    bad = submit(tmp_path, good_payload() | {"schema_version": 1}, "bad.json")
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    assert cli.main(["validate", str(bad)]) == 1
+    assert "::error" not in capsys.readouterr().out
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    assert cli.main(["validate", str(bad)]) == 1
+    errors = [line for line in capsys.readouterr().out.splitlines() if line.startswith("::error")]
+    assert errors and all(line.startswith("::error title=Soumission refusée::") for line in errors)
+    assert any(f"{bad} : " in line and "schéma d'export 1" in line for line in errors)
+
+
+def test_annotation_stays_on_one_line() -> None:
+    # un retour à la ligne venu d'un fichier soumis ne doit pas ouvrir une autre commande
+    assert cli._annotation("a\n::warning::b\r%") == "a%0A::warning::b%0D%25"
+
+
 def test_symlink_is_refused_without_being_read(tmp_path) -> None:
     secret = tmp_path / "secret.json"
     secret.write_text(json.dumps(good_payload()))
@@ -199,3 +217,9 @@ def test_duplicate_keys_cannot_hide_an_identifier(tmp_path) -> None:
 def test_non_standard_constants_are_refused(tmp_path) -> None:
     text = json.dumps(good_payload()).replace('"stdev": 0.0', '"stdev": NaN', 1)
     assert problems(tmp_path, text) == ["JSON invalide : valeur non standard en JSON : NaN"]
+
+
+@pytest.mark.parametrize("created", ["garbage", "", "2026-13-45"])
+def test_invalid_export_date_is_refused(tmp_path, created) -> None:
+    data = good_payload() | {"created": created}
+    assert "created : date d'export invalide (ISO 8601 attendu)" in problems(tmp_path, data)

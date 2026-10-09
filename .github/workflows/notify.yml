@@ -1,0 +1,92 @@
+name: Notify
+
+# Notifications Discord après les workflows CI, Results, Release et Pages.
+#
+# workflow_run tourne dans le contexte du dépôt, avec les secrets, même pour une PR de fork :
+# le code de la PR n'est JAMAIS récupéré ni exécuté. Seul scripts/discord_notify.py est
+# extrait, depuis la branche par défaut (main, le checkout par défaut d'un workflow_run), et il
+# ne lit que des métadonnées : l'événement (GITHUB_EVENT_PATH) et l'API GitHub. Aucune donnée
+# contrôlée par un contributeur (titre de PR, nom de branche, message de commit) n'est
+# interpolée dans un script : les conditions `if:` ne font que des comparaisons, le reste passe
+# par l'événement ou par env. Un job par salon, chacun avec son seul secret.
+# workflow_run ne se déclenche que depuis la version de ce fichier présente sur main.
+on:
+  workflow_run:
+    workflows: [CI, Results, Release, Pages]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  # #ci : échec d'un push sur dev ou main, puis retour au vert
+  ci:
+    if: >-
+      github.event.workflow_run.event == 'push'
+      && (github.event.workflow_run.head_branch == 'dev'
+          || github.event.workflow_run.head_branch == 'main')
+      && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # extraction du script (branche par défaut)
+      actions: read # jobs du run et runs précédents
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/discord_notify.py
+          sparse-checkout-cone-mode: false
+      - name: Notifier #ci
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DISCORD_WEBHOOK_CI: ${{ secrets.DISCORD_WEBHOOK_CI }}
+        run: python3 scripts/discord_notify.py ci
+
+  # #classement : soumission validée ou refusée (PR de results/, souvent depuis un fork)
+  results:
+    if: >-
+      github.event.workflow_run.name == 'Results'
+      && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # extraction du script (branche par défaut)
+      actions: read # jobs du run de validation
+      checks: read # annotations d'erreur du validateur (raisons du refus)
+      pull-requests: read # PR liée au run
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/discord_notify.py
+          sparse-checkout-cone-mode: false
+      - name: Notifier #classement
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DISCORD_WEBHOOK_CLASSEMENT: ${{ secrets.DISCORD_WEBHOOK_CLASSEMENT }}
+        run: python3 scripts/discord_notify.py results
+
+  # #dependabot : résultat de la CI des PR de Dependabot. Ce workflow_run reçoit les secrets
+  # Actions (workflow_run n'est pas un événement « Dependabot ») ; DISCORD_WEBHOOK_DEPENDABOT
+  # existe aussi en secret Dependabot par précaution, sous le même nom (voir CLAUDE.md).
+  dependabot:
+    if: >-
+      github.event.workflow_run.name == 'CI'
+      && github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.actor.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # extraction du script (branche par défaut)
+      pull-requests: read # PR liée au run
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/discord_notify.py
+          sparse-checkout-cone-mode: false
+      - name: Notifier #dependabot
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DISCORD_WEBHOOK_DEPENDABOT: ${{ secrets.DISCORD_WEBHOOK_DEPENDABOT }}
+        run: python3 scripts/discord_notify.py dependabot

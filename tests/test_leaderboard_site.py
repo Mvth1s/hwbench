@@ -64,7 +64,7 @@ def test_site_files_and_escaping(tmp_path) -> None:
         assert re.search(r'(src|href)="https?://(?!github\.com/Mvth1s/hwbench)', page) is None
     assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &lt;img" in index
     assert 'href="machines/rapide.html">Desktop rapide</a>' in index
-    assert "Généré le 2026-10-05 12:00 UTC" in index
+    assert "Généré le 05/10/2026 12:00 UTC" in index
     assert "1 machine(s) non classée(s) ici" in index  # le portable, dans le combiné
 
 
@@ -98,6 +98,27 @@ def test_cli_site(tmp_path, monkeypatch, capsys) -> None:
     assert (out / "index.html").exists()
 
 
+def test_cli_summary_gives_combined_ranks(tmp_path, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    d = results_dir(tmp_path)
+    assert cli.main(["summary", "--results", str(d)]) == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["ranked"] == 3
+    by_slug = {m["slug"]: m for m in summary["machines"]}
+    assert by_slug["rapide"]["rank"] == 1 and round(by_slug["rapide"]["combined"]) == 2000
+    assert by_slug["piege"]["machine"] == EVIL  # brut : l'échappement revient au consommateur
+    # combiné sans GPU : présent, mais sans rang
+    assert by_slug["portable"]["rank"] is None and by_slug["portable"]["combined"] is None
+
+    new = [str(d / "moyen.json"), str(d / "portable.json")]
+    assert cli.main(["summary", "--results", str(d), "--new", *new]) == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert [(m["slug"], m["rank"]) for m in summary["machines"]] == [
+        ("moyen", 2),
+        ("portable", None),
+    ]
+
+
 def test_site_skips_symlinks(tmp_path) -> None:
     d = results_dir(tmp_path)
     (d / "lien.json").symlink_to(d / "rapide.json")
@@ -111,3 +132,26 @@ def test_site_refuses_a_symlinked_results_dir(tmp_path) -> None:
     (tmp_path / "lien").symlink_to(real)
     entries, skipped = load_entries(tmp_path / "lien", REFERENCE)
     assert entries == [] and "lien symbolique refusé" in skipped[0]
+
+
+def test_gpu_column_and_dates(tmp_path) -> None:
+    out = tmp_path / "_site"
+    build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW)
+    index = (out / "index.html").read_text()
+    # renderer brut « Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2) » : nom seul, casse d'origine
+    assert "<td>Mesa Intel(R) Iris(R) Xe Graphics</td>" in index
+    assert "(TGL GT2)" not in index
+    assert '<td class="small muted">03/10/2026</td>' in index  # date d'export
+    assert "(mesurée le 29/09/2026," in index  # date de la référence
+    page = (out / "machines" / "rapide.html").read_text()
+    assert "<td>03/10/2026</td>" in page  # « Exporté le »
+    assert "Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)" in page  # détail : renderer complet
+
+
+def test_unreadable_date_does_not_break_the_site(tmp_path) -> None:
+    d = results_dir(tmp_path)
+    data = json.loads((d / "rapide.json").read_text()) | {"created": "<b>jamais</b>"}
+    (d / "rapide.json").write_text(json.dumps(data))
+    out = tmp_path / "_site"
+    build_site(d, out, REFERENCE, generated=NOW)
+    assert "&lt;b&gt;jamais&lt;/b&gt;" in (out / "index.html").read_text()  # brut, échappé

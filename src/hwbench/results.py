@@ -45,18 +45,24 @@ def driver_key(driver: str | None) -> tuple[str, str] | None:
     return driver[: match.start()].strip().lower(), match.group(0)
 
 
-def gpu_key(renderer: str | None) -> str | None:
-    """Nom du GPU sans les détails volatils du renderer (pilote, noyau, DRM, bus).
+def gpu_name(renderer: str | None) -> str | None:
+    """Nom du GPU, casse d'origine, sans les détails volatils du renderer (pilote, noyau, DRM).
 
     « AMD Radeon RX 9070 XT (radeonsi, gfx1201, ACO, DRM 3.64, 7.2.7-arch1-1) » et
-    « AMD Radeon RX 9070 XT (RADV GFX1201) » -> « amd radeon rx 9070 xt » ;
-    « NVIDIA GeForce RTX 3060/PCIe/SSE2 » -> « nvidia geforce rtx 3060 ».
+    « AMD Radeon RX 9070 XT (RADV GFX1201) » -> « AMD Radeon RX 9070 XT » ;
+    « NVIDIA GeForce RTX 3060/PCIe/SSE2 » -> « NVIDIA GeForce RTX 3060 ».
     """
     if not renderer:
         return None
     # « (… » précédé d'une espace : détails du pilote ; « Intel(R) » (collé) fait partie du nom
-    name = re.split(r"\s+\(|/", renderer, maxsplit=1)[0].strip().lower()
+    name = re.split(r"\s+\(|/", renderer, maxsplit=1)[0].strip()
     return name or None
+
+
+def gpu_key(renderer: str | None) -> str | None:
+    """Clé de comparaison d'un GPU : gpu_name en minuscules (« amd radeon rx 9070 xt »)."""
+    name = gpu_name(renderer)
+    return name.lower() if name else None
 
 
 @dataclass(frozen=True)

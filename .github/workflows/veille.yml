@@ -1,0 +1,36 @@
+name: Veille
+
+# Chaque semaine : versions de glmark2, vkmark et sysbench sur Arch Linux (API publique
+# archlinux.org) comparées à celles de la référence (src/hwbench/data/reference.json), et
+# nouvelle version stable de Python (endoflife.date) absente de la matrice de ci.yml. Message
+# dans #veille seulement s'il y a quelque chose à signaler. schedule ne tourne que depuis main.
+on:
+  schedule:
+    - cron: "23 5 * * 4" # jeudi, 05:23 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  veille:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # extraction du script, de la référence et de ci.yml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/discord_notify.py
+            src/hwbench/data/reference.json
+            .github/workflows/ci.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Notifier #veille
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_VEILLE: ${{ secrets.DISCORD_WEBHOOK_VEILLE }}
+        run: >-
+          python3 scripts/discord_notify.py veille
+          --reference src/hwbench/data/reference.json
+          --ci-workflow .github/workflows/ci.yml
