@@ -2,6 +2,208 @@
 
 <!-- version list -->
 
+## v0.6.0 (2026-10-09)
+
+### Bug Fixes
+
+- **analysis**: Derive threshold findings from measured values
+  ([`58b4899`](https://github.com/Mvth1s/hwbench/commit/58b48998b9d09732ed2da618055212d6659f4edd))
+
+- **ci**: Never forward the github token on a redirect
+  ([`3b8de07`](https://github.com/Mvth1s/hwbench/commit/3b8de07919443a87df476c3e4eece84e66720758))
+
+- **leaderboard**: Use real plurals instead of "(s)" on the site and in the cli
+  ([`788a596`](https://github.com/Mvth1s/hwbench/commit/788a596838eca540cb6073a7359454c8391a3df4))
+
+- **report**: Explain the conditions tile and word start temperatures exactly
+  ([`42be399`](https://github.com/Mvth1s/hwbench/commit/42be3992eeed7660536f5bab3c784037627252ee))
+
+- **report**: Never claim a multi-core gain below a factor of 1.1
+  ([`caa9d44`](https://github.com/Mvth1s/hwbench/commit/caa9d44e364ef435899f07afc552e3562360766a))
+
+### Chores
+
+- Ignore the generated _site/ directory
+  ([`4ad1f69`](https://github.com/Mvth1s/hwbench/commit/4ad1f69af50cf1e586acde297652b61353f68910))
+
+- **results**: Add dell latitude 5420
+  ([`92d61c8`](https://github.com/Mvth1s/hwbench/commit/92d61c8d3f20543fccd152b03fa6584900d393e8))
+
+### Continuous Integration
+
+- Pin actions/checkout by commit sha in the release job
+  ([`edfa7ef`](https://github.com/Mvth1s/hwbench/commit/edfa7ef4d0f2b2cab447ca206239cc0d197e04bc))
+
+- Pin checkout and setup-node by commit sha in commitlint
+  ([`4b2f35d`](https://github.com/Mvth1s/hwbench/commit/4b2f35dee1f9b82d1e58fa1ba6204cc5df5ed839))
+
+- Pin checkout and setup-python by commit sha in results validation
+  ([`245314f`](https://github.com/Mvth1s/hwbench/commit/245314f286c96940c3e0978e1056ef74bf873010))
+
+- Pin checkout and setup-python by commit sha in the ci workflow
+  ([`f6b52c7`](https://github.com/Mvth1s/hwbench/commit/f6b52c72eabd98dcd9fc626845fb4b13686e86d0))
+
+- Pin checkout and setup-python by commit sha in the pages build
+  ([`53a7d73`](https://github.com/Mvth1s/hwbench/commit/53a7d735c0529ef7153ed93340f90339dea88369))
+
+### Documentation
+
+- Describe the fio identity rule and the re-export of stale results
+  ([`d8d3a60`](https://github.com/Mvth1s/hwbench/commit/d8d3a60e689542e2e6a5319821e2a948ebf1e3bc))
+
+- Describe the memory and disk benchmarks in the readme
+  ([`d6e3378`](https://github.com/Mvth1s/hwbench/commit/d6e3378147a9198738272918f8459a3b72e3ba4b))
+
+- Document the html report and its conventions
+  ([`d3d65c3`](https://github.com/Mvth1s/hwbench/commit/d3d65c3190c86d2262f7a4bab396bb89b7cbcb57))
+
+- Give the new reference values and explain what the disk score measures
+  ([`d2815a9`](https://github.com/Mvth1s/hwbench/commit/d2815a96d450800e3a2ba90173fba0080116885d))
+
+- Plan the deterministic html report in docs/rapport.md
+  ([`6539d58`](https://github.com/Mvth1s/hwbench/commit/6539d583be1d5d142f552911cce3c6e8f6dae68a))
+
+- Record the memory and disk conventions in CLAUDE.md
+  ([`c780aae`](https://github.com/Mvth1s/hwbench/commit/c780aaee95848a4abdabee103d07032d921abc7a))
+
+- Record the regenerated reference in CLAUDE.md
+  ([`e39a5e3`](https://github.com/Mvth1s/hwbench/commit/e39a5e3825aad6e3dc9c608c8893e4baf8aef782))
+
+- Require every action, including actions/*, to be pinned by sha
+  ([`0eb6d37`](https://github.com/Mvth1s/hwbench/commit/0eb6d3770ffd04c016b3d303ad13bfac5869aab1))
+
+### Features
+
+- **analysis**: Add a deterministic rule engine for session findings
+  ([`45bbed4`](https://github.com/Mvth1s/hwbench/commit/45bbed4c4011e64a093eeb51c6d6ac68a73e0c15))
+
+- **analysis**: Add a reliable finding for conforming power conditions
+  ([`714315d`](https://github.com/Mvth1s/hwbench/commit/714315d4825f0c0971b974af803546785703bab8))
+
+- **analysis**: Give the category of each test cited by a finding
+  ([`fdfe801`](https://github.com/Mvth1s/hwbench/commit/fdfe801a59b6ddfc2cbce66778a8073ef7a5882f))
+
+- **bench**: Add native memory bandwidth benches, single and multi-process
+  ([`11ffcbb`](https://github.com/Mvth1s/hwbench/commit/11ffcbb4d3c367d2ebffda747e1f3d96fa22b1a5))
+
+- **bench**: Add sysbench memory backends, single and multi-thread
+  ([`b92650d`](https://github.com/Mvth1s/hwbench/commit/b92650d07c41b3bab678bb985c16a5f66ce15499))
+
+- **bench**: Add the fio disk benchmark
+  ([`4bff8e1`](https://github.com/Mvth1s/hwbench/commit/4bff8e1220cb2153a43668d615daede9ce2c385f))
+
+- **bench**: Call a cleanup hook after the runs, even on error or ctrl+c
+  ([`f05ded1`](https://github.com/Mvth1s/hwbench/commit/f05ded1436e76bd5072c9e1bd64444998f2d9010))
+
+- **cli**: Add --reliable-cv and write the run settings into exports
+  ([`e8c93c6`](https://github.com/Mvth1s/hwbench/commit/e8c93c61c900369aa2530fcef88b578349aa66c5))
+
+- **cli**: Add hwbench report and --report on bench and export
+  ([`4e786ff`](https://github.com/Mvth1s/hwbench/commit/4e786ff043dff5805c18843cbd78d6c8d6df0970))
+
+- **cli**: Add memory and disk targets with --disk-size and --disk-path
+  ([`146404f`](https://github.com/Mvth1s/hwbench/commit/146404fd98a1b1c5ade3a7ccb0a5140ee65af376))
+
+- **compare**: Flag a different fio version on the same disk model
+  ([`5b7c02d`](https://github.com/Mvth1s/hwbench/commit/5b7c02d7ded79e795b1f1a82d9cf97185bc3676c))
+
+- **compare**: Show memory benches and disk details as information rows
+  ([`16270b0`](https://github.com/Mvth1s/hwbench/commit/16270b0c077c86fadf019ef6a5adca738c5ce513))
+
+- **export**: Record the run settings in export schema 3
+  ([`5ab7c3f`](https://github.com/Mvth1s/hwbench/commit/5ab7c3f872d0617cef7a14fd5ba66e3eb613203f))
+
+- **leaderboard**: Detect exports scored against an older reference
+  ([`5de68cf`](https://github.com/Mvth1s/hwbench/commit/5de68cf12229a270083c6c6d6a3f7197a74b552d))
+
+- **leaderboard**: Flag results scored against an older reference
+  ([`d8c3fa8`](https://github.com/Mvth1s/hwbench/commit/d8c3fa8b9afe09f8505c8f7775a9d5fd987ebd61))
+
+- **leaderboard**: Rebuild machine pages on the report sections
+  ([`f9ab28a`](https://github.com/Mvth1s/hwbench/commit/f9ab28a40c4ac87e9ffb96bdc8f2859930a5941f))
+
+- **leaderboard**: Show memory and disk as information columns
+  ([`a598735`](https://github.com/Mvth1s/hwbench/commit/a598735ccc14c7808ac11d1bf86b257f7d623529))
+
+- **reference**: Score memory and disk against a regenerated reference
+  ([`ff722cf`](https://github.com/Mvth1s/hwbench/commit/ff722cff58fd4518eb44b6357b2178d511a6ccee))
+
+- **report**: Add french texts and the synthesis of session findings
+  ([`c0efd80`](https://github.com/Mvth1s/hwbench/commit/c0efd80b71104152c4a07fbe3edfb7a77bfe7bf2))
+
+- **report**: Add recommendations with exact commands
+  ([`55042ca`](https://github.com/Mvth1s/hwbench/commit/55042ca9aa5eff0b25a970a92fa31ff1921ba600))
+
+- **report**: Add svg bar charts and the session temperature timeline
+  ([`02c095b`](https://github.com/Mvth1s/hwbench/commit/02c095b9616140caddbf6668d05fda0978aa2112))
+
+- **report**: Add the shared offline html engine
+  ([`4c45eca`](https://github.com/Mvth1s/hwbench/commit/4c45eca2615c7594346e94c74215aba88c7ccbf7))
+
+- **report**: Describe conforming conditions and when temperatures are read
+  ([`7f17aa2`](https://github.com/Mvth1s/hwbench/commit/7f17aa2d2095e435795e76cfc70754d860a95c26))
+
+- **report**: Let pages insert a block after the header and show the full gpu renderer
+  ([`4fac18e`](https://github.com/Mvth1s/hwbench/commit/4fac18e1aadb9e10273b405abd14480fcbb1dfaf))
+
+- **report**: Render the deterministic html report of a session
+  ([`81368b1`](https://github.com/Mvth1s/hwbench/commit/81368b1393ea7f320809dea9ef739d34401fed96))
+
+- **runner**: Add the reliable cv threshold used by the report
+  ([`0e010b6`](https://github.com/Mvth1s/hwbench/commit/0e010b63140714df82f012772000f05957604e57))
+
+- **scoring**: Add memory and disk categories outside the combined score
+  ([`0acdcfa`](https://github.com/Mvth1s/hwbench/commit/0acdcfa63466fe8967bfbe599052a04fe5385731))
+
+- **scoring**: Keep the fio version out of the benchmark identity
+  ([`f39e332`](https://github.com/Mvth1s/hwbench/commit/f39e3323ccc4d6809956098f43392fafc31b0d52))
+
+### Refactoring
+
+- Choose the cpu temperature sensor in the models
+  ([`0164604`](https://github.com/Mvth1s/hwbench/commit/0164604dd42c983dbffd480acd2bb036cb7da3c0))
+
+- Share one label table between terminal, report and site
+  ([`4b2b672`](https://github.com/Mvth1s/hwbench/commit/4b2b672f84fe4a9fae79292feecf27c64924d58c))
+
+- **bench**: Extract the multi-process runner of the native cpu bench
+  ([`35b24ba`](https://github.com/Mvth1s/hwbench/commit/35b24ba3945c4ea9422b9208ec8e5540ba6ab314))
+
+- **results**: Make MachineState.best_profile public
+  ([`3fbf1df`](https://github.com/Mvth1s/hwbench/commit/3fbf1df6dca41ca9e567c630c8b8bc62d6765b0d))
+
+### Testing
+
+- Add sysbench memory and fio fixtures from the reference desktop
+  ([`3a280dc`](https://github.com/Mvth1s/hwbench/commit/3a280dc74f6e4c83f5eb380a44b436c7429ef2d1))
+
+- Capture tool fixtures under a suffix and by group
+  ([`2e11062`](https://github.com/Mvth1s/hwbench/commit/2e11062f93cb17a91c5dcb4d4336e76c3d478ddd))
+
+- Record the stale reference warning instead of printing it on every run
+  ([`1a300c0`](https://github.com/Mvth1s/hwbench/commit/1a300c019a40463b90cee01d8c2260bf2aaa1c8e))
+
+- State that the report fixture's memory and disk results are synthetic
+  ([`ec62594`](https://github.com/Mvth1s/hwbench/commit/ec62594238b1735f32efabef3bb02b68a3ed4f0b))
+
+- Warn instead of failing on results scored against an older reference
+  ([`7b10d02`](https://github.com/Mvth1s/hwbench/commit/7b10d02209bdbe964e8d596da822000d95cb6373))
+
+- **reference**: Check memory and disk benches once the reference has them
+  ([`c6c39bc`](https://github.com/Mvth1s/hwbench/commit/c6c39bcf04aeaf0d7a99ff86b20ab8ce83ae0c22))
+
+- **scoring**: Cover the score panel of the information categories
+  ([`d3b3183`](https://github.com/Mvth1s/hwbench/commit/d3b3183d135289ae3a1b4c7364d38b389349b8fa))
+
+### Additional Release Information
+
+- **reference**: New scoring reference: re-export results made before 0.6.0 to keep them ranked.
+
+- Exports now use schema 3, which records the run settings; schema 2 files stay readable.
+
+- Plain hwbench bench now runs a disk test writing 1 GiB (--disk-path, --disk-size).
+
+
 ## v0.5.0 (2026-10-09)
 
 ### Bug Fixes
