@@ -5,6 +5,10 @@ name: Release
 # « chore(release): X.Y.Z », tagge vX.Y.Z, puis crée la GitHub Release avec sdist et wheel.
 # Si une release a été créée : attestation de provenance des artefacts, puis publication sur
 # PyPI (trusted publishing) dans un job séparé, derrière l'environnement « pypi ».
+# Notifications Discord (scripts/discord_notify.py) dans des jobs à part, sans id-token :
+# #releases et « PyPI en attente d'approbation » (#deploiements) dès la GitHub Release, puis
+# « publié sur PyPI » (#deploiements) après le job pypi. Le job pypi ne contient que la
+# publication. Un échec de notification ne fait jamais échouer la release.
 # Configuration : [tool.semantic_release] dans pyproject.toml.
 on:
   push:
@@ -89,3 +93,52 @@ jobs:
 
       - name: Publier sur PyPI
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+
+  notify-release:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # extraction du script, lecture des notes de la GitHub Release
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/discord_notify.py
+          sparse-checkout-cone-mode: false
+
+      - name: Notifier #releases
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DISCORD_WEBHOOK_RELEASES: ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: python3 scripts/discord_notify.py release --tag "$TAG"
+
+      - name: Notifier #deploiements (PyPI en attente d'approbation)
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_DEPLOIEMENTS: ${{ secrets.DISCORD_WEBHOOK_DEPLOIEMENTS }}
+          TAG: ${{ needs.release.outputs.tag }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 scripts/discord_notify.py pypi-pending --version "${TAG#v}" --run-url "$RUN_URL"
+
+  notify-pypi:
+    needs: [release, pypi]
+    if: needs.pypi.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # extraction du script
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/discord_notify.py
+          sparse-checkout-cone-mode: false
+
+      - name: Notifier #deploiements (publié sur PyPI)
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_DEPLOIEMENTS: ${{ secrets.DISCORD_WEBHOOK_DEPLOIEMENTS }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: python3 scripts/discord_notify.py pypi-published --version "${TAG#v}"
