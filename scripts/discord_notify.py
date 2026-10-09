@@ -238,18 +238,28 @@ def deliver(webhook_env: str, messages: list[Payload], **send_options: Any) -> N
 # --- Accès aux API (les seules fonctions qui touchent le réseau, hors send) --------------------
 
 
-def fetch_json(url: str, headers: dict[str, str] | None = None) -> Any:
-    request = Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
-    with urlopen(request, timeout=30) as response:
+def fetch_json(url: str, headers: dict[str, str] | None = None, token: str | None = None) -> Any:
+    with urlopen(authorized(url, token, headers), timeout=30) as response:
         return json.load(response)
+
+
+def authorized(url: str, token: str | None, headers: dict[str, str] | None = None) -> Request:
+    """Requête dont le jeton n'est jamais transmis lors d'une redirection.
+
+    Request(headers=…) et add_header recopient l'en-tête dans la requête redirigée (l'API
+    GitHub redirige par exemple les téléchargements vers un stockage externe) ;
+    add_unredirected_header le réserve à l'hôte demandé.
+    """
+    request = Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
+    if token:
+        request.add_unredirected_header("Authorization", f"Bearer {token}")
+    return request
 
 
 def github_api(path: str) -> Any:
     base = os.environ.get("GITHUB_API_URL", "https://api.github.com")
     headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
-    if token := os.environ.get("GITHUB_TOKEN"):
-        headers["Authorization"] = f"Bearer {token}"
-    return fetch_json(base + path, headers)
+    return fetch_json(base + path, headers, os.environ.get("GITHUB_TOKEN"))
 
 
 def read_event() -> dict[str, Any]:
@@ -789,12 +799,27 @@ def parser() -> argparse.ArgumentParser:
     return p
 
 
+SECRET_MIN_LENGTH = 8  # en dessous, un remplacement masquerait du texte ordinaire
+
+
+def redact_secrets(text: str) -> str:
+    """Masque les webhooks Discord et le jeton GitHub présents dans l'environnement. Les valeurs
+    vides ou trop courtes sont ignorées : str.replace("", …) insérerait <secret> partout."""
+    for name, value in os.environ.items():
+        if (name.startswith("DISCORD_WEBHOOK_") or name == "GITHUB_TOKEN") and len(
+            value.strip()
+        ) >= SECRET_MIN_LENGTH:
+            text = text.replace(value.strip(), "<secret>")
+    return text
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
         webhook_env, embeds = build(args)
     except Exception as exc:  # noqa: BLE001 — une notification ne fait jamais échouer un job
-        warn(f"notification « {args.command} » non construite : {type(exc).__name__}: {exc}")
+        detail = redact_secrets(str(exc))
+        warn(f"notification « {args.command} » non construite : {type(exc).__name__}: {detail}")
         return 0
     if not embeds:
         print(f"{args.command} : rien à notifier")
