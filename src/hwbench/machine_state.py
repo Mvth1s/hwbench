@@ -4,23 +4,10 @@ from hwbench.collectors import get_collector
 from hwbench.models import CpuData, PowerData, SensorsData
 from hwbench.results import MachineState
 
-# (puce hwmon, libellés par ordre de préférence) ; "*" = n'importe quel capteur de la puce
-_CPU_SENSORS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("coretemp", ("Package id 0", "Package id 1")),
-    ("k10temp", ("Tdie", "Tctl")),
-    ("zenpower", ("Tdie", "Tctl")),
-    ("cpu_thermal", ("*",)),
-)
-
 
 def cpu_temperature(sensors: SensorsData) -> float | None:
-    for chip, labels in _CPU_SENSORS:
-        readings = [t for t in sensors.temperatures if t.chip == chip and t.current_c is not None]
-        for label in labels:
-            matching = [t.current_c for t in readings if label in ("*", t.label)]
-            if matching:
-                return max(v for v in matching if v is not None)
-    return None
+    sensor = sensors.cpu_sensor()
+    return sensor.current_c if sensor is not None else None
 
 
 def state_from(cpu: CpuData, power: PowerData, sensors: SensorsData) -> MachineState:
