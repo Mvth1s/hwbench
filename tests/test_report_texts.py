@@ -1,9 +1,7 @@
 """Textes des constats : chaque code a sa phrase, valeurs et seuils de la session cités."""
 
-from pathlib import Path
-
 import pytest
-from test_analysis import RESULTS
+from test_analysis import B850, DELL
 
 from hwbench import labels
 from hwbench.analysis import Finding, FindingCode, Status, analyze
@@ -150,13 +148,13 @@ def test_bench_labels() -> None:
 
 
 def test_no_sentence_mentions_the_governor() -> None:
-    for name in ("dell-latitude-5420", "asrock-b850-riptide-wifi"):
-        for sentence in synthesis(analyze(load_export(RESULTS / f"{name}.json"))):
+    for path in (DELL, B850):
+        for sentence in synthesis(analyze(load_export(path))):
             assert "governor" not in sentence.lower()
 
 
 def test_dell_synthesis() -> None:
-    sentences = synthesis(analyze(load_export(RESULTS / "dell-latitude-5420.json")))
+    sentences = synthesis(analyze(load_export(DELL)))
     assert sentences[:3] == [
         "4 tests ont démarré à 70 °C ou plus (seuil de départ chaud), chacun juste après un "
         "autre test : CPU single-core (sysbench) à 71 °C, CPU multi-core (sysbench) à 72 °C, "
@@ -178,7 +176,7 @@ def test_dell_synthesis() -> None:
 
 
 def test_synthesis_limit() -> None:
-    findings = analyze(load_export(Path(RESULTS) / "dell-latitude-5420.json"))
+    findings = analyze(load_export(DELL))
     assert len(synthesis(findings, limit=2)) == 2
 
 
@@ -191,7 +189,7 @@ def test_one_label_table_for_terminal_report_and_site() -> None:
 
 
 def test_recommendations_give_exact_commands() -> None:
-    findings = analyze(load_export(RESULTS / "dell-latitude-5420.json"))
+    findings = analyze(load_export(DELL))
     recs = recommendations(findings)
     commands = [c for r in recs for c in r.commands]
     # tests chauds dans plusieurs catégories : toutes ; instables : les deux GPU

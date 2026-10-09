@@ -14,7 +14,10 @@ from hwbench.results import BenchWarning, MachineState, Result
 from hwbench.runner import RunSettings
 from hwbench.scoring import score_results
 
-RESULTS = Path(__file__).parents[1] / "results"
+# exports réels figés (schéma 2), jamais results/ : voir tests/fixtures/exports/README.md
+EXPORTS = Path(__file__).parent / "fixtures" / "exports"
+DELL = EXPORTS / "dell-latitude-5420-schema2.json"
+B850 = EXPORTS / "asrock-b850-riptide-wifi-schema2.json"
 BATTERY = MachineState(["powersave"], on_ac=False, cpu_temp_c=45.0, has_battery=True)
 BALANCED = MachineState(
     ["powersave"],
@@ -305,11 +308,11 @@ def test_memory_and_disk_outside_the_reference() -> None:
     }
 
 
-# --- vraies sessions de results/ -----------------------------------------------------------
+# --- vraies sessions (exports figés) -----------------------------------------------------------
 
 
 def test_real_dell_session() -> None:
-    findings = analyze(load_export(RESULTS / "dell-latitude-5420.json"))
+    findings = analyze(load_export(DELL))
     assert codes(findings) == [
         FindingCode.HOT_START,
         FindingCode.HIGH_VARIANCE,
@@ -326,7 +329,7 @@ def test_real_dell_session() -> None:
 
 
 def test_real_b850_session_is_clean() -> None:
-    findings = analyze(load_export(RESULTS / "asrock-b850-riptide-wifi.json"))
+    findings = analyze(load_export(B850))
     assert not [f for f in findings if f.status in (Status.FIX, Status.CHECK)]
     assert FindingCode.REPRODUCIBLE in codes(findings)
     # k10temp n'expose pas de seuil : maximum seul, sans jugement
