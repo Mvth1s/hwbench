@@ -99,6 +99,35 @@ def test_powersave_governor_alone_is_not_a_problem() -> None:
     assert FindingCode.POWER_PROFILE not in codes(analyze(session(results)))
 
 
+def test_conforming_conditions() -> None:
+    f = find(analyze(session(clean())), FindingCode.CONDITIONS_OK)
+    assert f.status is Status.OK
+    assert f.params == {
+        "has_battery": None,
+        "platform_profile": "performance",
+        "energy_performance_preference": None,
+    }
+
+
+def _states(before: MachineState, after: MachineState) -> list[Result]:
+    return [replace(r, state_before=before, state_after=after) for r in clean()]
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        (BATTERY, BATTERY),  # sur batterie
+        (COOL_AC_STATE, replace(COOL_AC_STATE, on_ac=False)),  # débranché pendant la session
+        (BALANCED, BALANCED),  # profil non performance
+        (replace(COOL_AC_STATE, on_ac=None), COOL_AC_STATE),  # secteur non confirmé
+        # ni profil plateforme ni EPP : rien à affirmer
+        (MachineState(["powersave"], on_ac=True, cpu_temp_c=40.0),) * 2,
+    ],
+)
+def test_no_conforming_claim_otherwise(before, after) -> None:
+    assert FindingCode.CONDITIONS_OK not in codes(analyze(session(_states(before, after))))
+
+
 def test_software_rendering_and_vsync() -> None:
     results = [
         make_result("glmark2", 100.0, warnings=[BenchWarning.SOFTWARE_RENDERING]),
@@ -272,6 +301,7 @@ def test_real_dell_session() -> None:
     assert codes(findings) == [
         FindingCode.HOT_START,
         FindingCode.HIGH_VARIANCE,
+        FindingCode.CONDITIONS_OK,
         FindingCode.TEMPERATURE_OK,
         FindingCode.MULTI_FACTOR,
         FindingCode.MULTI_FACTOR,

@@ -35,6 +35,7 @@ class FindingCode(StrEnum):
     ON_BATTERY = "on_battery"
     POWER_PROFILE = "power_profile"
     SOFTWARE_RENDERING = "software_rendering"
+    CONDITIONS_OK = "conditions_ok"  # secteur, profil plateforme et EPP au meilleur réglage
     HOT_START = "hot_start"
     HIGH_VARIANCE = "high_variance"
     WARMUP_UNSTABLE = "warmup_unstable"
@@ -83,6 +84,8 @@ def _power(results: list[Result]) -> list[Finding]:
         findings.append(Finding(FindingCode.ON_BATTERY, Status.FIX, items=_bench_items(battery)))
     # EPP et profil plateforme seulement (throttling_settings), jamais le governor : sous
     # intel_pstate, « powersave » est le governor normal et ne bride rien.
+    if not findings and (conforming := _conforming_conditions(results)) is not None:
+        findings.append(conforming)
     if throttled := _with(results, BenchWarning.POWER_PROFILE):
         state = throttled[0].state_before
         findings.append(
@@ -99,6 +102,29 @@ def _power(results: list[Result]) -> list[Finding]:
             )
         )
     return findings
+
+
+def _conforming_conditions(results: list[Result]) -> Finding | None:
+    """Fiable si, avant et après chaque test : secteur confirmé et aucun réglage d'énergie
+    bridant (profil plateforme et EPP au meilleur réglage disponible). Rien n'est affirmé si ni
+    le profil plateforme ni l'EPP ne sont connus."""
+    states = [s for r in results for s in (r.state_before, r.state_after)]
+    if not states:
+        return None
+    if any(s.on_ac is not True or s.throttling_settings() for s in states):
+        return None
+    if all(s.platform_profile is None and s.energy_performance_preference is None for s in states):
+        return None
+    first = states[0]
+    return Finding(
+        FindingCode.CONDITIONS_OK,
+        Status.OK,
+        {
+            "has_battery": first.has_battery,
+            "platform_profile": first.platform_profile,
+            "energy_performance_preference": first.energy_performance_preference,
+        },
+    )
 
 
 def _per_bench_warnings(results: list[Result], settings: RunSettings) -> list[Finding]:
