@@ -1,8 +1,9 @@
 # Rapport HTML déterministe (phase R)
 
-> Statut : **en cours** (phase R). Remplace `idee.md`. L'export JSON (phase 4) et les catégories
-> mémoire et disque (phase C) sont faits ; le rapport et la page machine du classement partagent
-> désormais un même moteur de rendu.
+> Statut : **fait** (phase R). Remplace `idee.md`. Le rapport et la page machine du classement
+> partagent un même moteur de rendu (`report/`). Écarts avec le plan initial : la page du
+> classement n'embarque pas le JSON (le fichier est déjà dans `results/`) ; les constats liés à
+> un seuil sont recalculés depuis les valeurs mesurées, pour que le site applique ses seuils.
 
 ## 1. Objectif
 

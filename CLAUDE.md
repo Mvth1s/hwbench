@@ -132,6 +132,17 @@ CI (`.github/workflows/ci.yml`) : ruff + pytest sur Python 3.11 à 3.14 (ubuntu-
 - Fixtures `sysbench_memory_*.txt`, `fio_disk.json`, `findmnt_cache.json`, `lsblk_inverse.json` : capturées sur le portable Dell (`scripts/capture_tool_fixtures.sh`, fio sur 64 Mio dans `~/.cache/hwbench`, nom de fichier relatif pour qu'aucun chemin personnel n'entre dans la fixture ; pas `/tmp`, tmpfs sans E/S directes).
 - Référence : `tests/test_reference_file.py` exige les benchs CPU et GPU et accepte mémoire et disque (`OPTIONAL`), vérifiés à leur version dès qu'ils y sont. Régénérer sur le B850 avec fio et sysbench installés ; cela change l'empreinte : re-exporter ensuite les fichiers de `results/`.
 
+## Conventions établies (phase R : rapport HTML)
+
+- Spécification : `docs/rapport.md`. `analysis.py` (session -> `list[Finding]` : code, `Status` FIX/CHECK/OK/INFO, paramètres, éléments avec bench et catégorie), sans HTML, testé règle par règle (y compris faux positifs). Les constats liés à un seuil (batterie, profil, départ chaud, CV, warm-up) sont **recalculés depuis les valeurs mesurées** avec les `RunSettings` passés à `analyze` (via `runner.start_warnings`), jamais lus dans les avertissements enregistrés ; seuls vsync et rendu logiciel le sont. Profil : EPP et profil plateforme (`throttling_settings`), jamais le governor. `CONDITIONS_OK` (Fiable) : secteur confirmé et meilleur réglage avant et après chaque test.
+- Textes (`report/texts.py`) : phrases à l'indicatif citant valeurs et seuils, aucune cause non mesurée. La température CPU n'est relevée qu'avant et après chaque test : toujours le dire (« relevée avant et après chaque test »), y compris sur la frise. Recommandations root : `sudo "$(command -v hwbench)" info`, jamais `sudo hwbench` (secure_path).
+- Libellés : une seule table, `hwbench/labels.py` (catégories, benchs, détails, unités, présentation), partagée par `display/`, `report/` et `leaderboard/` ; « CPU multi-core » partout (pas « multi-cœur » dans un libellé). Testé par identité des objets.
+- Moteur de rendu commun : `report/html.py` (CSS, `e()`, `page`, `kv`, `table`, `status_badge`), `report/charts.py` (SVG en Python, coordonnées arrondies, chaque graphique suivi de ses valeurs), `report/sections.py` (sections ; absentes sans données). `render_report(session)` est la seule entrée : `hwbench report` et `--report` rendent depuis le JSON relu. Aucune URL `http(s)` en `src`/`href`, pas d'`@import`, le seul `<script>` est le JSON embarqué (`<`, `>`, `&` échappés en `\u00XX`).
+- Export schéma 3 : champ `settings` (`RunSettings`). Schémas 2 et 3 relus (`READABLE_SCHEMA_VERSIONS`) ; un schéma 2 a `settings = None` et le rapport le signale (`DEFAULT_SETTINGS_NOTE`). Un `ValueError` d'un modèle (`RunSettings.__post_init__`) devient `ExportError`. `--reliable-cv` (1 %) dans `RunSettings`.
+- `--report` : `$XDG_DATA_HOME/hwbench/reports/AAAA-MM-JJ_HHMMSS.{json,html}` (heure locale, suffixe `-2`… si le nom existe), `--report-dir` ; rien sans `--report`, rien si interrompu ou sans résultat. `bench --report` collecte le snapshot (sans identifiant).
+- Site : la page machine = sections du rapport sans recommandations ni JSON embarqué, points recalculés (session reconstruite avec `replace`), analyse **toujours avec `RunSettings()`** ; `settings_note` signale des seuils de mesure différents ou absents. L'index ne change pas.
+- Tests : snapshot `tests/fixtures/report/session.html` (rendu de `session.json`, session réelle du Dell en schéma 3 complétée par mémoire et disque) ; version du pied de page neutralisée ; mise à jour volontaire avec `HWBENCH_UPDATE_SNAPSHOTS=1 .venv/bin/pytest tests/test_report.py`.
+
 ## Architecture
 
 ```
@@ -153,7 +164,10 @@ src/hwbench/
 ├── machine_state.py    # governor, secteur, température : seul pont benchmarks -> collecteurs
 ├── scoring.py          # normalisation (référence = 1000), catégories, score combiné pondéré
 ├── privacy.py          # filtrage des identifiants
-├── export.py           # export JSON versionné et relecture en dataclasses
+├── export.py           # export JSON versionné (schéma 3 : + settings) et relecture en dataclasses
+├── analysis.py         # moteur de règles : session -> constats codés (Finding)
+├── labels.py           # libellés français partagés (terminal, rapport, site)
+├── report/             # rapport HTML : html.py (moteur commun), charts.py (SVG), sections.py, texts.py
 ├── compare.py          # comparaison d'exports (cellules, écarts, raisons de non-comparabilité)
 ├── reference.py        # contrôles et génération du fichier de référence
 ├── leaderboard/        # classement : validate.py (soumissions), site.py (site statique)
@@ -230,7 +244,8 @@ hwbench info [--json] [--show-serials]
 hwbench bench [cpu-single|cpu-multi|gpu|memory|disk|all] [--backend ...] [--runs N] [--weights ...] [--disk-size 1G] [--disk-path DIR]
 hwbench backends          # liste les backends et leur disponibilité
 hwbench reference -o FILE [--force]   # machine de référence uniquement
-hwbench export -o FILE
+hwbench export -o FILE [--report] [--report-dir DIR]
+hwbench report FILE.json [-o rapport.html]
 hwbench compare FILES...
 ```
 

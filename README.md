@@ -349,6 +349,32 @@ Deux exports successifs du desktop de référence (backend natif seul) :
 Les captures sont générées à partir de la vraie sortie des commandes par
 `scripts/readme_screenshots.py` (`info`, `bench`, `compare A B`).
 
+## Rapport HTML
+
+```sh
+hwbench bench --report                    # session en JSON + rapport HTML
+hwbench export -o desktop.json --report   # idem, en plus de l'export
+hwbench report desktop.json               # rapport depuis un JSON existant (-o rapport.html)
+```
+
+Rien n'est écrit sans le demander. Avec `--report`, la session (même schéma que `export`) et
+son rapport sont écrits dans `~/.local/share/hwbench/reports/` (`$XDG_DATA_HOME` respecté,
+`--report-dir` pour un autre dossier), sous un nom horodaté à la seconde. Un bench interrompu
+ou sans résultat n'écrit rien. `hwbench report` et `--report` produisent le même HTML : il est
+toujours rendu à partir du JSON, jamais du système.
+
+Le rapport est un fichier unique, hors ligne (aucune ressource externe), imprimable, en thème
+clair ou sombre : chiffres clés, synthèse, conditions de mesure, processeur, carte graphique,
+mémoire, disque, températures, fiabilité, composants, recommandations, lexique, et en annexe
+les résultats bruts et le JSON complet de la session. Chaque phrase vient d'une règle qui cite
+les valeurs mesurées et les seuils de la session (`--max-cv`, `--hot-start`, `--reliable-cv`…),
+sans hypothèse sur une cause non mesurée. La température CPU n'est relevée qu'avant et après
+chaque test, ce que le rapport précise. Les exports antérieurs au schéma 3 n'enregistrent pas
+les seuils : le rapport utilise alors les seuils par défaut et l'indique.
+
+La page de chaque machine du classement reprend les mêmes sections, sans les recommandations,
+et applique toujours les seuils par défaut.
+
 ## Classement
 
 Le classement est un site statique (GitHub Pages) généré à partir des exports déposés dans
