@@ -1,12 +1,18 @@
 """python -m hwbench.leaderboard validate FICHIERS… | site [--results DIR] [--out DIR]"""
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 from hwbench.leaderboard.site import build_site
 from hwbench.leaderboard.validate import validate_file
 from hwbench.scoring import load_reference
+
+
+def _annotation(text: str) -> str:
+    """Message d'une commande de workflow GitHub (::error::) : une seule ligne, % échappé."""
+    return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
 
 
 def _validate(files: list[Path]) -> int:
@@ -22,6 +28,12 @@ def _validate(files: list[Path]) -> int:
             print(f"✗ {path}")
             for problem in problems:
                 print(f"    - {problem}")
+            # Sous GitHub Actions, chaque problème devient aussi une annotation du job : la
+            # notification Discord du refus les relit par l'API (aucun accès aux journaux).
+            if os.environ.get("GITHUB_ACTIONS") == "true":
+                for problem in problems:
+                    message = _annotation(f"{path} : {problem}")
+                    print(f"::error title=Soumission refusée::{message}")
         else:
             print(f"✓ {path}")
     if failed:
