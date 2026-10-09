@@ -73,7 +73,9 @@ def test_on_battery() -> None:
         )
     ]
     f = find(analyze(session(results)), FindingCode.ON_BATTERY)
-    assert f.status is Status.FIX and f.items == [{"bench": "native-cpu-single"}]
+    assert f.status is Status.FIX and f.items == [
+        {"bench": "native-cpu-single", "category": "cpu_single"}
+    ]
 
 
 def test_power_profile_cites_epp_and_profile() -> None:
@@ -135,7 +137,9 @@ def test_software_rendering_and_vsync() -> None:
     ]
     findings = analyze(session(results))
     assert find(findings, FindingCode.SOFTWARE_RENDERING).status is Status.FIX
-    assert find(findings, FindingCode.VSYNC_UNVERIFIED).items == [{"bench": "vkmark"}]
+    assert find(findings, FindingCode.VSYNC_UNVERIFIED).items == [
+        {"bench": "vkmark", "category": "gpu"}
+    ]
 
 
 # --- mesures -------------------------------------------------------------------------------
@@ -151,7 +155,12 @@ def test_hot_start_names_the_previous_test_and_the_threshold() -> None:
     assert f.status is Status.CHECK
     assert f.params == {"threshold_c": 72.0}
     assert f.items == [
-        {"bench": "native-cpu-multi", "temp_c": 74.0, "previous": "native-cpu-single"}
+        {
+            "bench": "native-cpu-multi",
+            "category": "cpu_multi",
+            "temp_c": 74.0,
+            "previous": "native-cpu-single",
+        }
     ]
 
 
@@ -173,7 +182,7 @@ def test_high_variance_uses_the_session_threshold() -> None:
         FindingCode.HIGH_VARIANCE,
     )
     assert f.params == {"threshold_percent": 3.0}
-    assert f.items == [{"bench": "vkmark", "cv_percent": pytest.approx(17.0)}]
+    assert f.items == [{"bench": "vkmark", "category": "gpu", "cv_percent": pytest.approx(17.0)}]
 
 
 def test_warmup_unstable_cites_the_category_cap() -> None:
@@ -183,7 +192,7 @@ def test_warmup_unstable_cites_the_category_cap() -> None:
         )
     ]
     f = find(analyze(session(results)), FindingCode.WARMUP_UNSTABLE)
-    assert f.items == [{"bench": "native-cpu-multi", "cap_s": 90.0}]
+    assert f.items == [{"bench": "native-cpu-multi", "category": "cpu_multi", "cap_s": 90.0}]
 
 
 @pytest.mark.parametrize(("stdev", "expected"), [(1.0, True), (1.01, False)])

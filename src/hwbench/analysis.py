@@ -86,7 +86,7 @@ def _at_start(results: list[Result], warning: BenchWarning, settings: RunSetting
 
 
 def _bench_items(results: list[Result]) -> list[dict[str, Any]]:
-    return [{"bench": r.name} for r in results]
+    return [{"bench": r.name, "category": r.category.value} for r in results]
 
 
 def _power(results: list[Result], settings: RunSettings) -> list[Finding]:
@@ -151,6 +151,7 @@ def _per_bench_warnings(results: list[Result], settings: RunSettings) -> list[Fi
             hot.append(
                 {
                     "bench": r.name,
+                    "category": r.category.value,
                     "temp_c": r.state_before.cpu_temp_c,
                     "previous": results[i - 1].name if i else None,
                 }
@@ -166,7 +167,10 @@ def _per_bench_warnings(results: list[Result], settings: RunSettings) -> list[Fi
                 FindingCode.HIGH_VARIANCE,
                 Status.CHECK,
                 {"threshold_percent": settings.high_variance_cv_percent},
-                [{"bench": r.name, "cv_percent": r.cv_percent} for r in unstable],
+                [
+                    {"bench": r.name, "category": r.category.value, "cv_percent": r.cv_percent}
+                    for r in unstable
+                ],
             )
         )
     if warmup := [r for r in results if not r.warmup_stable]:
@@ -174,7 +178,14 @@ def _per_bench_warnings(results: list[Result], settings: RunSettings) -> list[Fi
             Finding(
                 FindingCode.WARMUP_UNSTABLE,
                 Status.CHECK,
-                items=[{"bench": r.name, "cap_s": settings.warmup_cap(r.category)} for r in warmup],
+                items=[
+                    {
+                        "bench": r.name,
+                        "category": r.category.value,
+                        "cap_s": settings.warmup_cap(r.category),
+                    }
+                    for r in warmup
+                ],
             )
         )
     if vsync := _with(results, BenchWarning.VSYNC_UNVERIFIED):
