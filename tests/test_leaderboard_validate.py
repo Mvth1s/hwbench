@@ -144,7 +144,7 @@ def test_cli_reports_each_file_and_fails_on_any_problem(tmp_path, capsys, monkey
     out = capsys.readouterr()
     assert f"✓ {good}" in out.out and f"✗ {bad}" in out.out
     assert "schéma d'export 1" in out.out
-    assert "1 fichier(s) refusé(s) sur 2" in out.err
+    assert "1 fichier refusé sur 2" in out.err
 
 
 def test_cli_annotates_problems_under_github_actions(tmp_path, capsys, monkeypatch) -> None:
@@ -212,7 +212,7 @@ def test_duplicate_keys_cannot_hide_an_identifier(tmp_path) -> None:
     sneaky = text.replace('"machine": ', '"machine": "aa:bb:cc:dd:ee:ff", "machine": ', 1)
     assert json.loads(sneaky)["machine"] != "aa:bb:cc:dd:ee:ff"
     found = problems(tmp_path, sneaky)
-    assert found == ["JSON invalide : clé(s) en double : machine"]
+    assert found == ["JSON invalide : clé en double : machine"]
 
 
 def test_non_standard_constants_are_refused(tmp_path) -> None:
