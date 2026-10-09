@@ -2,7 +2,8 @@ import json
 import re
 from datetime import UTC, datetime
 
-from test_compare import export
+from conftest import make_result
+from test_compare import disk, export
 from test_scoring import REFERENCE, machine
 
 from hwbench.export import to_dict, write_export
@@ -155,3 +156,25 @@ def test_unreadable_date_does_not_break_the_site(tmp_path) -> None:
     out = tmp_path / "_site"
     build_site(d, out, REFERENCE, generated=NOW)
     assert "&lt;b&gt;jamais&lt;/b&gt;" in (out / "index.html").read_text()  # brut, échappé
+
+
+def test_memory_and_disk_are_information_columns(tmp_path) -> None:
+    d = results_dir(tmp_path)
+    with_info = machine(1.0) + [
+        make_result("native-memory-multi", 25_000.0),
+        disk(3347.0, 238_831.0),
+    ]
+    write_export(export(with_info, "Avec mémoire et disque"), d / "infos.json")
+    entries, _ = load_entries(d, REFERENCE)
+    # le classement ne bouge pas : mêmes points combinés que la même machine sans ces benchs
+    combined = {e.slug: round(p) for e, p in ranking(entries, None)}
+    assert combined["infos"] == combined["moyen"] == 1000
+    out = tmp_path / "_site"
+    build_site(d, out, REFERENCE, generated=NOW)
+    index = (out / "index.html").read_text()
+    assert '<th class="num">Mémoire</th><th class="num">Disque</th>' in index
+    assert "25000 Mio/s" in index and "3347 Mio/s · 238831 IOPS 4K" in index
+    assert 'id="tab-memory"' not in index and 'id="tab-disk"' not in index
+    page = (out / "machines" / "infos.html").read_text()
+    assert "Mémoire (information)" in page
+    assert "Lecture aléatoire 4K (QD32)" in page and "fichier de 1 Gio" in page

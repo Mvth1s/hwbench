@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from hwbench.display.bench import DETAIL_LABELS, disk_size_label
 from hwbench.display.fmt import compact, fr_date, measure, num
 from hwbench.export import ExportError, MachineExport, from_dict
 from hwbench.leaderboard.validate import (
@@ -19,14 +20,18 @@ from hwbench.leaderboard.validate import (
     resolves_to_itself,
     strict_json,
 )
-from hwbench.results import Category, Result, gpu_name
+from hwbench.results import COMBINED_CATEGORIES, Category, Result, gpu_name
 from hwbench.scoring import Reference, Scores, score_results
 
 CATEGORY_LABELS = {
     Category.CPU_SINGLE: "CPU single-core",
     Category.CPU_MULTI: "CPU multi-core",
     Category.GPU: "GPU",
+    Category.MEMORY: "Mémoire",
+    Category.DISK: "Disque",
 }
+# Mémoire et disque : colonnes d'information, jamais classées ni dans le combiné
+INFO_CATEGORIES = tuple(c for c in Category if c not in COMBINED_CATEGORIES)
 UNIT_LABELS = {"MiB/s": "Mio/s", "index": "indice brut"}
 # favicon intégré (data URI) : aucune requête externe
 FAVICON = (
@@ -79,6 +84,26 @@ def ranking(entries: Iterable[Entry], category: Category | None) -> list[tuple[E
         (entry, p) for entry in entries if (p := category_points(entry, category)) is not None
     ]
     return sorted(ranked, key=lambda item: (-item[1], item[0].slug))
+
+
+def info_value(entry: Entry, category: Category) -> str | None:
+    """Colonne d'information : points s'ils sont calculables contre la référence, sinon la
+    valeur brute (mémoire : copie multi-processus ; disque : lecture séquentielle et 4K)."""
+    points = category_points(entry, category)
+    if points is not None:
+        return f"{num(points, 0)} pts"
+    results = {r.name: r for r in entry.export.results}
+    if category is Category.MEMORY:
+        r = results.get("native-memory-multi") or results.get("native-memory-single")
+        return f"{num(r.value, 0)} Mio/s" if r else None
+    if category is Category.DISK and (r := results.get("fio-disk")) is not None:
+        seq, rand = r.details.get("seq_read"), r.details.get("rand_read_4k")
+        parts = [
+            f"{num(seq, 0)} Mio/s" if seq else None,
+            f"{num(rand, 0)} IOPS 4K" if rand else None,
+        ]
+        return " · ".join(p for p in parts if p) or None
+    return None
 
 
 def _gpu(export: MachineExport) -> str | None:
@@ -172,13 +197,21 @@ def _ranking_table(ranked: list[tuple[Entry, float]]) -> str:
             # nom normalisé (sans pilote, noyau ni DRM), casse d'origine
             f"<td>{e(ex.snapshot.cpu.model or '?')}</td><td>{e(gpu_name(_gpu(ex)) or '?')}</td>"
             f'<td class="num"><strong>{e(num(points, 0))}</strong></td>'
-            f'<td class="small muted">{e(fr_date(ex.created))}</td></tr>'
+            + "".join(
+                f'<td class="num small">{e(info_value(entry, c) or "—")}</td>'
+                for c in INFO_CATEGORIES
+            )
+            + f'<td class="small muted">{e(fr_date(ex.created))}</td></tr>'
         )
+    info_headers = "".join(f'<th class="num">{e(CATEGORY_LABELS[c])}</th>' for c in INFO_CATEGORIES)
     return (
         '<table><thead><tr><th class="num">#</th><th>Machine</th><th>CPU</th><th>GPU</th>'
-        '<th class="num">Points</th><th>Date</th></tr></thead><tbody>'
+        f'<th class="num">Points</th>{info_headers}<th>Date</th></tr></thead><tbody>'
         + "".join(rows)
         + "</tbody></table>"
+        + '<p class="muted small">Mémoire (bande passante de copie multi-processus) et disque '
+        "(lecture séquentielle, lecture aléatoire 4K) : colonnes d'information, hors classement "
+        "et hors score combiné.</p>"
     )
 
 
@@ -186,7 +219,7 @@ def render_index(
     entries: list[Entry], reference: Reference, skipped: list[str], generated: datetime
 ) -> str:
     tabs: list[tuple[str, str, Category | None]] = [("combined", "Score combiné", None)]
-    tabs += [(c.value, CATEGORY_LABELS[c], c) for c in CATEGORY_LABELS]
+    tabs += [(c.value, CATEGORY_LABELS[c], c) for c in COMBINED_CATEGORIES]
     radios = "".join(
         f'<input type="radio" name="cat" id="tab-{key}"{" checked" if i == 0 else ""}>'
         f'<label for="tab-{key}">{e(label)}</label>'
@@ -215,7 +248,8 @@ def render_index(
     )
     body = f"""<h1>hwbench · classement</h1>
 <p class="muted">{len(entries)} machine(s). Benchmarks CPU et GPU notés contre une machine de
-référence (1000 points). Score combiné : moyenne géométrique des trois catégories.</p>
+référence (1000 points). Score combiné : moyenne géométrique des trois catégories. Mémoire et
+disque : information, hors classement.</p>
 <div class="tabs">{radios}{"".join(panels)}</div>
 {_reference_block(reference)}
 {skipped_html}"""
@@ -254,6 +288,36 @@ def _bench_rows(results: list[Result], scores: Scores) -> str:
     )
 
 
+def _disk_details(results: list[Result]) -> str:
+    """Débits et IOPS de chaque test fio (le bench lui-même n'expose qu'un indice)."""
+    blocks = []
+    for r in results:
+        if r.category is not Category.DISK or not r.details:
+            continue
+        rows = "".join(
+            f"<tr><td>{e(DETAIL_LABELS.get(key, key))}</td>"
+            f'<td class="num">{e(measure(value))} '
+            f"{e(UNIT_LABELS.get(r.detail_units.get(key, ''), r.detail_units.get(key, '')))}"
+            "</td></tr>"
+            for key, value in r.details.items()
+        )
+        where = ", ".join(
+            filter(
+                None,
+                [
+                    f"fichier de {disk_size_label(r.presentation)}" if r.presentation else None,
+                    r.environment.get("filesystem"),
+                    r.environment.get("device"),
+                ],
+            )
+        )
+        blocks.append(
+            f'<h3>{e(r.name)}</h3><p class="muted small">{e(where)}</p>'
+            f"<table><tbody>{rows}</tbody></table>"
+        )
+    return "".join(blocks)
+
+
 def render_machine(entry: Entry, reference: Reference, generated: datetime) -> str:
     ex = entry.export
     snap = ex.snapshot
@@ -281,13 +345,17 @@ def render_machine(entry: Entry, reference: Reference, generated: datetime) -> s
             ("Disques", disks),
         ]
     )
-    scores = [(CATEGORY_LABELS[c], category_points(entry, c)) for c in CATEGORY_LABELS] + [
+    scores = [(CATEGORY_LABELS[c], category_points(entry, c)) for c in COMBINED_CATEGORIES] + [
         ("Score combiné", category_points(entry, None))
     ]
     score_rows = "".join(
         f'<tr><th>{e(label)}</th><td class="num">'
         f"{e(num(points, 0) + ' pts' if points is not None else 'non classé')}</td></tr>"
         for label, points in scores
+    ) + "".join(
+        f'<tr><th>{e(CATEGORY_LABELS[c])} (information)</th><td class="num">{e(value)}</td></tr>'
+        for c in INFO_CATEGORIES
+        if (value := info_value(entry, c)) is not None
     )
     state = ex.results[0].state_before if ex.results else None
     conditions = _kv(
@@ -315,6 +383,7 @@ def render_machine(entry: Entry, reference: Reference, generated: datetime) -> s
 {components}
 <h2>Benchmarks</h2>
 {_bench_rows(ex.results, entry.scores)}
+{_disk_details(ex.results)}
 <h2>Conditions de mesure</h2>
 {conditions}"""
     return _page(f"{ex.machine} · hwbench", body, generated)
