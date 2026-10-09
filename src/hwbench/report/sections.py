@@ -68,14 +68,18 @@ def _value(r: Result) -> str:
     return f"{measure(r.value)} {unit_label(r.unit)}"
 
 
-def _gpu(session: MachineExport) -> str | None:
+def _gpu_renderer(session: MachineExport) -> str | None:
     gpu = session.snapshot.gpu
-    raw = (
+    return (
         gpu.opengl_renderer
         or gpu.vulkan_device_name
         or (gpu.pci_devices[0].model if gpu.pci_devices else None)
     )
-    return gpu_name(raw)
+
+
+def _gpu(session: MachineExport) -> str | None:
+    """Nom du GPU sans les détails du pilote (en-tête)."""
+    return gpu_name(_gpu_renderer(session))
 
 
 def _findings(ctx: Context, *codes: FindingCode) -> list[Finding]:
@@ -469,7 +473,7 @@ def components(ctx: Context) -> str:
             f"{cpu_data.physical_cores or '?'} / {cpu_data.logical_cores or '?'}",
         ),
         ("RAM", _ram(ctx)),
-        ("GPU", _gpu(ctx.session)),
+        ("GPU", _gpu_renderer(ctx.session)),  # détail : renderer complet
         ("Disques", disks or None),
         ("Batterie", batteries or None),
     ]
@@ -576,9 +580,14 @@ def appendix(ctx: Context, embed_json: bool) -> str:
     return _section("annexe", "Annexe : résultats bruts", content)
 
 
-def render_sections(ctx: Context, *, with_recommendations: bool, embed_json: bool) -> str:
+def render_sections(
+    ctx: Context, *, with_recommendations: bool, embed_json: bool, after_header: str = ""
+) -> str:
+    """Sections dans l'ordre de docs/rapport.md ; `after_header` : HTML propre à la page (bloc
+    de classement du site)."""
     parts = [
         header(ctx),
+        after_header,
         key_figures(ctx),
         synthesis_section(ctx),
         conditions(ctx),
