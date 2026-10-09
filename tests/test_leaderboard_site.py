@@ -221,7 +221,7 @@ def test_site_always_applies_the_default_thresholds(tmp_path) -> None:
     assert "seuil de CV 2 % au lieu de 5 %" in page
     # le site juge avec 70 °C : aucun départ chaud signalé
     assert "seuil de départ chaud)" not in page
-    assert "Sous le seuil de départ chaud 70 °C." in page
+    assert "Tous les tests ont démarré sous le seuil de départ chaud 70 °C." in page
 
 
 def test_site_notes_default_or_missing_settings(tmp_path) -> None:

@@ -35,8 +35,19 @@ def _celsius(value: float | None) -> str:
 TEMPERATURE_PREFIX = "Température CPU maximale relevée avant et après chaque test"
 
 
+def plural(count: int, singular: str, plural_form: str) -> str:
+    """« 1 test », « 4 tests » : jamais « test(s) »."""
+    return f"{count} {singular if count == 1 else plural_form}"
+
+
 def _tests(count: int) -> str:
-    return "1 test" if count == 1 else f"{count} tests"
+    return plural(count, "test", "tests")
+
+
+def hot_start_sentence(count: int, threshold_c: float) -> str:
+    """« 4 tests ont démarré à 70 °C ou plus » : la règle est « ≥ seuil »."""
+    verb = "a" if count == 1 else "ont"
+    return f"{_tests(count)} {verb} démarré à {_celsius(threshold_c)} ou plus"
 
 
 def _benches(finding: Finding) -> str:
@@ -73,19 +84,17 @@ def finding_text(finding: Finding) -> str:
                 if p[key] is not None:
                     parts.append(f"{PROFILE_LABELS[key]} « {p[key]} »")
             return (
-                f"Conditions conformes pendant tous les tests : {_list(parts)}, au meilleur "
-                "réglage disponible."
+                f"Alimentation et réglages d'énergie conformes : {_list(parts)}, au meilleur "
+                "réglage disponible, avant et après chaque test."
             )
         case FindingCode.HOT_START:
-            threshold = _celsius(p["threshold_c"])
             starts = _list([f"{bench_label(i['bench'])} à {_celsius(i['temp_c'])}" for i in items])
             after = (
                 ", chacun juste après un autre test" if all(i["previous"] for i in items) else ""
             )
-            subject = "Un test a" if len(items) == 1 else f"{_tests(len(items))} ont"
             return (
-                f"{subject} démarré à {threshold} ou plus (seuil de départ chaud){after} : "
-                f"{starts}."
+                f"{hot_start_sentence(len(items), p['threshold_c'])} (seuil de départ "
+                f"chaud){after} : {starts}."
             )
         case FindingCode.HIGH_VARIANCE:
             values = _list(

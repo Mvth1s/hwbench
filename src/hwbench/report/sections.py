@@ -21,7 +21,13 @@ from hwbench.labels import (
 )
 from hwbench.report.charts import Bar, Segment, bars, timeline
 from hwbench.report.html import e, kv, status_badge, table
-from hwbench.report.texts import finding_text, recommendations, synthesis
+from hwbench.report.texts import (
+    finding_text,
+    hot_start_sentence,
+    plural,
+    recommendations,
+    synthesis,
+)
 from hwbench.results import COMBINED_CATEGORIES, Category, MachineState, Result, gpu_name
 from hwbench.runner import RunSettings
 from hwbench.scoring import ScoreIssue
@@ -92,6 +98,24 @@ def conditions_status(findings: list[Finding]) -> Status | None:
     return min(statuses, key=STATUS_ORDER.index) if statuses else None
 
 
+def conditions_reason(findings: list[Finding]) -> str:
+    """Ligne courte sous la tuile : ce qui la fait passer en À corriger ou À vérifier
+    (« 4 départs chauds »), sinon ce qui la rend fiable."""
+    reasons = []
+    for f in findings:
+        if f.code is FindingCode.ON_BATTERY:
+            reasons.append(plural(len(f.items), "test sur batterie", "tests sur batterie"))
+        elif f.code is FindingCode.POWER_PROFILE:
+            reasons.append("réglage d'énergie non performance")
+        elif f.code is FindingCode.HOT_START:
+            reasons.append(plural(len(f.items), "départ chaud", "départs chauds"))
+    if reasons:
+        return " · ".join(reasons)
+    if any(f.code is FindingCode.CONDITIONS_OK for f in findings):
+        return "secteur, meilleur réglage d'énergie"
+    return ""
+
+
 # --- 1. En-tête, 2. chiffres clés, 3. synthèse ---------------------------------------------
 
 
@@ -135,7 +159,13 @@ def key_figures(ctx: Context) -> str:
         if main is not None:
             tiles.append(_tile(CATEGORY_LABELS[category], e(_value(main)), "valeur brute"))
     status = conditions_status(ctx.findings)
-    tiles.append(_tile("Conditions", status_badge(status) if status else e("non déterminées")))
+    tiles.append(
+        _tile(
+            "Conditions de mesure",
+            status_badge(status) if status else e("non déterminées"),
+            conditions_reason(ctx.findings),
+        )
+    )
     return f'<div class="tiles">{"".join(tiles)}</div>'
 
 
@@ -188,19 +218,23 @@ def conditions(ctx: Context) -> str:
     governors = ", ".join(sorted({g for st in states for g in st.governors})) or None
     rows.append(("Governor", governors, Status.INFO, "Affiché pour information, non jugé seul."))
     hot = _findings(ctx, FindingCode.HOT_START)
-    threshold = f"seuil de départ chaud {num(ctx.settings.hot_start_c, 0)} °C"
-    start = None if first.cpu_temp_c is None else f"{num(first.cpu_temp_c, 0)} °C"
-    if hot:
-        rows.append(
-            (
-                "Température de départ",
-                start,
-                Status.CHECK,
-                f"{len(hot[0].items)} test(s) ont démarré au-dessus du {threshold}.",
-            )
+    starts = [r.state_before.cpu_temp_c for r in ctx.session.results]
+    known = [t for t in starts if t is not None]
+    if known:
+        low, high = min(known), max(known)
+        span = (
+            f"{num(low, 0)} °C"
+            if round(low) == round(high)
+            else f"{num(low, 0)} à {num(high, 0)} °C"
         )
-    elif first.cpu_temp_c is not None:
-        rows.append(("Température de départ", start, Status.OK, f"Sous le {threshold}."))
+        threshold = f"seuil de départ chaud {num(ctx.settings.hot_start_c, 0)} °C"
+        if hot:
+            count = len(hot[0].items)
+            text = f"{hot_start_sentence(count, ctx.settings.hot_start_c)} (seuil de départ chaud)."
+            rows.append(("Température de départ", span, Status.CHECK, text))
+        else:
+            text = f"Tous les tests ont démarré sous le {threshold}."
+            rows.append(("Température de départ", span, Status.OK, text))
 
     html_rows = [
         [e(label), e(value if value not in (None, "") else "—"), status_badge(st), e(text)]
@@ -440,7 +474,7 @@ def _ram(ctx: Context) -> str | None:
     if ram.modules:
         speeds = {m.speed_mts for m in ram.modules if m.speed_mts}
         types = {m.type for m in ram.modules if m.type}
-        parts = [f"{len(ram.modules)} barrette(s)", *sorted(types)]
+        parts = [plural(len(ram.modules), "barrette", "barrettes"), *sorted(types)]
         parts += [f"{s} MT/s" for s in sorted(speeds)]
         text = f"{text or '?'} ({', '.join(parts)})"
     elif ram.modules_unavailable is not None and ram.modules_unavailable.value == "needs_root":
