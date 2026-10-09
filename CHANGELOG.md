@@ -2,6 +2,73 @@
 
 <!-- version list -->
 
+## v0.5.0 (2026-10-09)
+
+### Bug Fixes
+
+- **display**: Never raise on an unreadable date
+  ([`dc3c28a`](https://github.com/Mvth1s/hwbench/commit/dc3c28aaa68f005f9f9bec7efae46f9afd4d24b7))
+
+- **leaderboard**: Add a favicon to the site pages
+  ([`b4cc954`](https://github.com/Mvth1s/hwbench/commit/b4cc954bc77cac46ba279a19eafa0b2df061688d))
+
+- **leaderboard**: Refuse submissions with an invalid export date
+  ([`aa4b946`](https://github.com/Mvth1s/hwbench/commit/aa4b9463ea2cbd8016c12c8bcfbfb5ed58c72cf5))
+
+- **leaderboard**: Show the normalized GPU name and DD/MM/YYYY dates
+  ([`6e9a7a8`](https://github.com/Mvth1s/hwbench/commit/6e9a7a8ef800adb410bd2fe291320697af010c0c))
+
+### Continuous Integration
+
+- Add a stdlib discord notification script
+  ([`cdcb5b3`](https://github.com/Mvth1s/hwbench/commit/cdcb5b35184620b44fd2fec3830336bbf660eb7b))
+
+- Add a weekly project report on discord
+  ([`42f98ce`](https://github.com/Mvth1s/hwbench/commit/42f98ceaf7c43ab223adce9c1d2039f67a4faf0f))
+
+- Add a weekly watch of bench tool and python versions
+  ([`0a3e28d`](https://github.com/Mvth1s/hwbench/commit/0a3e28d7f7f36ea968c40354553f3ff52a931f4c))
+
+- Announce releases and pypi publication on discord
+  ([`f66b1f9`](https://github.com/Mvth1s/hwbench/commit/f66b1f9f417010d6550a3988b645456e66581cd1))
+
+- Announce site deployments and new leaderboard machines
+  ([`aabcb45`](https://github.com/Mvth1s/hwbench/commit/aabcb458edbe972651fdffe0127f813e53851826))
+
+- Notify discord of ci, leaderboard and dependabot results
+  ([`9fd735b`](https://github.com/Mvth1s/hwbench/commit/9fd735b53d98223c372327bb3a08d5ff68740ec8))
+
+- Pin actions/checkout by commit sha in notification jobs
+  ([`13514d4`](https://github.com/Mvth1s/hwbench/commit/13514d409d8f0f884507269f9a2f336b99590aae))
+
+### Documentation
+
+- Describe the discord notifications in the readme
+  ([`cc4be77`](https://github.com/Mvth1s/hwbench/commit/cc4be776f941287085a7082398636c2bc92c684c))
+
+- Record the discord notification rules in CLAUDE.md
+  ([`6853f1f`](https://github.com/Mvth1s/hwbench/commit/6853f1f1f857c5c9d410ebc6259c0270906eabae))
+
+- Verify provenance on the latest release instead of v0.3.0
+  ([`aa60f13`](https://github.com/Mvth1s/hwbench/commit/aa60f13c7a39c1fb0d45ced5364e4742c0f1091f))
+
+### Features
+
+- **leaderboard**: Add a summary command with combined ranks
+  ([`e70f642`](https://github.com/Mvth1s/hwbench/commit/e70f642d3eda89835d4f697a01523996348e9d17))
+
+- **leaderboard**: Annotate refused submissions under github actions
+  ([`4c43af1`](https://github.com/Mvth1s/hwbench/commit/4c43af1d27a2d4a59705464caa82861695d6e215))
+
+### Refactoring
+
+- Add gpu_name, the GPU name in its original case
+  ([`fc23f66`](https://github.com/Mvth1s/hwbench/commit/fc23f662bd515582007afb123eeaa7b238b22858))
+
+- **display**: Share the DD/MM/YYYY date formatter in fmt
+  ([`e172d3a`](https://github.com/Mvth1s/hwbench/commit/e172d3ab5948f6dc0eb309bcdf2ff02fdfb822ce))
+
+
 ## v0.4.0 (2026-10-05)
 
 ### Bug Fixes
