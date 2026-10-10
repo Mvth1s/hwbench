@@ -75,7 +75,7 @@ def test_bench_disk_with_fio(fake_tools) -> None:
     result = runner.invoke(cli.app, ["bench", "disk", "--disk-path", "/mnt/data"], env=WIDE)
     assert result.exit_code == 0, result.output
     out = result.output
-    assert "Disque · fio : fichier de test de 1 Gio dans /mnt/data, supprimé à la fin" in out
+    assert "Disque · fio-disk : fichier de test de 1 Gio dans /mnt/data, supprimé à la fin" in out
     assert "Disque · fio-disk v1 · outil 3.40" in out
     assert re.search(r"Fichier de test +1 Gio", out)
     assert "Lecture aléatoire 4K (QD32)" in out and "IOPS" in out
@@ -103,7 +103,7 @@ def test_bench_disk_size_is_validated(size: str) -> None:
 def test_bench_disk_without_fio_fails() -> None:
     result = runner.invoke(cli.app, ["bench", "disk"], env=WIDE)
     assert result.exit_code == 1
-    assert "Disque · fio : indisponible (outil absent), ignoré." in result.output
+    assert "Disque · fio-disk : indisponible (outil absent), ignoré." in result.output
 
 
 def test_memory_weight_is_refused() -> None:

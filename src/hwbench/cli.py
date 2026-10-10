@@ -276,7 +276,7 @@ def _run_all(
     previous: Category | None = None
     for cls in classes:
         instance = cls(options)
-        label = f"{CATEGORY_LABELS[cls.category]} · {cls.backend}"
+        label = f"{CATEGORY_LABELS[cls.category]} · {cls.name}"
         availability = instance.availability()
         if availability is not Availability.AVAILABLE:
             reason = AVAILABILITY_LABELS[availability].plain
