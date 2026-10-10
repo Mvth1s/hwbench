@@ -328,3 +328,35 @@ def test_only_files_sharing_the_disk_are_flagged() -> None:
     assert tool_notices(c) == [
         (CompareWarning.TOOL_VERSION_DIFFERS, "fio-disk", ["3.42", None, "3.40"])
     ]
+
+
+def _with_sysbench_build(results: list[Result], tool: str) -> list[Result]:
+    return [replace(r, tool_version=tool) if r.backend == "sysbench" else r for r in results]
+
+
+def test_other_build_of_the_same_tool_version_is_compared_and_cited() -> None:
+    a = machine(1.0)
+    b = _with_sysbench_build(machine(1.1), "1.0.20-1472a05")
+    c = compare([export(a, "a"), export(b, "b")])
+    assert row(c, "sysbench-cpu-single").cells[1].delta_percent == pytest.approx(10.0)
+    assert not any(w.code is CompareWarning.BENCH_VERSION_DIFFERS for w in c.warnings)
+    builds = [(w.subject, w.values) for w in c.warnings if w.code is CompareWarning.TOOL_BUILD_INFO]
+    assert builds == [
+        ("sysbench-cpu-single", ["1.0.20", "1.0.20-1472a05"]),
+        ("sysbench-cpu-multi", ["1.0.20", "1.0.20-1472a05"]),
+    ]
+    out = Console(width=200, record=True)
+    out.print(render_comparison(c, ["a", "b"]))
+    text = out.export_text()
+    assert (
+        "sysbench-cpu-single : même version amont de l'outil, builds différents "
+        "(a : 1.0.20, b : 1.0.20-1472a05)." in text
+    )
+    assert "⚠ sysbench" not in text
+
+
+def test_other_upstream_tool_version_is_not_a_build_notice() -> None:
+    b = _with_sysbench_build(machine(1.0), "1.0.21")
+    c = compare([export(machine(1.0)), export(b)])
+    assert row(c, "sysbench-cpu-single").cells[1].issue is Incomparable.IDENTITY_DIFFERS
+    assert not any(w.code is CompareWarning.TOOL_BUILD_INFO for w in c.warnings)

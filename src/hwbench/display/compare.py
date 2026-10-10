@@ -146,6 +146,11 @@ def notice_message(notice: Notice, labels: list[str] | None = None) -> str:
             )
         case CompareWarning.TOOL_VERSION_INFO:
             return f"{notice.subject} : version de l'outil ({_per_file(notice, labels)})."
+        case CompareWarning.TOOL_BUILD_INFO:
+            return (
+                f"{notice.subject} : même version amont de l'outil, builds différents "
+                f"({_per_file(notice, labels)})."
+            )
 
 
 def render_comparison(comparison: Comparison, labels: list[str]) -> Group:
