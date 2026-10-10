@@ -75,6 +75,39 @@ def test_sysbench_missing_and_failing(fake_tools) -> None:
         SysbenchCpuSingle().run()
 
 
+MESA_WARNING = "MESA-INTEL: warning: Haswell Vulkan support is incomplete"
+
+
+def test_crash_names_the_signal_and_quotes_stderr_as_such(fake_tools) -> None:
+    fake_tools(failing={"vkmark": (-11, MESA_WARNING)}, files=HEADLESS_PLUGIN)
+    with pytest.raises(_run.ToolError) as error:
+        Vkmark().run()
+    assert str(error.value) == (
+        "vkmark interrompu par le signal SIGSEGV (code -11). "
+        f"Fin de la sortie d'erreur : {MESA_WARNING}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        (1, "sysbench a échoué (code 1)"),
+        (-6, "sysbench interrompu par le signal SIGABRT (code -6)"),
+        (-9, "sysbench interrompu par le signal SIGKILL (code -9)"),
+        (-200, "sysbench interrompu par le signal 200 (code -200)"),  # numéro inconnu
+    ],
+)
+def test_failure_message(code, expected) -> None:
+    assert _run.failure_message("sysbench", code) == expected
+
+
+def test_failure_without_stderr(fake_tools) -> None:
+    fake_tools(failing={"sysbench": (-9, "")})
+    with pytest.raises(_run.ToolError) as error:
+        SysbenchCpuSingle().run()
+    assert str(error.value) == "sysbench interrompu par le signal SIGKILL (code -9)"
+
+
 # sysbench memory : sorties réelles du portable Dell (i5-1145G7, DDR4-3200)
 
 
