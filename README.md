@@ -125,6 +125,8 @@ hwbench bench cpu-multi --workers 4    # nombre de processus (défaut : CPU logi
 hwbench bench --backend native --runs 5
 hwbench bench cpu-multi --max-warmup 180   # plafond du warm-up en secondes
 hwbench bench --max-cv 3 --hot-start 60    # seuils des avertissements (défaut : 5 %, 70 °C)
+hwbench bench --cooldown 60               # pause de 60 s à chaque changement de catégorie
+hwbench bench --cooldown auto              # attendre que le CPU repasse sous --hot-start
 hwbench bench --weights cpu-single=1,cpu-multi=2,gpu=1   # pondération du score combiné
 hwbench bench disk --disk-path /mnt/data --disk-size 4G  # dossier et taille du fichier de test
 hwbench backends                       # backends disponibles et commande d'installation
@@ -243,6 +245,14 @@ Le governor, le profil plateforme ACPI (`platform_profile`), l'EPP de cpu0
 après. hwbench avertit, sans bloquer, si la machine est sur batterie, si le profil d'énergie
 n'est pas « performance », si le CPU dépasse 70 °C au départ (`--hot-start`) ou si les runs
 varient de plus de 5 % (`--max-cv`).
+
+Pour éviter qu'une catégorie démarre sur un CPU encore chaud de la précédente, `--cooldown`
+insère une pause. Avec un nombre de secondes, la pause a lieu à chaque changement de catégorie.
+Avec `auto`, hwbench attend avant chaque catégorie, la première comprise, que la température
+CPU passe sous le seuil `--hot-start`, en la relevant toutes les 2 s, au plus
+`--cooldown-timeout` secondes (300 par défaut). Il n'attend pas si la température n'est pas
+lisible. La pause effective est enregistrée dans chaque résultat (`cooldown_s`, export de
+schéma 4) et citée dans le rapport.
 
 Le score natif est un **indice brut** : la moyenne géométrique de débits hétérogènes, sans
 unité. Les points viennent du scoring, ci-dessous.
