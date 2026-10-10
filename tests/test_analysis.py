@@ -10,7 +10,7 @@ from test_scoring import REFERENCE, machine, snapshot
 from hwbench.analysis import STATUS_ORDER, FindingCode, Status, analyze
 from hwbench.export import MachineExport, build_export, load_export
 from hwbench.models import SensorsData, TemperatureReading, Unavailable
-from hwbench.results import BenchWarning, MachineState, Result
+from hwbench.results import BenchWarning, CooldownOutcome, MachineState, Result
 from hwbench.runner import RunSettings
 from hwbench.scoring import score_results
 
@@ -377,3 +377,29 @@ def test_threshold_findings_use_the_given_settings_not_the_stored_warnings() -> 
     ]
     strict = analyze(session(results), RunSettings(hot_start_c=60.0, high_variance_cv_percent=2.0))
     assert len(find(strict, FindingCode.HOT_START).items) == 2
+
+
+def test_hot_start_after_a_stalled_cooldown_is_information() -> None:
+    """Cas constaté : repos à 34 °C, seuil 30 °C, attente arrêtée sur stagnation avant le
+    premier bench de chaque catégorie ; le second bench de la catégorie n'a pas attendu."""
+    hot = MachineState(["performance"], on_ac=True, cpu_temp_c=34.0)
+    results = [
+        replace(
+            r,
+            state_before=hot,
+            cooldown_outcome=CooldownOutcome.STALLED if r.name != "native-cpu-multi" else None,
+        )
+        for r in clean()
+        if r.name in ("native-cpu-single", "native-cpu-multi")
+    ]
+    findings = analyze(session(results), RunSettings(hot_start_c=30.0))
+    idle = find(findings, FindingCode.HOT_IDLE)
+    assert idle.status is Status.INFO and [i["bench"] for i in idle.items] == ["native-cpu-single"]
+    hot_start = find(findings, FindingCode.HOT_START)
+    assert [i["bench"] for i in hot_start.items] == ["native-cpu-multi"]
+
+
+def test_stalled_cooldown_below_the_threshold_says_nothing() -> None:
+    results = [replace(r, cooldown_outcome=CooldownOutcome.STALLED) for r in clean()]
+    codes_found = codes(analyze(session(results)))
+    assert FindingCode.HOT_IDLE not in codes_found and FindingCode.HOT_START not in codes_found

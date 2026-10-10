@@ -60,6 +60,15 @@ def hot_start_sentence(count: int, threshold_c: float) -> str:
     return f"{_tests(count)} {verb} démarré à {_celsius(threshold_c)} ou plus"
 
 
+def hot_idle_sentence(count: int, threshold_c: float) -> str:
+    """« 2 tests ont démarré à leur température de repos, au-dessus de 70 °C »."""
+    verb, own = ("a", "sa") if count == 1 else ("ont", "leur")
+    return (
+        f"{_tests(count)} {verb} démarré à {own} température de repos, au-dessus de "
+        f"{_celsius(threshold_c)}"
+    )
+
+
 def _benches(finding: Finding) -> str:
     return _list([bench_label(i["bench"]) for i in finding.items])
 
@@ -105,6 +114,12 @@ def finding_text(finding: Finding) -> str:
             return (
                 f"{hot_start_sentence(len(items), p['threshold_c'])} (seuil de départ "
                 f"chaud){after} : {starts}."
+            )
+        case FindingCode.HOT_IDLE:
+            starts = _list([f"{bench_label(i['bench'])} à {_celsius(i['temp_c'])}" for i in items])
+            return (
+                f"{hot_idle_sentence(len(items), p['threshold_c'])} : {starts}. L'attente de "
+                "refroidissement s'est arrêtée faute de baisse, rien à corriger."
             )
         case FindingCode.HIGH_VARIANCE:
             values = _list(

@@ -18,7 +18,7 @@ from html import escape as html_escape
 from pathlib import Path
 
 import pytest
-from conftest import make_result
+from conftest import COOL_AC_STATE, make_result
 from test_fixtures_privacy import _live_identifiers
 from test_leaderboard_site import EVIL
 from test_scoring import REFERENCE, machine, snapshot
@@ -26,6 +26,7 @@ from test_scoring import REFERENCE, machine, snapshot
 from hwbench import __version__, privacy
 from hwbench.export import build_export, load_export, to_dict, write_export
 from hwbench.report import DEFAULT_SETTINGS_NOTE, render_report
+from hwbench.results import CooldownOutcome
 from hwbench.runner import RunSettings
 from hwbench.scoring import score_results
 
@@ -222,3 +223,15 @@ def test_cpu_multi_alone_report_says_nothing_about_the_gpu() -> None:
     results = [r for r in machine(1.0) if r.name == "native-cpu-multi"]
     html = _session_html(results, RunSettings())
     assert "sans GPU" not in html and "GPU non mesuré" not in html
+
+
+def test_idle_hot_start_is_information_in_the_conditions() -> None:
+    hot = replace(COOL_AC_STATE, cpu_temp_c=34.0)
+    results = [
+        replace(r, state_before=hot, cooldown_outcome=CooldownOutcome.STALLED, cooldown_s=34.0)
+        for r in machine(1.0)
+    ]
+    html = _session_html(results, RunSettings(hot_start_c=30.0, cooldown_auto=True))
+    assert "ont démarré à leur température de repos, au-dessus de 30 °C" in html
+    assert "Laisser refroidir la machine" not in html  # aucune recommandation
+    assert "départs chauds" not in html  # la tuile Conditions n'en compte aucun
