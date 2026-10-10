@@ -311,15 +311,18 @@ et du classement.
 - **CPU single et multi** : seul le backend natif compte. sysbench est noté à côté, pour
   information.
 - **GPU** : moyenne géométrique de glmark2 et vkmark. Chaque score de catégorie garde la liste
-  des backends utilisés ; si elle diffère de celle de la référence (vkmark absent par exemple),
-  le score GPU est « non comparable ». Jamais de moyenne sur « ce qui est installé ».
+  des backends utilisés. S'il manque un backend de la référence (vkmark absent, en échec, ou
+  sans Vulkan fonctionnel, comme sur un Intel Haswell où il plante en SIGSEGV), le GPU est
+  « incomplet » : pas de points GPU, et glmark2 reste noté seul pour information. Jamais de
+  moyenne sur « ce qui est installé ».
 - **Mémoire et disque** : catégories d'information. Mémoire = moyenne géométrique des deux
   benchs natifs (single et multi), sysbench à côté pour information ; disque = fio. Elles sont
   notées quand la référence contient ces benchs, sinon elles restent en valeurs brutes. Elles
   n'entrent **jamais** dans le score combiné ni dans le classement.
 - **Score combiné** : moyenne géométrique pondérée des catégories CPU single, CPU multi et GPU
-  (1/3 chacune par défaut, `--weights`). Sans GPU mesuré, il est calculé sur le CPU seul et le
-  signale ; un GPU mesuré mais non comparable rend le combiné non comparable.
+  (1/3 chacune par défaut, `--weights`). Sans GPU mesuré, ou avec un GPU incomplet, il est
+  calculé sur le CPU seul et signalé comme partiel. Il n'est alors pas classé. Un GPU mesuré
+  mais non comparable (autre version de bench ou d'outil) rend le combiné non comparable.
 
 La référence est `src/hwbench/data/reference.json`, versionnée dans le repo. Elle se régénère
 sur le desktop B850, depuis la session graphique (pour glmark2 et vkmark), rien d'autre ne
