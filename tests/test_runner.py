@@ -395,3 +395,41 @@ def test_cooldown_is_recorded_in_the_result() -> None:
 
     assert run(cooldown_s=42.0).cooldown_s == 42.0
     assert run().cooldown_s == 0.0
+
+
+def test_auto_cooldown_stops_when_the_temperature_no_longer_drops() -> None:
+    # repos au-dessus du seuil : 75 °C dès 6 s ; à 34 s, la baisse depuis 4 s (76 °C) vaut
+    # encore 1 °C, à 36 s elle est nulle depuis 6 s
+    t = FakeTime([85.0, 80.0, 76.0, 75.0])
+    result = t.cool_down(cooldown_auto=True)
+    assert result == Cooldown(36.0, CooldownOutcome.STALLED, 85.0, 75.0)
+
+
+def test_slow_but_steady_cooling_is_not_a_stall() -> None:
+    # 0,2 °C par relevé (2 s) : 3 °C par fenêtre de 30 s, l'attente continue jusqu'au seuil
+    temps = [round(73.0 - 0.2 * i, 1) for i in range(30)]
+    result = FakeTime(temps).cool_down(cooldown_auto=True)
+    assert result.outcome is CooldownOutcome.COOLED and result.end_c == 69.8
+    assert result.waited_s == 32.0
+
+
+def test_stall_window_follows_the_settings() -> None:
+    temps = [85.0, 80.0, 76.0, 75.0]
+    short = FakeTime(temps).cool_down(cooldown_auto=True, cooldown_stall_s=4.0)
+    assert (short.waited_s, short.outcome) == (10.0, CooldownOutcome.STALLED)
+    tolerant = FakeTime(temps).cool_down(cooldown_auto=True, cooldown_stall_delta_c=5.0)
+    assert (tolerant.waited_s, tolerant.outcome) == (34.0, CooldownOutcome.STALLED)
+
+
+def test_stall_detection_can_be_disabled() -> None:
+    t = FakeTime([85.0, 75.0])
+    result = t.cool_down(cooldown_auto=True, cooldown_stall_s=0.0, cooldown_timeout_s=60.0)
+    assert result.outcome is CooldownOutcome.TIMEOUT and result.waited_s == 60.0
+
+
+@pytest.mark.parametrize(
+    "settings", [dict(cooldown_stall_s=-1.0), dict(cooldown_stall_delta_c=-1.0)]
+)
+def test_invalid_stall_settings(settings) -> None:
+    with pytest.raises(ValueError):
+        RunSettings(**settings)
