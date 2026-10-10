@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from importlib import resources
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from hwbench.results import (
     COMBINED_CATEGORIES,
@@ -291,13 +291,26 @@ def is_official(result_backend: str, category: Category) -> bool:
     return result_backend == OFFICIAL_CPU_BACKEND
 
 
+class _Context(TypedDict, total=False):
+    """Champs de BackendScore hors identité : pilote, GPU, version d'outil, disque."""
+
+    driver: str | None
+    reference_driver: str | None
+    gpu: str | None
+    reference_gpu: str | None
+    tool_version: str | None
+    reference_tool_version: str | None
+    device: str | None
+    reference_device: str | None
+
+
 def normalize(result: Result, reference: Reference) -> BackendScore:
     ours = result.backend_id
     official = is_official(result.backend, result.category)
     entry = reference.find(ours.name)
     if entry is None:
         return BackendScore(ours, result.category, official, None, ScoreIssue.NOT_IN_REFERENCE)
-    drivers = {
+    drivers: _Context = {
         "driver": result.environment.get("driver"),
         "reference_driver": entry.driver,
         "gpu": result.environment.get("renderer"),
