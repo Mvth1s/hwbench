@@ -288,6 +288,11 @@ def test_gpu_not_measured() -> None:
     assert FindingCode.GPU_NOT_MEASURED not in codes(analyze(session(clean())))
 
 
+def test_no_gpu_finding_when_the_combined_is_not_computed() -> None:
+    multi_only = [r for r in clean() if r.name == "native-cpu-multi"]
+    assert FindingCode.GPU_NOT_MEASURED not in codes(analyze(session(multi_only)))
+
+
 def test_gpu_incomplete_names_the_missing_backend() -> None:
     no_vulkan = [r for r in clean() if r.name != "vkmark"]
     finding = find(analyze(session(no_vulkan)), FindingCode.GPU_NOT_MEASURED)

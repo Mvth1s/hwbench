@@ -216,3 +216,9 @@ def test_cooldown_without_stall_detection() -> None:
     settings = RunSettings(cooldown_auto=True, cooldown_stall_s=0.0)
     html = _session_html(machine(1.0), settings)
     assert "au plus 300 s, avant chaque catégorie." in html and "arrêtée si" not in html
+
+
+def test_cpu_multi_alone_report_says_nothing_about_the_gpu() -> None:
+    results = [r for r in machine(1.0) if r.name == "native-cpu-multi"]
+    html = _session_html(results, RunSettings())
+    assert "sans GPU" not in html and "GPU non mesuré" not in html

@@ -612,3 +612,28 @@ def test_partial_combined_is_marked_on_its_own_line() -> None:
         r"Score combiné +2000 pts  \(partiel, sans GPU\)",
         _panel(score_results(machine(2.0, vkmark=False), REFERENCE)),
     )
+
+
+@pytest.mark.parametrize(
+    ("results", "issue"),
+    [
+        # cas constaté : bench cpu-multi seul
+        (
+            machine(2.0, **{"native-cpu-single": False, "glmark2": False, "vkmark": False}),
+            ScoreIssue.CPU_NOT_MEASURED,
+        ),
+        (
+            [
+                replace(r, version="99") if r.name == "native-cpu-single" else r
+                for r in machine(2.0, glmark2=False, vkmark=False)
+            ],
+            ScoreIssue.CATEGORY_NOT_COMPARABLE,
+        ),
+    ],
+)
+def test_uncomputed_combined_is_never_flagged_without_gpu(results, issue) -> None:
+    scores = score_results(results, REFERENCE)
+    combined = scores.combined
+    assert combined is not None
+    assert (combined.points, combined.issue, combined.gpu_missing) == (None, issue, False)
+    assert "calculé sans GPU" not in _panel(scores)
