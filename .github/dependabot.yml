@@ -1,4 +1,5 @@
 # Dependabot : PR vers dev, messages conventionnels pour passer commitlint.
+# Uniquement les montées de version majeure (les security updates restent actives).
 version: 2
 updates:
   # actions épinglées par SHA (release.yml…) : « ci(deps): … »
@@ -10,6 +11,9 @@ updates:
     commit-message:
       prefix: ci
       include: scope
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
 
   # dépendances Python du pyproject.toml : « build(deps): … », « build(deps-dev): … »
   - package-ecosystem: pip
@@ -21,3 +25,6 @@ updates:
       prefix: build
       prefix-development: build
       include: scope
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
