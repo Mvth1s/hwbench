@@ -183,6 +183,29 @@ def _states(ctx: Context) -> list[MachineState]:
     return [st for r in ctx.session.results for st in (r.state_before, r.state_after)]
 
 
+def _cooldown_rows(ctx: Context) -> list[tuple[str, str | None, Status, str]]:
+    """--cooldown : pauses effectives avant chaque catégorie (rien si l'option n'a pas servi)."""
+    measured = ctx.session.settings
+    paused = [r for r in ctx.session.results if r.cooldown_s > 0]
+    if not paused and not (measured and measured.cooldown_enabled):
+        return []
+    if measured is not None and measured.cooldown_auto:
+        mode = (
+            f"Mode auto : attente du passage sous {num(measured.hot_start_c, 0)} °C, "
+            f"au plus {num(measured.cooldown_timeout_s, 0)} s, avant chaque catégorie."
+        )
+    elif measured is not None and measured.cooldown_s:
+        mode = f"Pause fixe de {num(measured.cooldown_s, 0)} s à chaque changement de catégorie."
+    else:
+        mode = "Pause de refroidissement avant certaines catégories."
+    if not paused:
+        return [("Refroidissement", "aucune attente", Status.INFO, mode)]
+    total = sum(r.cooldown_s for r in paused)
+    detail = ", ".join(f"{bench_label(r.name)} {num(r.cooldown_s, 0)} s" for r in paused)
+    value = f"{num(total, 0)} s au total"
+    return [("Refroidissement", value, Status.INFO, f"{mode} Pauses : {detail}.")]
+
+
 def conditions(ctx: Context) -> str:
     states = _states(ctx)
     if not states:
@@ -235,6 +258,7 @@ def conditions(ctx: Context) -> str:
         else:
             text = f"Tous les tests ont démarré sous le {threshold}."
             rows.append(("Température de départ", span, Status.OK, text))
+    rows += _cooldown_rows(ctx)
 
     html_rows = [
         [e(label), e(value if value not in (None, "") else "—"), status_badge(st), e(text)]
