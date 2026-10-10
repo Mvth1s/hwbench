@@ -123,7 +123,7 @@ def _build(tp: Any, value: Any, where: str) -> Any:
         return {
             _build(key_tp, k, where): _build(value_tp, v, f"{where}.{k}") for k, v in value.items()
         }
-    if dataclasses.is_dataclass(tp):
+    if isinstance(tp, type) and dataclasses.is_dataclass(tp):
         if not isinstance(value, dict):
             raise ExportError(f"{where} : objet attendu")
         hints = get_type_hints(tp)
