@@ -9,7 +9,7 @@ from conftest import make_result
 from rich.console import Console
 
 from hwbench import privacy
-from hwbench.display.scores import render_scores
+from hwbench.display.scores import PARTIAL_NOTE, combined_points, render_scores
 from hwbench.models import (
     BoardData,
     CpuData,
@@ -597,3 +597,18 @@ def test_tool_rule_does_not_apply_to_gpu_backends() -> None:
     # version brute relevée (même build que la référence), aucun disque
     assert score.tool_version == "2023.01" and score.device is None
     assert not score.tool_build_differs
+
+
+def test_partial_combined_is_marked_on_its_own_line() -> None:
+    def line(results) -> str:
+        combined = score_results(results, REFERENCE).combined
+        assert combined is not None
+        return combined_points(combined).plain
+
+    assert line(machine(2.0, glmark2=False, vkmark=False)) == f"2000 pts  {PARTIAL_NOTE}"
+    assert line(machine(2.0, vkmark=False)) == f"2000 pts  {PARTIAL_NOTE}"  # GPU incomplet
+    assert line(machine(2.0)) == "2000 pts"
+    assert re.search(
+        r"Score combiné +2000 pts  \(partiel, sans GPU\)",
+        _panel(score_results(machine(2.0, vkmark=False), REFERENCE)),
+    )
