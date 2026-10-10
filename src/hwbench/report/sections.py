@@ -191,9 +191,15 @@ def _cooldown_rows(ctx: Context) -> list[tuple[str, str | None, Status, str]]:
     if not paused and not (measured and measured.cooldown_enabled):
         return []
     if measured is not None and measured.cooldown_auto:
+        delta, window = measured.cooldown_stall_delta_c, measured.cooldown_stall_s
+        stall = (
+            f", arrêtée si la baisse est inférieure à {compact(delta)} °C en {num(window, 0)} s"
+            if window > 0
+            else ""
+        )
         mode = (
             f"Mode auto : attente du passage sous {num(measured.hot_start_c, 0)} °C, "
-            f"au plus {num(measured.cooldown_timeout_s, 0)} s, avant chaque catégorie."
+            f"au plus {num(measured.cooldown_timeout_s, 0)} s{stall}, avant chaque catégorie."
         )
     elif measured is not None and measured.cooldown_s:
         mode = f"Pause fixe de {num(measured.cooldown_s, 0)} s à chaque changement de catégorie."

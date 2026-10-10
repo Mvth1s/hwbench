@@ -185,7 +185,10 @@ def test_cooldown_pauses_are_listed_in_the_conditions() -> None:
     ]
     html = _session_html(results, RunSettings(cooldown_auto=True, cooldown_timeout_s=120.0))
     assert "Refroidissement" in html and "42 s au total" in html
-    assert "Mode auto : attente du passage sous 70 °C, au plus 120 s" in html
+    assert (
+        "Mode auto : attente du passage sous 70 °C, au plus 120 s, arrêtée si la baisse est "
+        "inférieure à 1 °C en 30 s, avant chaque catégorie."
+    ) in html
     assert "Pauses : CPU multi-core (natif) 42 s." in html
 
 
@@ -207,3 +210,9 @@ def test_key_figures_say_why_the_gpu_is_left_out() -> None:
     assert "sans GPU (incomplet)" in html([r for r in machine(1.0) if r.name != "vkmark"])
     cpu_only = [r for r in machine(1.0) if r.name not in ("glmark2", "vkmark")]
     assert "sans GPU (non mesuré)" in html(cpu_only)
+
+
+def test_cooldown_without_stall_detection() -> None:
+    settings = RunSettings(cooldown_auto=True, cooldown_stall_s=0.0)
+    html = _session_html(machine(1.0), settings)
+    assert "au plus 300 s, avant chaque catégorie." in html and "arrêtée si" not in html
