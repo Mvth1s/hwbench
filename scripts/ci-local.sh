@@ -4,7 +4,8 @@
 # Usage : scripts/ci-local.sh [base]      (base des commits à vérifier, défaut : dev)
 #
 # Comme .github/workflows/ci.yml : venv neuf (rien ne vient du .venv de dev),
-# pip install -e '.[dev]', ruff check, ruff format --check, pytest --cov. Et comme
+# pip install -e '.[dev]', ruff check, ruff format --check, mypy (src/ et scripts/, portée
+# dans [tool.mypy] du pyproject.toml), pytest --cov. Et comme
 # commitlint.yml : commitlint sur les commits de la branche depuis <base>.
 # GITHUB_ACTIONS=true et CI=true comme sur les runners : certaines bibliothèques changent de
 # comportement (Typer force alors un rendu de terminal, avec codes ANSI, dans l'aide).
@@ -26,6 +27,9 @@ python3 -m venv "$VENV"
 echo "== ruff"
 "$VENV/bin/ruff" check .
 "$VENV/bin/ruff" format --check .
+
+echo "== mypy"
+"$VENV/bin/mypy"
 
 echo "== pytest --cov"
 "$VENV/bin/pytest" --cov --cov-report=term -q
