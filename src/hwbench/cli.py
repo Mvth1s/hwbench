@@ -15,7 +15,12 @@ from hwbench.benchmarks.base import BenchOptions, known_backends, select
 from hwbench.benchmarks.external.fio import parse_size
 from hwbench.collect import collect_snapshot
 from hwbench.compare import compare
-from hwbench.display.bench import CATEGORY_LABELS, render_result, warning_message
+from hwbench.display.bench import (
+    CATEGORY_LABELS,
+    cooldown_message,
+    render_result,
+    warning_message,
+)
 from hwbench.display.compare import render_comparison
 from hwbench.display.fmt import num
 from hwbench.display.info import render_info
@@ -36,7 +41,14 @@ from hwbench.reference import (
 )
 from hwbench.report import render_report
 from hwbench.results import Availability, Category, Result
-from hwbench.runner import MIN_RUNS, RunSettings, run_benchmark, start_warnings
+from hwbench.runner import (
+    MIN_RUNS,
+    CooldownOutcome,
+    RunSettings,
+    cool_down,
+    run_benchmark,
+    start_warnings,
+)
 from hwbench.scoring import (
     DEFAULT_WEIGHTS,
     ReferenceError,
@@ -229,11 +241,38 @@ def _bench_options(workers: int | None, disk_size: str, disk_path: Path | None) 
     return BenchOptions(workers=workers, disk_size=size, disk_path=disk_path)
 
 
+def _cool_down(console: Console, category: Category, settings: RunSettings) -> float:
+    """Pause avant une catégorie (--cooldown) ; renvoie la durée effective."""
+    label = f"{CATEGORY_LABELS[category]} · refroidissement"
+    target = num(settings.hot_start_c, 0)
+    with console.status(f"{label}…") as status:
+
+        def progress(elapsed: float, temp: float | None) -> None:
+            if temp is None:
+                status.update(f"{label} : {num(elapsed, 0)}/{num(settings.cooldown_s, 0)} s…")
+            else:
+                status.update(
+                    f"{label} : CPU {num(temp, 0)} °C, objectif sous {target} °C "
+                    f"({num(elapsed, 0)}/{num(settings.cooldown_timeout_s, 0)} s)…"
+                )
+
+        cooldown = cool_down(settings, probe=capture_state, progress=progress)
+    warn = cooldown.outcome in (CooldownOutcome.TIMEOUT, CooldownOutcome.NO_SENSOR)
+    message = f"{label} : {cooldown_message(cooldown, settings)}"
+    console.print(Text(f"⚠ {message}", "yellow") if warn else Text(message, "dim"))
+    return cooldown.waited_s
+
+
 def _run_all(
     console: Console, classes: list, settings: RunSettings, options: BenchOptions
 ) -> list[Result]:
-    """Lance chaque bench disponible ; un bench qui échoue est signalé et sauté."""
+    """Lance chaque bench disponible ; un bench qui échoue est signalé et sauté.
+
+    --cooldown : pause à chaque changement de catégorie (durée fixe), ou avant chaque catégorie,
+    la première comprise (auto, sans attente si le CPU est déjà sous le seuil).
+    """
     results: list[Result] = []
+    previous: Category | None = None
     for cls in classes:
         instance = cls(options)
         label = f"{CATEGORY_LABELS[cls.category]} · {cls.backend}"
@@ -245,7 +284,13 @@ def _run_all(
         if (notice := instance.notice()) is not None:
             # le chemin vient de l'utilisateur : jamais interprété comme balisage rich
             console.print(Text(f"{label} : {notice}.", style="dim"))
+        new_category = cls.category is not previous
+        first = previous is None
+        previous = cls.category
         try:
+            waited = 0.0
+            if new_category and (settings.cooldown_auto or (settings.cooldown_s and not first)):
+                waited = _cool_down(console, cls.category, settings)
             with console.status(f"{label} : préparation…") as status:
                 cap = settings.warmup_cap(cls.category)
 
@@ -257,7 +302,9 @@ def _run_all(
                     else:
                         status.update(f"{label} : run {index}/{total}…")
 
-                result = run_benchmark(instance, settings, probe=capture_state, progress=progress)
+                result = run_benchmark(
+                    instance, settings, probe=capture_state, progress=progress, cooldown_s=waited
+                )
         except KeyboardInterrupt:
             console.print("[red]Interrompu.[/red]")
             raise typer.Exit(code=130) from None
@@ -297,12 +344,42 @@ ReliableCvOption = Annotated[
 HotStartOption = Annotated[
     float, typer.Option("--hot-start", help="Température CPU (°C) de départ jugée trop chaude.")
 ]
+CooldownOption = Annotated[
+    str | None,
+    typer.Option(
+        "--cooldown",
+        metavar="SECONDES|auto",
+        help=(
+            "Pause entre les catégories : durée fixe en secondes, ou « auto » (avant chaque "
+            "catégorie, attendre que le CPU passe sous le seuil --hot-start)."
+        ),
+    ),
+]
+CooldownTimeoutOption = Annotated[
+    float,
+    typer.Option("--cooldown-timeout", min=0, help="Attente maximale (s) d'un --cooldown auto."),
+]
 WeightsOption = Annotated[
     str | None,
     typer.Option(
         "--weights", help="Pondération du score combiné, ex. « cpu-single=1,cpu-multi=1,gpu=1 »."
     ),
 ]
+
+
+def parse_cooldown(value: str | None) -> tuple[float, bool]:
+    """« auto » -> (0, True) ; « 30 » -> (30.0, False) ; None -> pas de pause."""
+    if value is None:
+        return 0.0, False
+    if value.strip().lower() == "auto":
+        return 0.0, True
+    try:
+        seconds = float(value.replace(",", "."))
+    except ValueError:
+        seconds = -1.0
+    if not 0 <= seconds < float("inf"):
+        raise ValueError(f"« {value} » : nombre de secondes ou « auto » attendu")
+    return seconds, False
 
 
 def _settings(
@@ -312,7 +389,14 @@ def _settings(
     max_cv: float,
     hot_start: float,
     reliable_cv: float = DEFAULTS.reliable_cv_percent,
+    cooldown: str | None = None,
+    cooldown_timeout: float = DEFAULTS.cooldown_timeout_s,
 ) -> RunSettings:
+    try:
+        cooldown_s, cooldown_auto = parse_cooldown(cooldown)
+    except ValueError as exc:
+        typer.echo(f"Erreur : --cooldown : {exc}.", err=True)
+        raise typer.Exit(code=2) from None
     return RunSettings(
         runs=runs,
         max_warmup_s=max_warmup,
@@ -320,6 +404,9 @@ def _settings(
         high_variance_cv_percent=max_cv,
         hot_start_c=hot_start,
         reliable_cv_percent=reliable_cv,
+        cooldown_s=cooldown_s,
+        cooldown_auto=cooldown_auto,
+        cooldown_timeout_s=cooldown_timeout,
     )
 
 
@@ -389,6 +476,8 @@ def bench(
     max_cv: MaxCvOption = DEFAULTS.high_variance_cv_percent,
     hot_start: HotStartOption = DEFAULTS.hot_start_c,
     reliable_cv: ReliableCvOption = DEFAULTS.reliable_cv_percent,
+    cooldown: CooldownOption = None,
+    cooldown_timeout: CooldownTimeoutOption = DEFAULTS.cooldown_timeout_s,
     weights: WeightsOption = None,
     disk_size: DiskSizeOption = "1G",
     disk_path: DiskPathOption = None,
@@ -401,7 +490,16 @@ def bench(
     interrompu ou sans résultat : aucun fichier.
     """
     console = Console()
-    settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start, reliable_cv)
+    settings = _settings(
+        runs,
+        max_warmup,
+        warmup_tolerance,
+        max_cv,
+        hot_start,
+        reliable_cv,
+        cooldown,
+        cooldown_timeout,
+    )
     options = _bench_options(workers, disk_size, disk_path)
     results, scores = _bench_session(console, target, backend, settings, options, weights)
     if report:
@@ -426,6 +524,8 @@ def export(
     max_cv: MaxCvOption = DEFAULTS.high_variance_cv_percent,
     hot_start: HotStartOption = DEFAULTS.hot_start_c,
     reliable_cv: ReliableCvOption = DEFAULTS.reliable_cv_percent,
+    cooldown: CooldownOption = None,
+    cooldown_timeout: CooldownTimeoutOption = DEFAULTS.cooldown_timeout_s,
     weights: WeightsOption = None,
     disk_size: DiskSizeOption = "1G",
     disk_path: DiskPathOption = None,
@@ -437,7 +537,16 @@ def export(
     L'export contient les composants (sans aucun identifiant), les résultats et les scores.
     """
     console = Console()
-    settings = _settings(runs, max_warmup, warmup_tolerance, max_cv, hot_start, reliable_cv)
+    settings = _settings(
+        runs,
+        max_warmup,
+        warmup_tolerance,
+        max_cv,
+        hot_start,
+        reliable_cv,
+        cooldown,
+        cooldown_timeout,
+    )
     options = _bench_options(workers, disk_size, disk_path)
     results, scores = _bench_session(console, target, backend, settings, options, weights)
     snapshot, _ = collect_snapshot()

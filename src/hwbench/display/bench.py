@@ -15,6 +15,7 @@ from hwbench.labels import (  # noqa: F401 — réexportés pour display/
     unit_label,
 )
 from hwbench.results import BenchWarning, Category, MachineState, Result
+from hwbench.runner import Cooldown, CooldownOutcome, RunSettings
 
 NA = Text("non disponible", style="dim")
 
@@ -99,6 +100,28 @@ def _state_rows(t: Table, result: Result) -> None:
         t.add_row("Température CPU", f"{temps[0]} avant → {temps[1]} après")
 
 
+def cooldown_message(cooldown: Cooldown, settings: RunSettings) -> str:
+    seuil = f"{num(settings.hot_start_c, 0)} °C"
+    waited = f"{num(cooldown.waited_s, 0)} s"
+    start, end = (
+        "?" if v is None else f"{num(v, 0)} °C" for v in (cooldown.start_c, cooldown.end_c)
+    )
+    match cooldown.outcome:
+        case CooldownOutcome.FIXED:
+            return f"pause de {waited}."
+        case CooldownOutcome.ALREADY_COOL:
+            return f"CPU à {end}, déjà sous {seuil} : aucune attente."
+        case CooldownOutcome.COOLED:
+            return f"CPU de {start} à {end} en {waited} (seuil {seuil})."
+        case CooldownOutcome.TIMEOUT:
+            return (
+                f"CPU encore à {end} après {waited} (seuil {seuil}, départ à {start}) : "
+                "test lancé quand même."
+            )
+        case CooldownOutcome.NO_SENSOR:
+            return "température CPU non disponible : pas d'attente automatique."
+
+
 def render_result(result: Result) -> Panel:
     unit = _unit(result.unit)
     t = Table.grid(padding=(0, 2))
@@ -117,6 +140,8 @@ def render_result(result: Result) -> Panel:
         + ("" if result.warmup_stable else " (non stabilisé)")
         + f" · {num(result.duration_s)} s au total",
     )
+    if result.cooldown_s > 0:
+        t.add_row("Refroidissement", f"{num(result.cooldown_s, 0)} s de pause avant le test")
     t.add_row("Burst (à froid)", Text(f"{measure(result.burst)} {unit}  (hors score)", style="dim"))
     if result.workers is not None:
         # le natif lance des processus (GIL) ; les outils externes, des threads
