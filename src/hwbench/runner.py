@@ -2,8 +2,10 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
 from statistics import median, stdev
 from time import perf_counter
+from time import sleep as real_sleep
 
 from hwbench.benchmarks.base import Benchmark
 from hwbench.machine_state import capture_state
@@ -29,12 +31,25 @@ class RunSettings:
     high_variance_cv_percent: float = 5.0
     hot_start_c: float = 70.0
     reliable_cv_percent: float = 1.0  # rapport : « très reproductible » sous ce CV
+    # Pause entre catégories (--cooldown) : durée fixe, ou (auto) attente que la température CPU
+    # passe sous hot_start_c, avant chaque catégorie, dans la limite de cooldown_timeout_s.
+    cooldown_s: float = 0.0
+    cooldown_auto: bool = False
+    cooldown_timeout_s: float = 300.0
 
     def __post_init__(self) -> None:
         if self.runs < MIN_RUNS:
             raise ValueError(f"au moins {MIN_RUNS} runs sont nécessaires (reçu {self.runs})")
         if self.max_warmup_s is not None and self.max_warmup_s < 0:
             raise ValueError("le plafond de warm-up ne peut pas être négatif")
+        if self.cooldown_s < 0 or self.cooldown_timeout_s < 0:
+            raise ValueError("une durée de refroidissement ne peut pas être négative")
+        if self.cooldown_auto and self.cooldown_s:
+            raise ValueError("refroidissement : durée fixe ou auto, pas les deux")
+
+    @property
+    def cooldown_enabled(self) -> bool:
+        return self.cooldown_auto or self.cooldown_s > 0
 
     def warmup_cap(self, category: Category) -> float:
         if self.max_warmup_s is not None:
@@ -43,9 +58,71 @@ class RunSettings:
 
 
 Probe = Callable[[], MachineState]
+Sleep = Callable[[float], None]
 # (phase « warmup » ou « run », index 1-based, total ; None pendant le warm-up adaptatif)
 Progress = Callable[[str, int, int | None], None]
 Clock = Callable[[], float]
+
+
+COOLDOWN_POLL_S = 2.0  # mode auto : intervalle entre deux relevés de température
+
+
+class CooldownOutcome(StrEnum):
+    FIXED = "fixed"  # pause de durée fixe
+    ALREADY_COOL = "already_cool"  # auto : déjà sous le seuil, aucune attente
+    COOLED = "cooled"  # auto : passé sous le seuil
+    TIMEOUT = "timeout"  # auto : encore au-dessus du seuil au bout du délai
+    NO_SENSOR = "no_sensor"  # auto : température CPU illisible, aucune attente
+
+
+@dataclass(frozen=True)
+class Cooldown:
+    waited_s: float
+    outcome: CooldownOutcome
+    start_c: float | None = None
+    end_c: float | None = None
+
+
+# (secondes écoulées, température relevée ou None en pause fixe)
+CooldownProgress = Callable[[float, float | None], None]
+
+
+def cool_down(
+    settings: RunSettings,
+    probe: Probe = capture_state,
+    progress: CooldownProgress | None = None,
+    sleep: Sleep = real_sleep,
+    clock: Clock = perf_counter,
+) -> Cooldown:
+    """Pause avant une catégorie : durée fixe (cooldown_s), ou attente que la température CPU
+    passe sous hot_start_c (cooldown_auto), relevée toutes les COOLDOWN_POLL_S secondes,
+    au plus cooldown_timeout_s."""
+    start = clock()
+    if not settings.cooldown_auto:
+        while (elapsed := clock() - start) < settings.cooldown_s:
+            if progress:
+                progress(elapsed, None)
+            sleep(min(1.0, settings.cooldown_s - elapsed))
+        return Cooldown(clock() - start, CooldownOutcome.FIXED)
+
+    first = temp = probe().cpu_temp_c
+    if temp is None:
+        return Cooldown(0.0, CooldownOutcome.NO_SENSOR)
+    if temp < settings.hot_start_c:
+        return Cooldown(0.0, CooldownOutcome.ALREADY_COOL, first, temp)
+    while True:
+        elapsed = clock() - start
+        if elapsed >= settings.cooldown_timeout_s:
+            return Cooldown(elapsed, CooldownOutcome.TIMEOUT, first, temp)
+        if progress:
+            progress(elapsed, temp)
+        sleep(min(COOLDOWN_POLL_S, settings.cooldown_timeout_s - elapsed))
+        reading = probe().cpu_temp_c
+        if reading is None:  # capteur perdu en route : on s'arrête là
+            return Cooldown(clock() - start, CooldownOutcome.NO_SENSOR, first, temp)
+        temp = reading
+        if temp < settings.hot_start_c:
+            return Cooldown(clock() - start, CooldownOutcome.COOLED, first, temp)
 
 
 def start_warnings(state: MachineState, settings: RunSettings | None = None) -> list[BenchWarning]:
@@ -95,7 +172,9 @@ def run_benchmark(
     probe: Probe = capture_state,
     progress: Progress | None = None,
     clock: Clock = perf_counter,
+    cooldown_s: float = 0.0,
 ) -> Result:
+    """cooldown_s : pause de refroidissement effective juste avant ce bench (cool_down)."""
     settings = settings or RunSettings()
     before = probe()
     start = clock()
@@ -146,4 +225,5 @@ def run_benchmark(
         state_before=before,
         state_after=after,
         warnings=warnings,
+        cooldown_s=cooldown_s,
     )

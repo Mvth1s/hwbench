@@ -184,6 +184,9 @@ class Result:
     state_before: MachineState
     state_after: MachineState
     warnings: list[BenchWarning]
+    # pause de refroidissement juste avant ce bench (--cooldown), 0 sans pause ; absente des
+    # exports de schéma 2 et 3
+    cooldown_s: float = 0.0
 
     @property
     def backend_id(self) -> BackendId:
