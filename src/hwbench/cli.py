@@ -310,7 +310,7 @@ def _run_all(
             console.print("[red]Interrompu.[/red]")
             raise typer.Exit(code=130) from None
         except RuntimeError as exc:
-            console.print(render_failure(cls.category, cls.backend, cls.version, str(exc)))
+            console.print(render_failure(cls.category, cls.name, cls.version, str(exc)))
             continue
         console.print(render_result(result))
         results.append(result)

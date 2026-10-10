@@ -36,7 +36,7 @@ def fast_and_isolated(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_bench_single_core() -> None:
     result = runner.invoke(cli.app, ["bench", "cpu-single"], env=WIDE)
     assert result.exit_code == 0, result.output
-    assert "CPU single-core · native v1" in result.output
+    assert "CPU single-core · native-cpu-single v1" in result.output
     assert "Score (médiane)" in result.output
     assert "SHA-256" in result.output and "Mio/s" in result.output
     assert "multi-core" not in result.output
@@ -47,9 +47,10 @@ def test_bench_all_with_workers() -> None:
         cli.app, ["bench", "all", "--backend", "native", "--workers", "2", "--runs", "3"], env=WIDE
     )
     assert result.exit_code == 0, result.output
-    assert "CPU single-core · native v1" in result.output
-    assert "CPU multi-core · native v1" in result.output
-    assert "Mémoire · native v1" in result.output
+    assert "CPU single-core · native-cpu-single v1" in result.output
+    assert "CPU multi-core · native-cpu-multi v1" in result.output
+    assert "Mémoire · native-memory-single v1" in result.output
+    assert "Mémoire · native-memory-multi v1" in result.output
     assert re.search(r"Processus +2 ", result.output)
     assert "GPU : le backend « native » ne couvre pas cette catégorie." in result.output
 
@@ -57,7 +58,9 @@ def test_bench_all_with_workers() -> None:
 def test_bench_memory_native() -> None:
     result = runner.invoke(cli.app, ["bench", "memory", "--backend", "native"], env=WIDE)
     assert result.exit_code == 0, result.output
-    assert "Mémoire · native v1" in result.output and "Mio/s" in result.output
+    # single et multi : deux panneaux, deux titres distincts (#24)
+    assert "Mémoire · native-memory-single v1" in result.output
+    assert "Mémoire · native-memory-multi v1" in result.output and "Mio/s" in result.output
     assert "CPU single-core" not in result.output
 
 
@@ -73,7 +76,7 @@ def test_bench_disk_with_fio(fake_tools) -> None:
     assert result.exit_code == 0, result.output
     out = result.output
     assert "Disque · fio : fichier de test de 1 Gio dans /mnt/data, supprimé à la fin" in out
-    assert "Disque · fio v1 · outil 3.40" in out
+    assert "Disque · fio-disk v1 · outil 3.40" in out
     assert re.search(r"Fichier de test +1 Gio", out)
     assert "Lecture aléatoire 4K (QD32)" in out and "IOPS" in out
     assert "système de fichiers btrfs" in out and "Samsung SSD 990 EVO Plus 1TB" in out
@@ -358,6 +361,6 @@ def test_failed_bench_is_shown_in_its_panel(fake_tools, monkeypatch) -> None:
     monkeypatch.setattr(cli, "render_failure", lambda *args: shown.append(args) or "")
     result = runner.invoke(cli.app, ["bench", "cpu-single", "--backend", "sysbench"], env=WIDE)
     assert result.exit_code == 1  # aucun résultat, mais pas de plantage
-    ((category, backend, version, message),) = shown
-    assert (category, backend, version) == (Category.CPU_SINGLE, "sysbench", "1")
+    ((category, name, version, message),) = shown
+    assert (category, name, version) == (Category.CPU_SINGLE, "sysbench-cpu-single", "1")
     assert message.startswith("sysbench interrompu par le signal SIGSEGV (code -11).")
