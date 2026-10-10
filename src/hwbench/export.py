@@ -22,10 +22,12 @@ from hwbench.scoring import BackendScore, CategoryScore, CombinedScore, Referenc
 
 # 2 : empreinte de référence complète (sha256, 64 hex) au lieu de 12 caractères
 # 3 : réglages des mesures (RunSettings : seuils, runs, warm-up) dans le champ « settings »
-EXPORT_SCHEMA_VERSION = 3
+# 4 : refroidissement entre catégories (RunSettings.cooldown_*, Result.cooldown_s)
+EXPORT_SCHEMA_VERSION = 4
 # Schémas relus. Un export de schéma 2 n'a pas de réglages : settings vaut None, et le rapport
-# utilise les réglages par défaut en le signalant.
-READABLE_SCHEMA_VERSIONS = (2, 3)
+# utilise les réglages par défaut en le signalant. Schémas 2 et 3 : pas de refroidissement
+# (valeurs par défaut des champs, 0 s).
+READABLE_SCHEMA_VERSIONS = (2, 3, 4)
 
 
 class ExportError(ValueError):

@@ -403,7 +403,8 @@ table.values { width: auto; font-size: 13px; }
     "energy_performance_preference": "performance",
     "has_battery": true
    },
-   "warnings": []
+   "warnings": [],
+   "cooldown_s": 0.0
   },
   {
    "name": "sysbench-cpu-single",
@@ -467,7 +468,8 @@ table.values { width: auto; font-size: 13px; }
    },
    "warnings": [
     "hot_start"
-   ]
+   ],
+   "cooldown_s": 0.0
   },
   {
    "name": "native-cpu-multi",
@@ -541,7 +543,8 @@ table.values { width: auto; font-size: 13px; }
     "energy_performance_preference": "performance",
     "has_battery": true
    },
-   "warnings": []
+   "warnings": [],
+   "cooldown_s": 0.0
   },
   {
    "name": "sysbench-cpu-multi",
@@ -605,7 +608,8 @@ table.values { width: auto; font-size: 13px; }
    },
    "warnings": [
     "hot_start"
-   ]
+   ],
+   "cooldown_s": 0.0
   },
   {
    "name": "glmark2",
@@ -691,7 +695,8 @@ table.values { width: auto; font-size: 13px; }
    "warnings": [
     "hot_start",
     "high_variance"
-   ]
+   ],
+   "cooldown_s": 0.0
   },
   {
    "name": "vkmark",
@@ -765,7 +770,8 @@ table.values { width: auto; font-size: 13px; }
    "warnings": [
     "hot_start",
     "high_variance"
-   ]
+   ],
+   "cooldown_s": 0.0
   },
   {
    "name": "native-memory-single",
@@ -826,7 +832,8 @@ table.values { width: auto; font-size: 13px; }
     "energy_performance_preference": "performance",
     "has_battery": true
    },
-   "warnings": []
+   "warnings": [],
+   "cooldown_s": 0.0
   },
   {
    "name": "native-memory-multi",
@@ -887,7 +894,8 @@ table.values { width: auto; font-size: 13px; }
     "energy_performance_preference": "performance",
     "has_battery": true
    },
-   "warnings": []
+   "warnings": [],
+   "cooldown_s": 0.0
   },
   {
    "name": "sysbench-memory-single",
@@ -950,7 +958,8 @@ table.values { width: auto; font-size: 13px; }
     "energy_performance_preference": "performance",
     "has_battery": true
    },
-   "warnings": []
+   "warnings": [],
+   "cooldown_s": 0.0
   },
   {
    "name": "fio-disk",
@@ -1024,7 +1033,8 @@ table.values { width: auto; font-size: 13px; }
     "energy_performance_preference": "performance",
     "has_battery": true
    },
-   "warnings": []
+   "warnings": [],
+   "cooldown_s": 0.0
   }
  ],
  "reference": {
@@ -1399,7 +1409,10 @@ table.values { width: auto; font-size: 13px; }
   "warmup_tolerance_percent": 3.0,
   "high_variance_cv_percent": 5.0,
   "hot_start_c": 70.0,
-  "reliable_cv_percent": 1.0
+  "reliable_cv_percent": 1.0,
+  "cooldown_s": 0.0,
+  "cooldown_auto": false,
+  "cooldown_timeout_s": 300.0
  }
 }</script></section>
 <footer class="muted small">Rapport généré par hwbench @@HWBENCH_VERSION@@ à partir de la session du 09/10/2026. Fichier autonome, consultable hors ligne.</footer>
