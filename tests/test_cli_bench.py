@@ -5,13 +5,14 @@ from pathlib import Path
 import pytest
 from conftest import TINY, TINY_MEMORY, tool_output
 from rich.console import Console
+from rich.text import Text
 from test_scoring import snapshot
 from typer.testing import CliRunner
 
 from hwbench import cli
 from hwbench import runner as bench_runner
 from hwbench.benchmarks.native import cpu, memory
-from hwbench.display.bench import render_result
+from hwbench.display.bench import render_failure, render_result
 from hwbench.results import BenchWarning, Category, MachineState, Result
 from hwbench.runner import Cooldown, CooldownOutcome
 
@@ -342,3 +343,21 @@ def test_cooldown_settings_are_exported(cooldowns, tmp_path, monkeypatch) -> Non
     data = json.loads(out.read_text())
     assert data["schema_version"] == 4 and data["settings"]["cooldown_auto"] is True
     assert [r["cooldown_s"] for r in data["results"]] == [12.0, 12.0, 12.0, 0.0]
+
+
+def test_render_failure_is_a_panel_of_its_category() -> None:
+    panel = render_failure(Category.GPU, "vkmark", "1", "[/x] vkmark interrompu")
+    assert panel.title == "GPU · vkmark v1" and panel.border_style == "red"
+    message = panel.renderable.columns[1]._cells[1]
+    assert isinstance(message, Text) and message.plain == "[/x] vkmark interrompu"
+
+
+def test_failed_bench_is_shown_in_its_panel(fake_tools, monkeypatch) -> None:
+    fake_tools(failing={"sysbench": (-11, "MESA-INTEL: warning: something")})
+    shown = []
+    monkeypatch.setattr(cli, "render_failure", lambda *args: shown.append(args) or "")
+    result = runner.invoke(cli.app, ["bench", "cpu-single", "--backend", "sysbench"], env=WIDE)
+    assert result.exit_code == 1  # aucun résultat, mais pas de plantage
+    ((category, backend, version, message),) = shown
+    assert (category, backend, version) == (Category.CPU_SINGLE, "sysbench", "1")
+    assert message.startswith("sysbench interrompu par le signal SIGSEGV (code -11).")

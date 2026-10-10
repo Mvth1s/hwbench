@@ -178,6 +178,22 @@ def render_result(result: Result) -> Panel:
     )
 
 
+def render_failure(category: Category, backend: str, version: str, message: str) -> Panel:
+    """Bench en échec : même cadre que render_result, le message (texte d'un outil externe)
+    n'est jamais interprété comme balisage rich."""
+    t = Table.grid(padding=(0, 2))
+    t.add_column(style="bold cyan", no_wrap=True)
+    t.add_column()
+    t.add_row("Statut", Text("échec, bench ignoré", style="bold red"))
+    t.add_row("Détail", Text(message))
+    return Panel(
+        t,
+        title=f"{CATEGORY_LABELS[category]} · {backend} v{version}",
+        title_align="left",
+        border_style="red",
+    )
+
+
 def _environment(env: dict[str, str]) -> list[str]:
     items: list[str] = []
     for key, value in env.items():

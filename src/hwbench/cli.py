@@ -18,6 +18,7 @@ from hwbench.compare import compare
 from hwbench.display.bench import (
     CATEGORY_LABELS,
     cooldown_message,
+    render_failure,
     render_result,
     warning_message,
 )
@@ -309,8 +310,7 @@ def _run_all(
             console.print("[red]Interrompu.[/red]")
             raise typer.Exit(code=130) from None
         except RuntimeError as exc:
-            # la fin de stderr d'un outil externe : jamais interprétée comme balisage rich
-            console.print(Text(f"{label} : échec, ignoré. {exc}", style="red"))
+            console.print(render_failure(cls.category, cls.backend, cls.version, str(exc)))
             continue
         console.print(render_result(result))
         results.append(result)
