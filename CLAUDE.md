@@ -22,6 +22,7 @@ Machines de dev (Python 3.11+, shell fish) :
 - `typer` pour les commandes, `rich` pour l'affichage
 - `psutil` et `py-cpuinfo` pour la collecte de base
 - `pytest` pour les tests, `ruff` pour le lint
+- `mypy` en mode standard sur `src/` et `scripts/` (`tests/` exclu pour l'instant), `types-psutil` pour les stubs ; py-cpuinfo sans stubs, ignoré par un override
 - `textual` réservé à la future TUI (pas dans cette itération)
 
 ## Commandes
@@ -31,6 +32,7 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/pytest                                   # toute la suite
 .venv/bin/pytest tests/test_collectors_disk.py::test_smart_health   # un seul test
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
+.venv/bin/mypy                                     # src/ et scripts/ (mode standard, [tool.mypy])
 .venv/bin/hwbench info            # essai réel (sudo pour dmidecode/smartctl)
 .venv/bin/hwbench bench cpu-single   # ~7 s ; multi-cœur jusqu'à ~90 s de warm-up sur portable
 .venv/bin/hwbench bench gpu          # ~2 min 30 (glmark2 ~2 min, vkmark ~30 s)
