@@ -367,7 +367,7 @@ def find_pull_request(event: dict[str, Any], api: Api) -> dict[str, Any] | None:
 
 
 def _pr_line(run: dict[str, Any], pr: dict[str, Any] | None) -> str:
-    title = escape_md(truncate(pr.get("title") if pr else run.get("display_title") or "", 200))
+    title = escape_md(truncate((pr.get("title") if pr else run.get("display_title")) or "", 200))
     if not pr:
         return title or "pull request introuvable"
     return link(f"\\#{int(pr['number'])} {title}", pr.get("html_url"))
