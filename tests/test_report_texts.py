@@ -95,6 +95,12 @@ def test_every_code_and_status_has_a_text() -> None:
                 "threads": 8,
             },
         ),
+        FindingCode.HOT_IDLE: Finding(
+            FindingCode.HOT_IDLE,
+            Status.INFO,
+            {"threshold_c": 30.0},
+            [{"bench": "native-cpu-single", "category": "cpu_single", "temp_c": 34.0}],
+        ),
         FindingCode.GPU_NOT_MEASURED: Finding(FindingCode.GPU_NOT_MEASURED, Status.INFO),
         FindingCode.NEEDS_ROOT: Finding(
             FindingCode.NEEDS_ROOT, Status.INFO, {"missing": ["smart"]}
@@ -274,3 +280,21 @@ def test_gpu_incomplete_text() -> None:
         "GPU incomplet (vkmark non mesuré) : le score combiné porte sur le processeur seul et "
         "n'est pas classé."
     )
+
+
+def test_hot_idle_text_has_no_recommendation() -> None:
+    finding = Finding(
+        FindingCode.HOT_IDLE,
+        Status.INFO,
+        {"threshold_c": 30.0},
+        [
+            {"bench": "native-cpu-single", "category": "cpu_single", "temp_c": 34.0},
+            {"bench": "native-cpu-multi", "category": "cpu_multi", "temp_c": 34.4},
+        ],
+    )
+    assert finding_text(finding) == (
+        "2 tests ont démarré à leur température de repos, au-dessus de 30 °C : CPU single-core "
+        "(natif) à 34 °C et CPU multi-core (natif) à 34 °C. L'attente de refroidissement s'est "
+        "arrêtée faute de baisse, rien à corriger."
+    )
+    assert recommendation(finding) is None

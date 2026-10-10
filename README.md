@@ -255,7 +255,10 @@ ne baisse plus : moins de 1 °C de baisse sur les 30 dernières secondes (`--coo
 `--cooldown-stall`, 0 pour désactiver), ce qui évite d'attendre tout le délai avant chaque
 catégorie sur une machine dont la température au repos dépasse le seuil. Il n'attend pas si la
 température n'est pas lisible. Avec `auto`, le contrôle global de départ ne signale plus la température au
-lancement : la ligne de refroidissement et chaque panneau donnent l'état après l'attente. La pause effective est enregistrée dans chaque résultat (`cooldown_s`, export de
+lancement : la ligne de refroidissement et chaque panneau donnent l'état après l'attente. Quand
+l'attente s'arrête faute de baisse, le CPU est à sa température de repos : un départ au-dessus de
+`--hot-start` est alors cité pour information, sans avertissement ni conseil de laisser
+refroidir. La pause effective est enregistrée dans chaque résultat (`cooldown_s`, export de
 schéma 4) et citée dans le rapport.
 
 Le score natif est un **indice brut** : la moyenne géométrique de débits hétérogènes, sans

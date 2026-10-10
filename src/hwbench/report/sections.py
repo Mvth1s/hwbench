@@ -23,6 +23,7 @@ from hwbench.report.charts import Bar, Segment, bars, timeline
 from hwbench.report.html import e, kv, status_badge, table
 from hwbench.report.texts import (
     finding_text,
+    hot_idle_sentence,
     hot_start_sentence,
     plural,
     recommendations,
@@ -258,10 +259,19 @@ def conditions(ctx: Context) -> str:
             else f"{num(low, 0)} à {num(high, 0)} °C"
         )
         threshold = f"seuil de départ chaud {num(ctx.settings.hot_start_c, 0)} °C"
+        idle = _findings(ctx, FindingCode.HOT_IDLE)
+        idle_text = (
+            f" {hot_idle_sentence(len(idle[0].items), ctx.settings.hot_start_c)} (attente de "
+            "refroidissement arrêtée faute de baisse)."
+            if idle
+            else ""
+        )
         if hot:
             count = len(hot[0].items)
             text = f"{hot_start_sentence(count, ctx.settings.hot_start_c)} (seuil de départ chaud)."
-            rows.append(("Température de départ", span, Status.CHECK, text))
+            rows.append(("Température de départ", span, Status.CHECK, text + idle_text))
+        elif idle:
+            rows.append(("Température de départ", span, Status.INFO, idle_text.strip()))
         else:
             text = f"Tous les tests ont démarré sous le {threshold}."
             rows.append(("Température de départ", span, Status.OK, text))

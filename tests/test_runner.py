@@ -433,3 +433,38 @@ def test_stall_detection_can_be_disabled() -> None:
 def test_invalid_stall_settings(settings) -> None:
     with pytest.raises(ValueError):
         RunSettings(**settings)
+
+
+HOT_AC = MachineState(governors=["performance"], on_ac=True, cpu_temp_c=75.0)
+
+
+@pytest.mark.parametrize(
+    ("outcome", "expected"),
+    [
+        (None, BenchWarning.HOT_START),
+        (CooldownOutcome.TIMEOUT, BenchWarning.HOT_START),  # encore en train de refroidir
+        (CooldownOutcome.FIXED, BenchWarning.HOT_START),
+        (CooldownOutcome.STALLED, BenchWarning.HOT_IDLE),  # température de repos
+    ],
+)
+def test_hot_start_after_a_stalled_cooldown_is_idle(outcome, expected) -> None:
+    assert start_warnings(HOT_AC, RunSettings(), outcome) == [expected]
+
+
+def test_hot_idle_only_above_the_threshold() -> None:
+    assert start_warnings(COOL_AC, RunSettings(), CooldownOutcome.STALLED) == []
+
+
+def test_cooldown_outcome_is_recorded_and_drives_the_start_warning() -> None:
+    bench = ScriptedBench([10.0] * 20)
+    result = run_benchmark(
+        bench,
+        RunSettings(),
+        probe=lambda: HOT_AC,
+        clock=bench.clock,
+        cooldown_s=36.0,
+        cooldown_outcome=CooldownOutcome.STALLED,
+    )
+    assert result.cooldown_outcome is CooldownOutcome.STALLED
+    assert BenchWarning.HOT_IDLE in result.warnings
+    assert BenchWarning.HOT_START not in result.warnings
