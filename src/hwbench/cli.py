@@ -359,6 +359,25 @@ CooldownTimeoutOption = Annotated[
     float,
     typer.Option("--cooldown-timeout", min=0, help="Attente maximale (s) d'un --cooldown auto."),
 ]
+CooldownStallOption = Annotated[
+    float,
+    typer.Option(
+        "--cooldown-stall",
+        min=0,
+        help=(
+            "--cooldown auto : fenêtre (s) sur laquelle une baisse trop faible arrête l'attente "
+            "(0 : jamais, attendre le seuil ou --cooldown-timeout)."
+        ),
+    ),
+]
+CooldownStallDeltaOption = Annotated[
+    float,
+    typer.Option(
+        "--cooldown-stall-delta",
+        min=0,
+        help="--cooldown auto : baisse minimale (°C) attendue sur la fenêtre --cooldown-stall.",
+    ),
+]
 WeightsOption = Annotated[
     str | None,
     typer.Option(
@@ -391,6 +410,8 @@ def _settings(
     reliable_cv: float = DEFAULTS.reliable_cv_percent,
     cooldown: str | None = None,
     cooldown_timeout: float = DEFAULTS.cooldown_timeout_s,
+    cooldown_stall: float = DEFAULTS.cooldown_stall_s,
+    cooldown_stall_delta: float = DEFAULTS.cooldown_stall_delta_c,
 ) -> RunSettings:
     try:
         cooldown_s, cooldown_auto = parse_cooldown(cooldown)
@@ -407,6 +428,8 @@ def _settings(
         cooldown_s=cooldown_s,
         cooldown_auto=cooldown_auto,
         cooldown_timeout_s=cooldown_timeout,
+        cooldown_stall_s=cooldown_stall,
+        cooldown_stall_delta_c=cooldown_stall_delta,
     )
 
 
@@ -478,6 +501,8 @@ def bench(
     reliable_cv: ReliableCvOption = DEFAULTS.reliable_cv_percent,
     cooldown: CooldownOption = None,
     cooldown_timeout: CooldownTimeoutOption = DEFAULTS.cooldown_timeout_s,
+    cooldown_stall: CooldownStallOption = DEFAULTS.cooldown_stall_s,
+    cooldown_stall_delta: CooldownStallDeltaOption = DEFAULTS.cooldown_stall_delta_c,
     weights: WeightsOption = None,
     disk_size: DiskSizeOption = "1G",
     disk_path: DiskPathOption = None,
@@ -499,6 +524,8 @@ def bench(
         reliable_cv,
         cooldown,
         cooldown_timeout,
+        cooldown_stall,
+        cooldown_stall_delta,
     )
     options = _bench_options(workers, disk_size, disk_path)
     results, scores = _bench_session(console, target, backend, settings, options, weights)
@@ -526,6 +553,8 @@ def export(
     reliable_cv: ReliableCvOption = DEFAULTS.reliable_cv_percent,
     cooldown: CooldownOption = None,
     cooldown_timeout: CooldownTimeoutOption = DEFAULTS.cooldown_timeout_s,
+    cooldown_stall: CooldownStallOption = DEFAULTS.cooldown_stall_s,
+    cooldown_stall_delta: CooldownStallDeltaOption = DEFAULTS.cooldown_stall_delta_c,
     weights: WeightsOption = None,
     disk_size: DiskSizeOption = "1G",
     disk_path: DiskPathOption = None,
@@ -546,6 +575,8 @@ def export(
         reliable_cv,
         cooldown,
         cooldown_timeout,
+        cooldown_stall,
+        cooldown_stall_delta,
     )
     options = _bench_options(workers, disk_size, disk_path)
     results, scores = _bench_session(console, target, backend, settings, options, weights)

@@ -36,13 +36,18 @@ class RunSettings:
     cooldown_s: float = 0.0
     cooldown_auto: bool = False
     cooldown_timeout_s: float = 300.0
+    # auto : arrêt si la température a baissé de moins de cooldown_stall_delta_c sur les
+    # cooldown_stall_s dernières secondes (repos au-dessus du seuil) ; 0 s désactive
+    cooldown_stall_s: float = 30.0
+    cooldown_stall_delta_c: float = 1.0
 
     def __post_init__(self) -> None:
         if self.runs < MIN_RUNS:
             raise ValueError(f"au moins {MIN_RUNS} runs sont nécessaires (reçu {self.runs})")
         if self.max_warmup_s is not None and self.max_warmup_s < 0:
             raise ValueError("le plafond de warm-up ne peut pas être négatif")
-        if self.cooldown_s < 0 or self.cooldown_timeout_s < 0:
+        durations = (self.cooldown_s, self.cooldown_timeout_s, self.cooldown_stall_s)
+        if min(durations) < 0 or self.cooldown_stall_delta_c < 0:
             raise ValueError("une durée de refroidissement ne peut pas être négative")
         if self.cooldown_auto and self.cooldown_s:
             raise ValueError("refroidissement : durée fixe ou auto, pas les deux")
@@ -72,6 +77,7 @@ class CooldownOutcome(StrEnum):
     ALREADY_COOL = "already_cool"  # auto : déjà sous le seuil, aucune attente
     COOLED = "cooled"  # auto : passé sous le seuil
     TIMEOUT = "timeout"  # auto : encore au-dessus du seuil au bout du délai
+    STALLED = "stalled"  # auto : température stable au-dessus du seuil (repos trop chaud)
     NO_SENSOR = "no_sensor"  # auto : température CPU illisible, aucune attente
 
 
@@ -96,7 +102,8 @@ def cool_down(
 ) -> Cooldown:
     """Pause avant une catégorie : durée fixe (cooldown_s), ou attente que la température CPU
     passe sous hot_start_c (cooldown_auto), relevée toutes les COOLDOWN_POLL_S secondes,
-    au plus cooldown_timeout_s."""
+    au plus cooldown_timeout_s, et arrêtée plus tôt si elle ne baisse plus (moins de
+    cooldown_stall_delta_c sur cooldown_stall_s)."""
     start = clock()
     if not settings.cooldown_auto:
         while (elapsed := clock() - start) < settings.cooldown_s:
@@ -110,6 +117,7 @@ def cool_down(
         return Cooldown(0.0, CooldownOutcome.NO_SENSOR)
     if temp < settings.hot_start_c:
         return Cooldown(0.0, CooldownOutcome.ALREADY_COOL, first, temp)
+    readings = [(0.0, temp)]  # (secondes écoulées, température)
     while True:
         elapsed = clock() - start
         if elapsed >= settings.cooldown_timeout_s:
@@ -121,8 +129,22 @@ def cool_down(
         if reading is None:  # capteur perdu en route : on s'arrête là
             return Cooldown(clock() - start, CooldownOutcome.NO_SENSOR, first, temp)
         temp = reading
+        now = clock() - start
         if temp < settings.hot_start_c:
-            return Cooldown(clock() - start, CooldownOutcome.COOLED, first, temp)
+            return Cooldown(now, CooldownOutcome.COOLED, first, temp)
+        readings.append((now, temp))
+        if _stalled(readings, settings):
+            return Cooldown(now, CooldownOutcome.STALLED, first, temp)
+
+
+def _stalled(readings: list[tuple[float, float]], settings: RunSettings) -> bool:
+    """Baisse de moins de cooldown_stall_delta_c depuis le relevé d'il y a au moins
+    cooldown_stall_s secondes (le plus récent d'entre eux)."""
+    if settings.cooldown_stall_s <= 0:
+        return False
+    now, temp = readings[-1]
+    past = [t for at, t in readings if now - at >= settings.cooldown_stall_s]
+    return bool(past) and past[-1] - temp < settings.cooldown_stall_delta_c
 
 
 def start_warnings(state: MachineState, settings: RunSettings | None = None) -> list[BenchWarning]:

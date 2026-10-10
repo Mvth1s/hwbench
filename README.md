@@ -250,8 +250,11 @@ Pour éviter qu'une catégorie démarre sur un CPU encore chaud de la précéden
 insère une pause. Avec un nombre de secondes, la pause a lieu à chaque changement de catégorie.
 Avec `auto`, hwbench attend avant chaque catégorie, la première comprise, que la température
 CPU passe sous le seuil `--hot-start`, en la relevant toutes les 2 s, au plus
-`--cooldown-timeout` secondes (300 par défaut). Il n'attend pas si la température n'est pas
-lisible. La pause effective est enregistrée dans chaque résultat (`cooldown_s`, export de
+`--cooldown-timeout` secondes (300 par défaut). L'attente s'arrête plus tôt si la température
+ne baisse plus : moins de 1 °C de baisse sur les 30 dernières secondes (`--cooldown-stall-delta`,
+`--cooldown-stall`, 0 pour désactiver), ce qui évite d'attendre tout le délai avant chaque
+catégorie sur une machine dont la température au repos dépasse le seuil. Il n'attend pas si la
+température n'est pas lisible. La pause effective est enregistrée dans chaque résultat (`cooldown_s`, export de
 schéma 4) et citée dans le rapport.
 
 Le score natif est un **indice brut** : la moyenne géométrique de débits hétérogènes, sans

@@ -3,7 +3,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from hwbench.display.fmt import measure, num
+from hwbench.display.fmt import compact, measure, num
 from hwbench.labels import (  # noqa: F401 — réexportés pour display/
     CATEGORY_LABELS,
     DETAIL_LABELS,
@@ -117,6 +117,13 @@ def cooldown_message(cooldown: Cooldown, settings: RunSettings) -> str:
             return (
                 f"CPU encore à {end} après {waited} (seuil {seuil}, départ à {start}) : "
                 "test lancé quand même."
+            )
+        case CooldownOutcome.STALLED:
+            return (
+                f"CPU stabilisé à {end} après {waited} (départ à {start}, baisse de moins de "
+                f"{compact(settings.cooldown_stall_delta_c)} °C en "
+                f"{num(settings.cooldown_stall_s, 0)} s ; seuil {seuil} non atteint) : "
+                "test lancé."
             )
         case CooldownOutcome.NO_SENSOR:
             return "température CPU non disponible : pas d'attente automatique."
