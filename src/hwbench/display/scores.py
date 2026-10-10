@@ -86,6 +86,18 @@ def _category_row(t: Table, c: CategoryScore) -> None:
         )
 
 
+PARTIAL_NOTE = "(partiel, sans GPU)"
+
+
+def combined_points(c: CombinedScore) -> Text:
+    """Points du combiné ; sans GPU (non mesuré ou incomplet), marqué partiel sur sa ligne, le
+    détail restant dans l'avertissement du panneau."""
+    score = Text(points(c.points or 0.0), style="bold green")
+    if c.gpu_missing:
+        score.append(f"  {PARTIAL_NOTE}", style="yellow")
+    return score
+
+
 def _combined_row(t: Table, c: CombinedScore) -> None:
     if c.points is None:
         t.add_row("Score combiné", _not_comparable(c.issue))
@@ -93,7 +105,7 @@ def _combined_row(t: Table, c: CombinedScore) -> None:
     weights = " · ".join(
         f"{CATEGORY_LABELS[cat]} {num(100 * w, 0)} %" for cat, w in c.weights.items()
     )
-    t.add_row("Score combiné", Text(points(c.points), style="bold green"))
+    t.add_row("Score combiné", combined_points(c))
     t.add_row("", Text(f"pondération : {weights}", style="dim"))
 
 
