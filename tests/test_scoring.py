@@ -21,7 +21,15 @@ from hwbench.models import (
     SensorsData,
 )
 from hwbench.reference import build_reference
-from hwbench.results import BackendId, Category, Result, driver_key, gpu_key, gpu_name
+from hwbench.results import (
+    BackendId,
+    Category,
+    Result,
+    driver_key,
+    gpu_key,
+    gpu_name,
+    upstream_version,
+)
 from hwbench.scoring import (
     ReferenceError,
     ScoreIssue,
@@ -481,6 +489,48 @@ def test_sysbench_memory_tool_version_stays_in_the_identity() -> None:
     reference = reference_from_dict(build_reference([ref_result], snapshot(), []))
     assert reference.find("sysbench-memory-single").id.tool_version == "1.0.20"
     score = normalize(replace(ref_result, tool_version="1.1.0"), reference)
+    assert (score.points, score.issue) == (None, ScoreIssue.TOOL_VERSION_MISMATCH)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("1.0.20", "1.0.20"),
+        ("1.0.20-1472a05", "1.0.20"),  # build git (Arch)
+        ("1.0.20+ds-8", "1.0.20"),  # Debian
+        ("2025.01", "2025.01"),
+        (" 3.42 ", "3.42"),
+        ("git-1472a05", "git-1472a05"),  # pas de version numérotée : chaîne brute
+        (None, None),
+    ],
+)
+def test_upstream_version(raw, expected) -> None:
+    assert upstream_version(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["1.0.20-1472a05", "1.0.20+ds-8"])
+def test_build_suffix_keeps_sysbench_comparable(raw) -> None:
+    reference = reference_from_dict(
+        build_reference(
+            [make_result("sysbench-cpu-single", 9000.0, tool_version="1.0.20")], snapshot(), []
+        )
+    )
+    result = make_result("sysbench-cpu-single", 4500.0, tool_version=raw)
+    assert result.tool_version == raw  # chaîne brute conservée
+    assert result.backend_id == BackendId("sysbench-cpu-single", "1", "1.0.20", None)
+    score = normalize(result, reference)
+    assert (score.points, score.issue) == (pytest.approx(500), None)
+
+
+def test_other_upstream_version_stays_not_comparable() -> None:
+    reference = reference_from_dict(
+        build_reference(
+            [make_result("sysbench-cpu-single", 9000.0, tool_version="1.0.20")], snapshot(), []
+        )
+    )
+    score = normalize(
+        make_result("sysbench-cpu-single", 9000.0, tool_version="1.0.21-abc"), reference
+    )
     assert (score.points, score.issue) == (None, ScoreIssue.TOOL_VERSION_MISMATCH)
 
 
