@@ -41,7 +41,7 @@ from hwbench.reference import (
     state_issues,
 )
 from hwbench.report import render_report
-from hwbench.results import Availability, Category, Result
+from hwbench.results import Availability, BenchWarning, Category, MachineState, Result
 from hwbench.runner import (
     MIN_RUNS,
     CooldownOutcome,
@@ -433,6 +433,16 @@ def _settings(
     )
 
 
+def upfront_warnings(state: MachineState, settings: RunSettings) -> list[BenchWarning]:
+    """Contrôle global avant les benchs. Avec --cooldown auto, la température de départ n'y
+    figure pas : l'attente précède chaque catégorie (la première comprise), sa ligne cite la
+    température atteinte et chaque panneau relève l'état après l'attente."""
+    warnings = start_warnings(state, settings)
+    if settings.cooldown_auto:
+        warnings = [w for w in warnings if w is not BenchWarning.HOT_START]
+    return warnings
+
+
 def _bench_session(
     console: Console,
     target: Target,
@@ -468,7 +478,7 @@ def _bench_session(
             console.print(f"[yellow]{CATEGORY_LABELS[category]} : {reason}.[/yellow]")
 
     initial = capture_state()
-    for warning in start_warnings(initial, settings):
+    for warning in upfront_warnings(initial, settings):
         console.print(f"[yellow]⚠ {warning_message(warning, initial)}[/yellow]")
 
     results = _run_all(console, classes, settings, options)
