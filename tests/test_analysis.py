@@ -288,6 +288,14 @@ def test_gpu_not_measured() -> None:
     assert FindingCode.GPU_NOT_MEASURED not in codes(analyze(session(clean())))
 
 
+def test_gpu_incomplete_names_the_missing_backend() -> None:
+    no_vulkan = [r for r in clean() if r.name != "vkmark"]
+    finding = find(analyze(session(no_vulkan)), FindingCode.GPU_NOT_MEASURED)
+    assert finding.params == {"missing": ["vkmark"]}
+    cpu_only = [r for r in clean() if r.name.startswith(("native", "sysbench"))]
+    assert find(analyze(session(cpu_only)), FindingCode.GPU_NOT_MEASURED).params == {}
+
+
 def test_memory_and_disk_outside_the_reference() -> None:
     results = clean() + [
         make_result("native-memory-single", 10_000.0),

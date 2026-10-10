@@ -263,7 +263,11 @@ def _multi_factors(session: MachineExport) -> list[Finding]:
 def _context(session: MachineExport) -> list[Finding]:
     findings = []
     if session.combined is not None and session.combined.gpu_missing:
-        findings.append(Finding(FindingCode.GPU_NOT_MEASURED, Status.INFO))
+        # GPU incomplet (backend de la référence en échec ou absent) : on nomme ce qui manque
+        gpu = next((c for c in session.categories if c.category is Category.GPU), None)
+        missing = gpu.missing if gpu is not None else []
+        params = {"missing": missing} if missing else {}
+        findings.append(Finding(FindingCode.GPU_NOT_MEASURED, Status.INFO, params))
     snapshot = session.snapshot
     missing = [
         name

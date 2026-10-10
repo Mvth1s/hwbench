@@ -147,7 +147,8 @@ def key_figures(ctx: Context) -> str:
     if s.combined is not None and s.combined.points is not None:
         note = f"référence {s.reference.machine} = 1000" if s.reference else ""
         if s.combined.gpu_missing:
-            note = "sans GPU (non mesuré)"
+            gpu = next((c for c in s.categories if c.category is Category.GPU), None)
+            note = "sans GPU (incomplet)" if gpu is not None else "sans GPU (non mesuré)"
         tiles.append(_tile("Score combiné", e(f"{num(s.combined.points, 0)} pts"), note))
     for category in COMBINED_CATEGORIES:
         points = _category_points(ctx, category)

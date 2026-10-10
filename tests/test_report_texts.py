@@ -266,3 +266,11 @@ def test_multi_factor_above_the_threshold_keeps_the_gain_sentence() -> None:
     )
     assert "1,5 fois plus élevée" in _factor("memory", 10_000.0, 15_000.0)
     assert "1,1 fois plus vite" in _factor("cpu", 100.0, 110.0)  # seuil inclus
+
+
+def test_gpu_incomplete_text() -> None:
+    finding = Finding(FindingCode.GPU_NOT_MEASURED, Status.INFO, {"missing": ["vkmark"]})
+    assert finding_text(finding) == (
+        "GPU incomplet (vkmark non mesuré) : le score combiné porte sur le processeur seul et "
+        "n'est pas classé."
+    )
