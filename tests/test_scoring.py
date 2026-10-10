@@ -141,16 +141,37 @@ def test_gpu_category_is_geometric_mean_of_its_backends() -> None:
     assert [b.name for b in gpu.backends] == ["glmark2", "vkmark"]
 
 
-def test_gpu_with_fewer_backends_than_reference_is_not_comparable() -> None:
-    """Règle 2 : pas de moyenne silencieuse sur ce qui est installé."""
+def test_gpu_with_fewer_backends_than_reference_is_incomplete() -> None:
+    """Règle 2 : pas de moyenne silencieuse sur ce qui est installé (vkmark en échec, absent ou
+    sans Vulkan fonctionnel) ; le combiné porte alors sur le CPU seul, signalé partiel."""
     scores = score_results(machine(2.0, vkmark=False), REFERENCE)
     gpu = next(c for c in scores.categories if c.category is Category.GPU)
-    assert (gpu.points, gpu.issue) == (None, ScoreIssue.BACKENDS_DIFFER)
+    assert (gpu.points, gpu.issue) == (None, ScoreIssue.BACKENDS_INCOMPLETE)
     assert [b.name for b in gpu.backends] == ["glmark2"]
     assert [b.name for b in gpu.reference_backends] == ["glmark2", "vkmark"]
+    assert gpu.missing == ["vkmark"]
     # glmark2 reste noté seul, pour information
     glmark2 = next(s for s in scores.backends if s.backend.name == "glmark2")
     assert glmark2.points == pytest.approx(2000)
+    combined = scores.combined
+    assert combined is not None and combined.issue is None
+    assert combined.points == pytest.approx(2000) and combined.gpu_missing
+    assert set(combined.weights) == {Category.CPU_SINGLE, Category.CPU_MULTI}
+    assert "glmark2" not in [b.name for b in combined.backends]
+    out = _panel(scores)
+    assert "incomplet (vkmark non mesuré)" in out
+    assert "⚠ Score combiné calculé sans GPU : vkmark non mesuré" in out
+    assert "Score partiel, non classé." in out
+
+
+def test_incomplete_gpu_with_an_identity_issue_stays_not_comparable() -> None:
+    """Un backend GPU mesuré mais d'une autre version prime : combiné non comparable."""
+    results = [
+        replace(r, version="99") if r.name == "glmark2" else r for r in machine(2.0, vkmark=False)
+    ]
+    scores = score_results(results, REFERENCE)
+    gpu = next(c for c in scores.categories if c.category is Category.GPU)
+    assert gpu.issue is ScoreIssue.VERSION_MISMATCH
     assert scores.combined is not None
     assert (scores.combined.points, scores.combined.issue) == (
         None,

@@ -182,7 +182,8 @@ class FakeTools:
     """Remplace hwbench.benchmarks.external._run : aucun outil réellement lancé.
 
     outputs : binaire -> sortie (ou liste de sorties rendues tour à tour, la dernière répétée).
-    failing : binaire -> stderr d'un échec (code 1).
+    failing : binaire -> stderr d'un échec (code 1), ou (code de retour, stderr) ; un code
+    négatif simule un processus tué par un signal (-11 : SIGSEGV).
     free_bytes : espace libre simulé ; fichiers temporaires et suppressions sont enregistrés.
     """
 
@@ -191,7 +192,7 @@ class FakeTools:
         outputs: dict[str, str | list[str]] | None = None,
         env: dict[str, str] | None = None,
         files: set[str] | None = None,
-        failing: dict[str, str] | None = None,
+        failing: dict[str, str | tuple[int, str]] | None = None,
         free_bytes: int = 500 * 1024**3,
     ) -> None:
         self.outputs = outputs or {}
@@ -235,7 +236,9 @@ class FakeTools:
     def run(self, args: list[str], timeout: float) -> _run.Completed:
         self.calls.append(list(args))
         if args[0] in self.failing:
-            return _run.Completed(1, "", self.failing[args[0]])
+            failure = self.failing[args[0]]
+            code, stderr = failure if isinstance(failure, tuple) else (1, failure)
+            return _run.Completed(code, "", stderr)
         out = self.outputs[args[0]]
         if isinstance(out, list):
             out = out.pop(0) if len(out) > 1 else out[0]

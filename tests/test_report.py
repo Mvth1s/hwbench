@@ -197,3 +197,13 @@ def test_cooldown_enabled_without_any_pause() -> None:
     html = _session_html(machine(1.0), RunSettings(cooldown_s=30.0))
     assert "aucune attente" in html
     assert "Pause fixe de 30 s à chaque changement de catégorie." in html
+
+
+def test_key_figures_say_why_the_gpu_is_left_out() -> None:
+    def html(results):
+        scores = score_results(results, REFERENCE)
+        return render_report(build_export(snapshot(), "m", results, scores))
+
+    assert "sans GPU (incomplet)" in html([r for r in machine(1.0) if r.name != "vkmark"])
+    cpu_only = [r for r in machine(1.0) if r.name not in ("glmark2", "vkmark")]
+    assert "sans GPU (non mesuré)" in html(cpu_only)

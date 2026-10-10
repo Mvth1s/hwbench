@@ -173,6 +173,11 @@ def finding_text(finding: Finding) -> str:
             )
             return f"{subject} {verb} {num(p['factor'])} fois {gain} {where}{cores}."
         case FindingCode.GPU_NOT_MEASURED:
+            if p.get("missing"):
+                return (
+                    f"GPU incomplet ({_list(p['missing'])} non mesuré) : le score combiné porte "
+                    "sur le processeur seul et n'est pas classé."
+                )
             return "GPU non mesuré : le score combiné porte sur le processeur seul."
         case FindingCode.NEEDS_ROOT:
             missing = _list([NEEDS_ROOT_LABELS[m] for m in p["missing"]])
