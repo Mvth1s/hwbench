@@ -169,16 +169,17 @@ def render_result(result: Result) -> Panel:
         message = warning_message(warning, result.state_before, result)
         parts.append(Text(f"⚠ {message}", style="yellow"))
 
-    # v{version} : version du protocole hwbench (charges, scènes, durée) ; outil : son binaire
+    # nom du bench (comme le panneau Scores : single et multi d'une même catégorie se
+    # distinguent), v{version} : version du protocole hwbench ; outil : son binaire
     tool = f" · outil {result.tool_version}" if result.tool_version else ""
     return Panel(
         Group(*parts),
-        title=f"{CATEGORY_LABELS[result.category]} · {result.backend} v{result.version}{tool}",
+        title=f"{CATEGORY_LABELS[result.category]} · {result.name} v{result.version}{tool}",
         title_align="left",
     )
 
 
-def render_failure(category: Category, backend: str, version: str, message: str) -> Panel:
+def render_failure(category: Category, name: str, version: str, message: str) -> Panel:
     """Bench en échec : même cadre que render_result, le message (texte d'un outil externe)
     n'est jamais interprété comme balisage rich."""
     t = Table.grid(padding=(0, 2))
@@ -188,7 +189,7 @@ def render_failure(category: Category, backend: str, version: str, message: str)
     t.add_row("Détail", Text(message))
     return Panel(
         t,
-        title=f"{CATEGORY_LABELS[category]} · {backend} v{version}",
+        title=f"{CATEGORY_LABELS[category]} · {name} v{version}",
         title_align="left",
         border_style="red",
     )

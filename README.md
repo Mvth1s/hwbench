@@ -258,7 +258,7 @@ Le score natif est un **indice brut** : la moyenne géométrique de débits hét
 unité. Les points viennent du scoring, ci-dessous.
 
 ```
-╭─ CPU single-core · native v1 ────────────────────────────────────────────────╮
+╭─ CPU single-core · native-cpu-single v1 ─────────────────────────────────────╮
 │ Score (médiane)    126,0 indice brut  ± 0,8 (CV 0,6 %)                       │
 │ Runs               125,0 · 126,0 · 126,6                                     │
 │ Warm-up            2 itérations, 2,6 s · 6,3 s au total                      │
