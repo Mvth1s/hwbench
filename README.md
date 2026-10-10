@@ -293,9 +293,11 @@ Mémoire et disque sont notés (1000 points sur la référence) mais restent hor
 et du classement.
 
 - Un backend n'est noté que s'il a la même identité que dans la référence : même bench, même
-  version du protocole, même version de l'outil, même mode de présentation. Sinon il est
-  déclaré « non comparable », avec la raison. Exception : la version de fio, traitée comme le
-  pilote GPU (voir plus bas).
+  version du protocole, même version amont de l'outil, même mode de présentation. Sinon il
+  est déclaré « non comparable », avec la raison. Seule la version amont compte :
+  `1.0.20-1472a05` (build git) ou `1.0.20+ds-8` (paquet Debian) valent `1.0.20`, et un autre
+  build que celui de la référence est cité pour information. Exception : la version de fio,
+  traitée comme le pilote GPU (voir plus bas).
 - **CPU single et multi** : seul le backend natif compte. sysbench est noté à côté, pour
   information.
 - **GPU** : moyenne géométrique de glmark2 et vkmark. Chaque score de catégorie garde la liste
@@ -319,8 +321,8 @@ tournant :
 
 À refaire seulement quand ce qui fait l'identité d'un bench change : version du protocole
 hwbench (un test l'impose) ou version de l'outil (sysbench, glmark2, vkmark, fio) installée sur
-le desktop. Un résultat mesuré avec une autre version d'outil que la référence est déclaré non
-comparable.
+le desktop. Un résultat mesuré avec une autre version amont de l'outil que la référence est
+déclaré non comparable ; un suffixe de build ou de paquet ne compte pas.
 
 Le pilote GPU (Mesa, RADV…) n'en fait pas partie : il change trop souvent (à chaque mise à
 jour sur une distribution rolling comme Arch). Il reste relevé à titre d'information. Un
@@ -365,8 +367,9 @@ brutes de chaque bench, avec l'écart en pourcentage par rapport au premier fich
 meilleur, rouge si moins bon). Rien n'est comparé à peu près :
 
 - un bench n'a d'écart que si son identité est la même dans les deux fichiers (version du
-  protocole, version de l'outil, mode de présentation) ; sinon « non comparé (version
-  différente) » et un avertissement ;
+  protocole, version amont de l'outil, mode de présentation) ; sinon « non comparé (version
+  différente) » et un avertissement. Deux builds de la même version amont sont comparés et
+  cités pour information ;
 - un score de catégorie ou le combiné n'a d'écart que si les deux fichiers ont été notés contre
   la même référence (même empreinte) avec la même liste de backends (et, pour le combiné, les
   mêmes pondérations) ;
