@@ -27,6 +27,20 @@ class BenchWarning(StrEnum):
     WARMUP_UNSTABLE = "warmup_unstable"
     VSYNC_UNVERIFIED = "vsync_unverified"  # présentation à l'écran, mode non vérifiable
     SOFTWARE_RENDERING = "software_rendering"  # llvmpipe / lavapipe : le CPU fait le rendu
+    # départ au-dessus du seuil chaud, mais à la température de repos (--cooldown auto arrêté
+    # sur stagnation) : information, sans conseil de laisser refroidir
+    HOT_IDLE = "hot_idle"
+
+
+class CooldownOutcome(StrEnum):
+    """Issue d'une pause de refroidissement (--cooldown), enregistrée dans le résultat."""
+
+    FIXED = "fixed"  # pause de durée fixe
+    ALREADY_COOL = "already_cool"  # auto : déjà sous le seuil, aucune attente
+    COOLED = "cooled"  # auto : passé sous le seuil
+    TIMEOUT = "timeout"  # auto : encore au-dessus du seuil au bout du délai
+    STALLED = "stalled"  # auto : température stable au-dessus du seuil (repos trop chaud)
+    NO_SENSOR = "no_sensor"  # auto : température CPU illisible, aucune attente
 
 
 class Availability(StrEnum):
@@ -200,6 +214,7 @@ class Result:
     # pause de refroidissement juste avant ce bench (--cooldown), 0 sans pause ; absente des
     # exports de schéma 2 et 3
     cooldown_s: float = 0.0
+    cooldown_outcome: CooldownOutcome | None = None  # issue de cette pause, None sans pause
 
     @property
     def backend_id(self) -> BackendId:

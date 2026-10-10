@@ -2,14 +2,13 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from enum import StrEnum
 from statistics import median, stdev
 from time import perf_counter
 from time import sleep as real_sleep
 
 from hwbench.benchmarks.base import Benchmark
 from hwbench.machine_state import capture_state
-from hwbench.results import BenchWarning, Category, MachineState, Result
+from hwbench.results import BenchWarning, Category, CooldownOutcome, MachineState, Result
 
 MIN_RUNS = 3
 
@@ -70,15 +69,6 @@ Clock = Callable[[], float]
 
 
 COOLDOWN_POLL_S = 2.0  # mode auto : intervalle entre deux relevés de température
-
-
-class CooldownOutcome(StrEnum):
-    FIXED = "fixed"  # pause de durée fixe
-    ALREADY_COOL = "already_cool"  # auto : déjà sous le seuil, aucune attente
-    COOLED = "cooled"  # auto : passé sous le seuil
-    TIMEOUT = "timeout"  # auto : encore au-dessus du seuil au bout du délai
-    STALLED = "stalled"  # auto : température stable au-dessus du seuil (repos trop chaud)
-    NO_SENSOR = "no_sensor"  # auto : température CPU illisible, aucune attente
 
 
 @dataclass(frozen=True)
@@ -147,7 +137,14 @@ def _stalled(readings: list[tuple[float, float]], settings: RunSettings) -> bool
     return bool(past) and past[-1] - temp < settings.cooldown_stall_delta_c
 
 
-def start_warnings(state: MachineState, settings: RunSettings | None = None) -> list[BenchWarning]:
+def start_warnings(
+    state: MachineState,
+    settings: RunSettings | None = None,
+    cooldown_outcome: CooldownOutcome | None = None,
+) -> list[BenchWarning]:
+    """Avertissements de l'état de départ. Au-dessus du seuil chaud après une attente arrêtée
+    sur stagnation (STALLED), le CPU est à sa température de repos : HOT_IDLE (information),
+    pas HOT_START (« laissez refroidir »)."""
     settings = settings or RunSettings()
     warnings: list[BenchWarning] = []
     if state.on_ac is False:
@@ -155,7 +152,8 @@ def start_warnings(state: MachineState, settings: RunSettings | None = None) -> 
     if state.throttling_settings():
         warnings.append(BenchWarning.POWER_PROFILE)
     if state.cpu_temp_c is not None and state.cpu_temp_c >= settings.hot_start_c:
-        warnings.append(BenchWarning.HOT_START)
+        idle = cooldown_outcome is CooldownOutcome.STALLED
+        warnings.append(BenchWarning.HOT_IDLE if idle else BenchWarning.HOT_START)
     return warnings
 
 
@@ -195,8 +193,10 @@ def run_benchmark(
     progress: Progress | None = None,
     clock: Clock = perf_counter,
     cooldown_s: float = 0.0,
+    cooldown_outcome: CooldownOutcome | None = None,
 ) -> Result:
-    """cooldown_s : pause de refroidissement effective juste avant ce bench (cool_down)."""
+    """cooldown_s, cooldown_outcome : pause de refroidissement effective juste avant ce bench
+    et son issue (cool_down), None sans attente."""
     settings = settings or RunSettings()
     before = probe()
     start = clock()
@@ -217,7 +217,7 @@ def run_benchmark(
     values = [m.value for m in measurements]
     value = median(values)
     spread = stdev(values)
-    warnings = start_warnings(before, settings) + bench.warnings()
+    warnings = start_warnings(before, settings, cooldown_outcome) + bench.warnings()
     if not stable:
         warnings.append(BenchWarning.WARMUP_UNSTABLE)
     if value and 100.0 * spread / value > settings.high_variance_cv_percent:
@@ -248,4 +248,5 @@ def run_benchmark(
         state_after=after,
         warnings=warnings,
         cooldown_s=cooldown_s,
+        cooldown_outcome=cooldown_outcome,
     )
