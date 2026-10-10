@@ -16,6 +16,7 @@ ISSUE_LABELS = {
         "mode de présentation (ou taille du fichier disque) différent de la référence"
     ),
     ScoreIssue.BACKENDS_DIFFER: "backends différents de la référence",
+    ScoreIssue.BACKENDS_INCOMPLETE: "backends de la référence non mesurés",
     ScoreIssue.CATEGORY_NOT_COMPARABLE: "une catégorie n'est pas comparable",
     ScoreIssue.CPU_NOT_MEASURED: "CPU single-core et multi-core requis",
 }
@@ -67,6 +68,8 @@ def _category_row(t: Table, c: CategoryScore) -> None:
         t.add_row(
             label, Text.assemble((points(c.points), "bold"), (INFO_NOTE if info else "", "dim"))
         )
+    elif c.issue is ScoreIssue.BACKENDS_INCOMPLETE:
+        t.add_row(label, Text(f"incomplet ({', '.join(c.missing)} non mesuré)", "yellow"))
     elif info and c.issue is ScoreIssue.NOT_IN_REFERENCE:
         # pas encore dans la référence : les valeurs brutes des benchs font foi
         t.add_row(label, Text("valeurs brutes (pas encore dans la référence)", "dim"))
@@ -132,6 +135,18 @@ def tool_build_info(s: BackendScore) -> str:
     )
 
 
+def gpu_missing_notice(scores: Scores) -> str:
+    """Combiné calculé sans GPU : non mesuré, ou incomplet (backend de la référence en échec,
+    absent ou non supporté par le matériel)."""
+    gpu = next((c for c in scores.categories if c.category is Category.GPU), None)
+    if gpu is not None and gpu.issue is ScoreIssue.BACKENDS_INCOMPLETE:
+        return (
+            f"Score combiné calculé sans GPU : {', '.join(gpu.missing)} non mesuré (en échec, "
+            "absent ou non supporté sur cette machine). Score partiel, non classé."
+        )
+    return "Score combiné calculé sans GPU (non mesuré)."
+
+
 def render_scores(scores: Scores) -> Panel:
     ref = scores.reference
     t = Table.grid(padding=(0, 2))
@@ -151,7 +166,7 @@ def render_scores(scores: Scores) -> Panel:
 
     parts: list[Table | Text] = [t]
     if scores.combined is not None and scores.combined.gpu_missing:
-        parts.append(Text("⚠ Score combiné calculé sans GPU (non mesuré).", style="yellow"))
+        parts.append(Text(f"⚠ {gpu_missing_notice(scores)}", style="yellow"))
     for s in scores.backends:
         if s.driver_differs:
             parts.append(

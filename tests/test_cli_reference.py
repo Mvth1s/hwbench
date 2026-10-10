@@ -160,7 +160,7 @@ def test_bench_prints_scores_against_reference(fake_runs, monkeypatch) -> None:
     assert "calculé sans GPU" in result.output
 
 
-def test_bench_gpu_subset_is_not_comparable(fake_runs, fake_tools, monkeypatch) -> None:
+def test_bench_gpu_subset_is_incomplete(fake_runs, fake_tools, monkeypatch) -> None:
     fake_tools(
         outputs={"glmark2-wayland": tool_output("glmark2-wayland_offscreen.txt")},
         env={"WAYLAND_DISPLAY": "wayland-0"},
@@ -168,8 +168,34 @@ def test_bench_gpu_subset_is_not_comparable(fake_runs, fake_tools, monkeypatch) 
     monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
     result = runner.invoke(cli.app, ["bench", "gpu"], env=WIDE)
     assert result.exit_code == 0, result.output
-    assert re.search(r"GPU +non comparable \(backends différents de la référence\)", result.output)
-    assert "mesurés : glmark2" in result.output and "vkmark v2" in result.output
+    assert re.search(r"GPU +incomplet \(vkmark non mesuré\)", result.output)
+
+
+def test_bench_all_without_working_vulkan(fake_runs, fake_tools, monkeypatch) -> None:
+    """vkmark tué par SIGSEGV (Haswell, Vulkan incomplet) : échec dans son panneau, GPU
+    incomplet, combiné calculé sur le CPU seul et signalé partiel, sans plantage."""
+    fake_tools(
+        outputs={"glmark2-wayland": tool_output("glmark2-wayland_offscreen.txt")},
+        failing={"vkmark": (-11, "MESA-INTEL: warning: Haswell Vulkan support is incomplete")},
+        env={"WAYLAND_DISPLAY": "wayland-0"},
+    )
+    faked = cli.run_benchmark
+
+    def run_benchmark(bench, settings, **kwargs):
+        if bench.name == "vkmark":
+            bench.run()  # vrai chemin d'exécution : lève ToolError
+        return faked(bench, settings, **kwargs)
+
+    monkeypatch.setattr(cli, "run_benchmark", run_benchmark)
+    monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    result = runner.invoke(cli.app, ["bench", "all"], env=WIDE)
+    assert result.exit_code == 0, result.output
+    assert "vkmark" not in fake_runs.ran and "glmark2" in fake_runs.ran
+    assert "vkmark interrompu par le signal SIGSEGV (code -11)" in result.output
+    assert "échec, bench ignoré" in result.output
+    assert re.search(r"GPU +incomplet \(vkmark non mesuré\)", result.output)
+    assert re.search(r"Score combiné +500 pts", result.output)
+    assert "Score partiel, non classé." in result.output
 
 
 def test_bench_without_reference_says_how_to_make_one(fake_runs, monkeypatch) -> None:

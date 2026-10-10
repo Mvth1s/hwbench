@@ -48,6 +48,19 @@ def test_rankings_follow_points_and_composition(tmp_path) -> None:
     assert "portable" not in gpu
 
 
+def test_incomplete_gpu_is_ranked_nowhere_but_in_the_cpu_tabs(tmp_path) -> None:
+    """vkmark en échec : combiné CPU seul (partiel), ni au combiné ni à l'onglet GPU."""
+    d = tmp_path / "results"
+    d.mkdir()
+    no_vulkan = [r for r in machine(3.0) if r.name != "vkmark"]
+    write_export(export(no_vulkan, "Sans Vulkan"), d / "sans-vulkan.json")
+    write_export(export(machine(1.0), "Desktop moyen"), d / "moyen.json")
+    entries, _ = load_entries(d, REFERENCE)
+    assert [e.slug for e, _ in ranking(entries, None)] == ["moyen"]
+    assert [e.slug for e, _ in ranking(entries, Category.GPU)] == ["moyen"]
+    assert [e.slug for e, _ in ranking(entries, Category.CPU_MULTI)] == ["sans-vulkan", "moyen"]
+
+
 def test_points_are_recomputed_not_taken_from_the_file(tmp_path) -> None:
     d = tmp_path / "results"
     d.mkdir()

@@ -11,9 +11,11 @@ Règles :
 - mémoire : seul le natif compte (single et multi, moyenne géométrique), sysbench pour
   information ; disque : fio. Ces deux catégories sont notées si la référence contient leurs
   benchs, sinon elles restent en valeurs brutes ; elles ne comptent jamais dans le combiné ;
+- un backend officiel de la référence qui manque (vkmark en échec, absent ou sans Vulkan
+  fonctionnel) rend la catégorie « incomplète » (BACKENDS_INCOMPLETE), sans points ;
 - combiné : moyenne géométrique pondérée des catégories CPU et GPU (COMBINED_CATEGORIES). Sans
-  GPU mesuré, il est calculé sans lui et le signale ; un GPU mesuré mais non comparable rend le
-  combiné non comparable.
+  GPU mesuré, ou avec un GPU incomplet, il est calculé sans lui et le signale (gpu_missing :
+  partiel, jamais classé) ; un GPU mesuré mais non comparable rend le combiné non comparable.
 """
 
 import hashlib
@@ -54,6 +56,8 @@ class ScoreIssue(StrEnum):
     TOOL_VERSION_MISMATCH = "tool_version_mismatch"
     PRESENTATION_MISMATCH = "presentation_mismatch"
     BACKENDS_DIFFER = "backends_differ"  # composition de la catégorie ≠ référence
+    # une partie seulement des backends de la référence, tous comparables (vkmark en échec)
+    BACKENDS_INCOMPLETE = "backends_incomplete"
     CATEGORY_NOT_COMPARABLE = "category_not_comparable"  # combiné : une catégorie ne l'est pas
     CPU_NOT_MEASURED = "cpu_not_measured"  # combiné : single ou multi manquant
 
@@ -192,6 +196,12 @@ class CategoryScore:
     backends: list[BackendId]
     reference_backends: list[BackendId]
     issue: ScoreIssue | None = None
+
+    @property
+    def missing(self) -> list[str]:
+        """Backends de la référence non mesurés, dans l'ordre de la référence."""
+        measured = {b.name for b in self.backends}
+        return [b.name for b in self.reference_backends if b.name not in measured]
 
 
 @dataclass(frozen=True)
@@ -334,7 +344,9 @@ def _category_score(
         if e.category is category and is_official(e.backend, category)
     ]
     blocking = next((s.issue for s in official if s.issue is not None), None)
-    if blocking is None and sorted(b.name for b in ours) != sorted(b.name for b in theirs):
+    if blocking is None and {b.name for b in ours} < {b.name for b in theirs}:
+        blocking = ScoreIssue.BACKENDS_INCOMPLETE
+    elif blocking is None and sorted(b.name for b in ours) != sorted(b.name for b in theirs):
         blocking = ScoreIssue.BACKENDS_DIFFER
     if blocking is not None:
         return CategoryScore(category, None, ours, theirs, blocking)
@@ -345,8 +357,12 @@ def _category_score(
 def combine(
     categories: list[CategoryScore], weights: Mapping[Category, float] = DEFAULT_WEIGHTS
 ) -> CombinedScore | None:
-    # mémoire et disque : jamais dans le combiné
-    by_cat = {c.category: c for c in categories if c.category in COMBINED_CATEGORIES}
+    # mémoire et disque : jamais dans le combiné ; GPU incomplet : traité comme non mesuré
+    by_cat = {
+        c.category: c
+        for c in categories
+        if c.category in COMBINED_CATEGORIES and c.issue is not ScoreIssue.BACKENDS_INCOMPLETE
+    }
     if not by_cat:
         return None
     gpu_missing = Category.GPU not in by_cat
