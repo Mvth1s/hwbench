@@ -48,6 +48,18 @@ def test_sysbench_single_run(fake_tools) -> None:
     assert bench.workers is None
 
 
+def test_sysbench_keeps_the_raw_build_suffix(fake_tools) -> None:
+    # sortie réelle, version d'un build git (Arch) : la chaîne brute est conservée ;
+    # seule l'identité (BackendId) la ramène à la version amont
+    text = tool_output("sysbench_cpu_1thread.txt").replace(
+        "sysbench 1.0.20 ", "sysbench 1.0.20-1472a05 ", 1
+    )
+    fake_tools(outputs={"sysbench": text})
+    bench = SysbenchCpuSingle()
+    bench.run()
+    assert bench.tool_version() == "1.0.20-1472a05"
+
+
 def test_sysbench_multi_uses_workers(fake_tools) -> None:
     tools = fake_tools(outputs={"sysbench": tool_output("sysbench_cpu_multi.txt")})
     bench = SysbenchCpuMulti(BenchOptions(workers=6))

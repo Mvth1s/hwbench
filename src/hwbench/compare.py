@@ -47,10 +47,12 @@ class CompareWarning(StrEnum):
     TOOL_VERSION_DIFFERS = "tool_version_differs"
     # disques différents : versions citées pour information, sans avertissement
     TOOL_VERSION_INFO = "tool_version_info"
+    # outil dans l'identité : même version amont, builds différents (« 1.0.20-1472a05 »)
+    TOOL_BUILD_INFO = "tool_build_info"
 
 
 # Notices d'information : affichées sans ⚠
-INFO_NOTICES = frozenset({CompareWarning.TOOL_VERSION_INFO})
+INFO_NOTICES = frozenset({CompareWarning.TOOL_VERSION_INFO, CompareWarning.TOOL_BUILD_INFO})
 
 
 @dataclass(frozen=True)
@@ -264,6 +266,26 @@ def _tool_notices(row: BenchRow) -> list[Notice]:
     return [Notice(CompareWarning.TOOL_VERSION_INFO, row.name, values(measured))]
 
 
+def _build_notices(row: BenchRow) -> list[Notice]:
+    """Outil dans l'identité, même version amont mais builds différents entre les fichiers de
+    même identité : information. Valeurs : version brute par fichier, None hors du groupe."""
+    if row.name in TOOL_VERSION_NOT_IN_IDENTITY or row.detail is not None:
+        return []
+    groups: dict[BackendId, list[int]] = {}
+    for i, identity in enumerate(row.identities):
+        if identity is not None and row.tool_versions[i] is not None:
+            groups.setdefault(identity, []).append(i)
+    return [
+        Notice(
+            CompareWarning.TOOL_BUILD_INFO,
+            row.name,
+            [v if i in members else None for i, v in enumerate(row.tool_versions)],
+        )
+        for members in groups.values()
+        if len({row.tool_versions[i] for i in members}) > 1
+    ]
+
+
 def _warnings(exports: list[MachineExport], benches: list[BenchRow]) -> list[Notice]:
     warnings = [
         Notice(CompareWarning.BENCH_VERSION_DIFFERS, row.name)
@@ -271,7 +293,7 @@ def _warnings(exports: list[MachineExport], benches: list[BenchRow]) -> list[Not
         if row.detail is None and len({i for i in row.identities if i is not None}) > 1
     ]
     for row in benches:
-        warnings += _driver_notices(row) + _tool_notices(row)
+        warnings += _driver_notices(row) + _tool_notices(row) + _build_notices(row)
     digests = {e.reference.digest for e in exports if e.reference is not None}
     if len(digests) > 1:
         warnings.append(Notice(CompareWarning.REFERENCE_DIFFERS, ""))

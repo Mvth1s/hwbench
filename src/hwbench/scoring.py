@@ -123,8 +123,9 @@ class BackendScore:
     reference_driver: str | None = None
     gpu: str | None = None
     reference_gpu: str | None = None
-    # Version de l'outil hors identité (TOOL_VERSION_NOT_IN_IDENTITY, fio) et modèle du disque,
-    # mesurés / de la référence : même règle que le pilote, signalée sur le disque de la référence.
+    # Version brute de l'outil et modèle du disque, mesurés / de la référence. Hors identité
+    # (TOOL_VERSION_NOT_IN_IDENTITY, fio) : même règle que le pilote, signalée sur le disque de
+    # la référence. Dans l'identité : seule la version amont compte, un autre build est cité.
     tool_version: str | None = None
     reference_tool_version: str | None = None
     device: str | None = None
@@ -153,6 +154,18 @@ class BackendScore:
             self.backend.name in TOOL_VERSION_NOT_IN_IDENTITY
             and self.tool_version is not None
             and not self.same_device
+        )
+
+    @property
+    def tool_build_differs(self) -> bool:
+        """Noté, même version amont que la référence mais autre build (« 1.0.20-1472a05 » contre
+        « 1.0.20 ») : information, sans ⚠."""
+        return (
+            self.backend.name not in TOOL_VERSION_NOT_IN_IDENTITY
+            and self.points is not None
+            and self.tool_version is not None
+            and self.reference_tool_version is not None
+            and self.tool_version != self.reference_tool_version
         )
 
     @property
@@ -279,11 +292,11 @@ def normalize(result: Result, reference: Reference) -> BackendScore:
         "reference_driver": entry.driver,
         "gpu": result.environment.get("renderer"),
         "reference_gpu": entry.gpu,
+        "tool_version": result.tool_version,
+        "reference_tool_version": entry.tool_version,
     }
     if ours.name in TOOL_VERSION_NOT_IN_IDENTITY:
         drivers |= {
-            "tool_version": result.tool_version,
-            "reference_tool_version": entry.tool_version,
             "device": result.environment.get("device"),
             "reference_device": entry.device,
         }
