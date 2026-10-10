@@ -198,6 +198,18 @@ def test_bench_all_without_working_vulkan(fake_runs, fake_tools, monkeypatch) ->
     assert "Score partiel, non classé." in result.output
 
 
+def test_bench_cpu_multi_alone_has_no_gpu_notice(fake_runs, monkeypatch) -> None:
+    """Cas constaté : `bench cpu-multi` seul. Combiné non calculé, donc pas d'avertissement
+    « calculé sans GPU »."""
+    monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    result = runner.invoke(cli.app, ["bench", "cpu-multi", "--backend", "native"], env=WIDE)
+    assert result.exit_code == 0, result.output
+    assert re.search(
+        r"Score combiné +non comparable \(CPU single-core et multi-core requis\)", result.output
+    )
+    assert "calculé sans GPU" not in result.output
+
+
 def test_bench_without_reference_says_how_to_make_one(fake_runs, monkeypatch) -> None:
     monkeypatch.setattr(cli, "load_reference", lambda: None)
     result = runner.invoke(cli.app, ["bench", "cpu-single"], env=WIDE)

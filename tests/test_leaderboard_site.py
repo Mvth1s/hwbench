@@ -61,6 +61,17 @@ def test_incomplete_gpu_is_ranked_nowhere_but_in_the_cpu_tabs(tmp_path) -> None:
     assert [e.slug for e, _ in ranking(entries, Category.CPU_MULTI)] == ["sans-vulkan", "moyen"]
 
 
+def test_cpu_multi_alone_is_ranked_only_in_its_tab(tmp_path) -> None:
+    d = tmp_path / "results"
+    d.mkdir()
+    multi_only = [r for r in machine(2.0) if r.name == "native-cpu-multi"]
+    write_export(export(multi_only, "Multi seul"), d / "multi.json")
+    (entry,) = load_entries(d, REFERENCE)[0]
+    assert entry.scores.combined is not None and not entry.scores.combined.gpu_missing
+    assert category_points(entry, None) is None
+    assert round(category_points(entry, Category.CPU_MULTI)) == 2000
+
+
 def test_points_are_recomputed_not_taken_from_the_file(tmp_path) -> None:
     d = tmp_path / "results"
     d.mkdir()

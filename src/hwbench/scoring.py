@@ -209,7 +209,7 @@ class CombinedScore:
     points: float | None
     weights: dict[Category, float]  # poids effectifs, normalisés sur les catégories utilisées
     backends: list[BackendId]
-    gpu_missing: bool
+    gpu_missing: bool  # calculé sans GPU (non mesuré ou incomplet) ; False si points est None
     issue: ScoreIssue | None = None
 
 
@@ -371,12 +371,12 @@ def combine(
     total = sum(weights[c] for c in used)
     effective = {c: weights[c] / total for c in used} if total else {}
     backends = [b for c in used for b in by_cat[c].backends]
+    # gpu_missing : combiné *calculé* sans GPU. Non calculé (points None), il n'a pas lieu
+    # d'être : l'affichage, l'analyse et le site n'ont pas à le tester avec points.
     if Category.CPU_SINGLE not in by_cat or Category.CPU_MULTI not in by_cat:
-        return CombinedScore(None, effective, backends, gpu_missing, ScoreIssue.CPU_NOT_MEASURED)
+        return CombinedScore(None, effective, backends, False, ScoreIssue.CPU_NOT_MEASURED)
     if any(by_cat[c].points is None for c in used):
-        return CombinedScore(
-            None, effective, backends, gpu_missing, ScoreIssue.CATEGORY_NOT_COMPARABLE
-        )
+        return CombinedScore(None, effective, backends, False, ScoreIssue.CATEGORY_NOT_COMPARABLE)
     points = _geometric_mean((by_cat[c].points or 0.0 for c in used), (effective[c] for c in used))
     return CombinedScore(points, effective, backends, gpu_missing)
 
