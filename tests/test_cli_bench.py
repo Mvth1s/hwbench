@@ -364,3 +364,23 @@ def test_failed_bench_is_shown_in_its_panel(fake_tools, monkeypatch) -> None:
     ((category, name, version, message),) = shown
     assert (category, name, version) == (Category.CPU_SINGLE, "sysbench-cpu-single", "1")
     assert message.startswith("sysbench interrompu par le signal SIGSEGV (code -11).")
+
+
+def test_stalled_cooldown_is_information_not_a_warning(cooldowns) -> None:
+    cooldowns["outcome"] = CooldownOutcome.STALLED
+    args = ["bench", "cpu-single", "--backend", "native", "--cooldown", "auto"]
+    result = runner.invoke(cli.app, args, env=WIDE)
+    assert result.exit_code == 0, result.output
+    assert (
+        "CPU single-core · refroidissement : CPU stabilisé à 66 °C après 12 s (départ à 82 °C, "
+        "baisse de moins de 1 °C en 30 s ; seuil 70 °C non atteint) : test lancé."
+    ) in result.output
+    assert "⚠ CPU single-core · refroidissement" not in result.output
+
+
+def test_stall_options_reach_the_settings(cooldowns) -> None:
+    args = ["bench", "cpu-single", "--backend", "native", "--cooldown", "auto"]
+    stall = ["--cooldown-stall", "60", "--cooldown-stall-delta", "0.5"]
+    assert runner.invoke(cli.app, [*args, *stall]).exit_code == 0
+    (settings,) = cooldowns["calls"]
+    assert (settings.cooldown_stall_s, settings.cooldown_stall_delta_c) == (60.0, 0.5)
