@@ -124,6 +124,14 @@ def tool_info(s: BackendScore) -> str:
     return f"{s.backend.name} : outil {s.tool_version}{suffix}"
 
 
+def tool_build_info(s: BackendScore) -> str:
+    """Même version amont que la référence, autre build : simple information."""
+    return (
+        f"{s.backend.name} : outil {s.tool_version} "
+        f"(référence : {s.reference_tool_version}, même version amont)"
+    )
+
+
 def render_scores(scores: Scores) -> Panel:
     ref = scores.reference
     t = Table.grid(padding=(0, 2))
@@ -157,6 +165,8 @@ def render_scores(scores: Scores) -> Panel:
             parts.append(Text(tool_notice(s), style="yellow"))
         elif s.tool_info:
             parts.append(Text(tool_info(s), style="dim"))
+        elif s.tool_build_differs:
+            parts.append(Text(tool_build_info(s), style="dim"))
     if ref.forced:
         parts.append(
             Text(

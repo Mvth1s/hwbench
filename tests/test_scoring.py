@@ -520,6 +520,17 @@ def test_build_suffix_keeps_sysbench_comparable(raw) -> None:
     assert result.backend_id == BackendId("sysbench-cpu-single", "1", "1.0.20", None)
     score = normalize(result, reference)
     assert (score.points, score.issue) == (pytest.approx(500), None)
+    assert score.tool_build_differs and not score.tool_differs and not score.tool_info
+    out = _panel(score_results([result], reference))
+    assert f"sysbench-cpu-single : outil {raw} (référence : 1.0.20, même version amont)" in out
+    assert "⚠ sysbench" not in out
+
+
+def test_same_build_says_nothing() -> None:
+    result = make_result("sysbench-cpu-single", 9000.0, tool_version="1.0.20")
+    reference = reference_from_dict(build_reference([result], snapshot(), []))
+    assert not normalize(result, reference).tool_build_differs
+    assert "même version amont" not in _panel(score_results([result], reference))
 
 
 def test_other_upstream_version_stays_not_comparable() -> None:
@@ -562,4 +573,6 @@ def test_other_disk_shows_fio_version_as_information(device) -> None:
 def test_tool_rule_does_not_apply_to_gpu_backends() -> None:
     score = normalize(_glmark2(2000.0, "Mesa 26.2.3"), _reference("Mesa 26.2.3"))
     assert not score.tool_differs and not score.tool_info
-    assert score.tool_version is None and score.device is None
+    # version brute relevée (même build que la référence), aucun disque
+    assert score.tool_version == "2023.01" and score.device is None
+    assert not score.tool_build_differs
