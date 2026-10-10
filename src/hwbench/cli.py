@@ -44,6 +44,7 @@ from hwbench.report import render_report
 from hwbench.results import Availability, BenchWarning, Category, MachineState, Result
 from hwbench.runner import (
     MIN_RUNS,
+    Cooldown,
     CooldownOutcome,
     RunSettings,
     cool_down,
@@ -242,8 +243,8 @@ def _bench_options(workers: int | None, disk_size: str, disk_path: Path | None) 
     return BenchOptions(workers=workers, disk_size=size, disk_path=disk_path)
 
 
-def _cool_down(console: Console, category: Category, settings: RunSettings) -> float:
-    """Pause avant une catégorie (--cooldown) ; renvoie la durée effective."""
+def _cool_down(console: Console, category: Category, settings: RunSettings) -> Cooldown:
+    """Pause avant une catégorie (--cooldown) ; renvoie sa durée effective et son issue."""
     label = f"{CATEGORY_LABELS[category]} · refroidissement"
     target = num(settings.hot_start_c, 0)
     with console.status(f"{label}…") as status:
@@ -261,7 +262,7 @@ def _cool_down(console: Console, category: Category, settings: RunSettings) -> f
     warn = cooldown.outcome in (CooldownOutcome.TIMEOUT, CooldownOutcome.NO_SENSOR)
     message = f"{label} : {cooldown_message(cooldown, settings)}"
     console.print(Text(f"⚠ {message}", "yellow") if warn else Text(message, "dim"))
-    return cooldown.waited_s
+    return cooldown
 
 
 def _run_all(
@@ -289,9 +290,9 @@ def _run_all(
         first = previous is None
         previous = cls.category
         try:
-            waited = 0.0
+            cooldown = None
             if new_category and (settings.cooldown_auto or (settings.cooldown_s and not first)):
-                waited = _cool_down(console, cls.category, settings)
+                cooldown = _cool_down(console, cls.category, settings)
             with console.status(f"{label} : préparation…") as status:
                 cap = settings.warmup_cap(cls.category)
 
@@ -304,7 +305,12 @@ def _run_all(
                         status.update(f"{label} : run {index}/{total}…")
 
                 result = run_benchmark(
-                    instance, settings, probe=capture_state, progress=progress, cooldown_s=waited
+                    instance,
+                    settings,
+                    probe=capture_state,
+                    progress=progress,
+                    cooldown_s=cooldown.waited_s if cooldown else 0.0,
+                    cooldown_outcome=cooldown.outcome if cooldown else None,
                 )
         except KeyboardInterrupt:
             console.print("[red]Interrompu.[/red]")

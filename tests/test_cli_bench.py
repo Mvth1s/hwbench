@@ -442,3 +442,18 @@ def test_upfront_warnings_keep_battery_and_profile_with_auto_cooldown() -> None:
     settings = cli.RunSettings(cooldown_auto=True)
     assert cli.upfront_warnings(state, settings) == [BenchWarning.ON_BATTERY]
     assert BenchWarning.HOT_START in cli.upfront_warnings(state, cli.RunSettings())
+
+
+def test_stalled_cooldown_turns_the_hot_start_into_information(monkeypatch) -> None:
+    """Cas constaté : refroidissement arrêté sur stagnation à 34 °C (--hot-start 30). Les
+    benchs précédés d'une attente démarrent à leur température de repos : information, sans
+    « laissez refroidir ». Le second bench d'une catégorie (mémoire multi), sans attente,
+    garde l'avertissement."""
+    _real_cool_down_without_waiting(monkeypatch, [49.0, 49.0, 40.0, 34.0])
+    args = ["bench", "all", "--backend", "native", "--cooldown", "auto", "--hot-start", "30"]
+    result = runner.invoke(cli.app, args, env=WIDE)
+    assert result.exit_code == 0, result.output
+    idle = "CPU à 34 °C au départ, sa température de repos"
+    assert result.output.count(idle) == 3  # CPU single, CPU multi, mémoire single
+    assert result.output.count("Laissez refroidir avant de relancer.") == 1  # mémoire multi
+    assert f"⚠ {idle}" not in result.output

@@ -20,6 +20,10 @@ from hwbench.runner import Cooldown, CooldownOutcome, RunSettings
 NA = Text("non disponible", style="dim")
 
 
+# Avertissements d'information : affichés sans ⚠ ni conseil
+INFO_WARNINGS = frozenset({BenchWarning.HOT_IDLE})
+
+
 def _unit(unit: str) -> str:
     return unit_label(unit)
 
@@ -32,6 +36,11 @@ def warning_message(
             return (
                 "Machine sur batterie : les performances sont souvent bridées. "
                 "Relancez sur secteur pour des résultats comparables."
+            )
+        case BenchWarning.HOT_IDLE:
+            return (
+                f"CPU à {num(state.cpu_temp_c or 0, 0)} °C au départ, sa température de repos : "
+                "l'attente s'est arrêtée faute de baisse, au-dessus du seuil de départ chaud."
             )
         case BenchWarning.HOT_START:
             return (
@@ -174,7 +183,10 @@ def render_result(result: Result) -> Panel:
         parts.append(Text(" · ".join(_environment(result.environment)), style="dim"))
     for warning in result.warnings:
         message = warning_message(warning, result.state_before, result)
-        parts.append(Text(f"⚠ {message}", style="yellow"))
+        if warning in INFO_WARNINGS:
+            parts.append(Text(message, style="dim"))
+        else:
+            parts.append(Text(f"⚠ {message}", style="yellow"))
 
     # nom du bench (comme le panneau Scores : single et multi d'une même catégorie se
     # distinguent), v{version} : version du protocole hwbench ; outil : son binaire
