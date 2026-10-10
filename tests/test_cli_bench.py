@@ -384,3 +384,61 @@ def test_stall_options_reach_the_settings(cooldowns) -> None:
     assert runner.invoke(cli.app, [*args, *stall]).exit_code == 0
     (settings,) = cooldowns["calls"]
     assert (settings.cooldown_stall_s, settings.cooldown_stall_delta_c) == (60.0, 0.5)
+
+
+class _SimulatedTime:
+    now = 0.0
+
+    def clock(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+def _real_cool_down_without_waiting(monkeypatch, temps: list[float]) -> None:
+    """Vrai cool_down sur horloge simulée ; capture_state renvoie les températures tour à
+    tour (la dernière répétée), au lancement comme pendant l'attente et autour des benchs."""
+    readings = list(temps)
+    time = _SimulatedTime()
+
+    def capture_state() -> MachineState:
+        temp = readings.pop(0) if len(readings) > 1 else readings[0]
+        return MachineState(["performance"], on_ac=True, cpu_temp_c=temp)
+
+    def cool_down(settings, **kwargs):
+        return bench_runner.cool_down(settings, **kwargs, sleep=time.sleep, clock=time.clock)
+
+    monkeypatch.setattr(cli, "capture_state", capture_state)
+    monkeypatch.setattr(cli, "cool_down", cool_down)
+
+
+def test_auto_cooldown_replaces_the_upfront_hot_start_warning(monkeypatch) -> None:
+    """Cas constaté : `bench all --backend native --cooldown auto --hot-start 30`, 49 °C au
+    lancement, 34 °C après l'attente : pas de « CPU déjà chaud au départ (49 °C) » global."""
+    _real_cool_down_without_waiting(monkeypatch, [49.0, 49.0, 40.0, 34.0])
+    args = ["bench", "all", "--backend", "native", "--cooldown", "auto", "--hot-start", "30"]
+    result = runner.invoke(cli.app, args, env=WIDE)
+    assert result.exit_code == 0, result.output
+    assert "CPU déjà chaud au départ (49 °C)" not in result.output
+    assert "CPU single-core · refroidissement : CPU stabilisé à 34 °C" in result.output
+
+
+@pytest.mark.parametrize("cooldown", [[], ["--cooldown", "30"]])
+def test_upfront_hot_start_warning_without_auto_cooldown(monkeypatch, cooldown) -> None:
+    # sans attente avant la première catégorie, le contrôle global reste utile
+    warm = MachineState(["performance"], on_ac=True, cpu_temp_c=49.0)
+    monkeypatch.setattr(cli, "capture_state", lambda: warm)
+    monkeypatch.setattr(
+        cli, "cool_down", lambda settings, **kw: Cooldown(30.0, CooldownOutcome.FIXED)
+    )
+    args = ["bench", "cpu-single", "--backend", "native", "--hot-start", "30", *cooldown]
+    result = runner.invoke(cli.app, args, env=WIDE)
+    assert result.output.index("CPU déjà chaud au départ (49 °C)") < result.output.index("╭")
+
+
+def test_upfront_warnings_keep_battery_and_profile_with_auto_cooldown() -> None:
+    state = MachineState(["powersave"], on_ac=False, cpu_temp_c=80.0)
+    settings = cli.RunSettings(cooldown_auto=True)
+    assert cli.upfront_warnings(state, settings) == [BenchWarning.ON_BATTERY]
+    assert BenchWarning.HOT_START in cli.upfront_warnings(state, cli.RunSettings())
