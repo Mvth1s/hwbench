@@ -515,8 +515,10 @@ jobs:
   # racine et la preview (dev, `site --preview` : bandeau, noindex) sous /preview/. La branche
   # poussée utilise la wheel testée par ce run ; l'autre est installée depuis ses sources. Sur
   # main, après la release et PyPI s'il y en a une ; toute mise à jour de results/ sur main
-  # passe donc par ici (pas de filtre documentation sur results/).
-  site:
+  # passe donc par ici (pas de filtre documentation sur results/). Prod et preview sont
+  # générées dans deux jobs séparés : le code de dev ne s'exécute jamais là où la prod est
+  # écrite, il ne peut rien produire hors de /preview/.
+  site-prod:
     needs: [build, ci-ok, release, pypi]
     if: >-
       always() && github.event_name == 'push'
@@ -530,53 +532,38 @@ jobs:
     env:
       ON_MAIN: ${{ github.ref == 'refs/heads/main' }}
     steps:
-      - name: Prod (main)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.ref == 'refs/heads/main' && github.sha || 'main' }}
-          path: prod
           fetch-depth: 0 # comparaison avec le push précédent (nouvelles machines)
           persist-credentials: false
 
-      - name: Preview (dev)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.ref == 'refs/heads/dev' && github.sha || 'dev' }}
-          path: preview
-          persist-credentials: false
-
       - name: Wheel testée par ce run
+        if: env.ON_MAIN == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
-          path: dist/
+          path: ${{ runner.temp }}/dist
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
           cache: pip
-          cache-dependency-path: |
-            prod/pyproject.toml
-            preview/pyproject.toml
+          cache-dependency-path: pyproject.toml
 
-      - name: Installer hwbench (prod et preview, chacun dans son venv)
+      - name: Installer hwbench (wheel testée sur main, sources de main sinon)
         run: |
-          python -m venv "$RUNNER_TEMP/prod"
-          python -m venv "$RUNNER_TEMP/preview"
+          python -m venv "$RUNNER_TEMP/venv"
           if [ "$ON_MAIN" = true ]; then
-            "$RUNNER_TEMP/prod/bin/pip" install dist/*.whl
-            "$RUNNER_TEMP/preview/bin/pip" install ./preview
+            "$RUNNER_TEMP/venv/bin/pip" install "$RUNNER_TEMP"/dist/*.whl
           else
-            "$RUNNER_TEMP/prod/bin/pip" install ./prod
-            "$RUNNER_TEMP/preview/bin/pip" install dist/*.whl
+            "$RUNNER_TEMP/venv/bin/pip" install .
           fi
 
-      - name: Générer le site
+      - name: Générer le site de prod
         run: |
-          "$RUNNER_TEMP/prod/bin/python" -I -m hwbench.leaderboard site \
-            --results prod/results --out _site
-          "$RUNNER_TEMP/preview/bin/python" -I -m hwbench.leaderboard site \
-            --results preview/results --out _site/preview --preview
+          "$RUNNER_TEMP/venv/bin/python" -I -m hwbench.leaderboard site \
+            --results results --out "$RUNNER_TEMP/site"
 
       # Sur main : fichiers results/*.json ajoutés depuis le push précédent -> JSON sur une ligne
       # (rang au classement combiné), passé au job notify-site par env. Noms par -z / xargs -0.
@@ -585,18 +572,92 @@ jobs:
         id: new
         if: env.ON_MAIN == 'true'
         continue-on-error: true
-        working-directory: prod
         env:
           BEFORE: ${{ github.event.before }}
         run: |
           summary=""
           if git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
             summary="$(git diff -z --name-only --diff-filter=A "$BEFORE" HEAD -- 'results/*.json' \
-              | xargs -0 --no-run-if-empty "$RUNNER_TEMP/prod/bin/python" -I -m hwbench.leaderboard summary \
-                  --results results --new)"
+              | xargs -0 --no-run-if-empty "$RUNNER_TEMP/venv/bin/python" -I -m hwbench.leaderboard \
+                  summary --results results --new)"
           fi
           echo "summary=$summary" >> "$GITHUB_OUTPUT"
 
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: site-prod
+          path: ${{ runner.temp }}/site
+          include-hidden-files: true # .nojekyll
+          if-no-files-found: error
+          retention-days: 1
+
+  site-preview:
+    needs: [build, ci-ok, release, pypi]
+    if: >-
+      always() && github.event_name == 'push'
+      && needs.build.result == 'success' && needs.ci-ok.result == 'success'
+      && contains(fromJSON('["success", "skipped"]'), needs.release.result)
+      && contains(fromJSON('["success", "skipped"]'), needs.pypi.result)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ON_DEV: ${{ github.ref == 'refs/heads/dev' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref == 'refs/heads/dev' && github.sha || 'dev' }}
+          persist-credentials: false
+
+      - name: Wheel testée par ce run
+        if: env.ON_DEV == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: ${{ runner.temp }}/dist
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Installer hwbench (wheel testée sur dev, sources de dev sinon)
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          if [ "$ON_DEV" = true ]; then
+            "$RUNNER_TEMP/venv/bin/pip" install "$RUNNER_TEMP"/dist/*.whl
+          else
+            "$RUNNER_TEMP/venv/bin/pip" install .
+          fi
+
+      - name: Générer la preview (bandeau, noindex, robots.txt)
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" -I -m hwbench.leaderboard site \
+            --results results --out "$RUNNER_TEMP/site" --preview
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: site-preview
+          path: ${{ runner.temp }}/site
+          include-hidden-files: true # .nojekyll
+          if-no-files-found: error
+          retention-days: 1
+
+  # Assemblage sans exécuter de code du dépôt : prod à la racine, preview sous /preview/.
+  site:
+    needs: [site-prod, site-preview]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: site-prod
+          path: _site
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: site-preview
+          path: _site/preview
       - name: Préparer l'artefact Pages
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
@@ -625,7 +686,7 @@ jobs:
 
   # #deploiements et #classement : déploiements de main seulement (pas à chaque push sur dev)
   notify-site:
-    needs: [site, deploy]
+    needs: [site-prod, deploy]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -645,10 +706,10 @@ jobs:
 
       # noms de machines venus des exports : par env (SUMMARY), jamais interpolés dans run
       - name: Notifier #classement (nouvelles machines)
-        if: needs.site.outputs.summary != ''
+        if: needs.site-prod.outputs.summary != ''
         continue-on-error: true
         env:
           DISCORD_WEBHOOK_CLASSEMENT: ${{ secrets.DISCORD_WEBHOOK_CLASSEMENT }}
-          SUMMARY: ${{ needs.site.outputs.summary }}
+          SUMMARY: ${{ needs.site-prod.outputs.summary }}
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
         run: python3 scripts/discord_notify.py new-machines --site-url "$PAGE_URL"
