@@ -641,8 +641,13 @@ jobs:
           retention-days: 1
 
   # Assemblage sans exécuter de code du dépôt : prod à la racine, preview sous /preview/.
+  # always() + résultat explicite : sans if, un job est sauté dès qu'un job en amont, même
+  # indirect, l'a été (release et pypi sont sautés sur dev et sur main sans release).
   site:
     needs: [site-prod, site-preview]
+    if: >-
+      always() && needs.site-prod.result == 'success'
+      && needs.site-preview.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions: {}
@@ -662,6 +667,7 @@ jobs:
 
   deploy:
     needs: site
+    if: always() && needs.site.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # un déploiement à la fois (dev et main publient le même site)
@@ -684,7 +690,9 @@ jobs:
   # #deploiements et #classement : déploiements de main seulement (pas à chaque push sur dev)
   notify-site:
     needs: [site-prod, deploy]
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      always() && github.ref == 'refs/heads/main'
+      && needs.site-prod.result == 'success' && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
