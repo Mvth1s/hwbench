@@ -501,18 +501,9 @@ def release_embed(release: dict[str, Any], repo: str) -> dict[str, Any]:
         url=release.get("html_url"),
         color=BLUE,
         fields=[
-            field("PyPI", f"{link('pypi.org', pypi)} (après approbation de la publication)"),
+            field("PyPI", f"{link('pypi.org', pypi)} (publication automatique, quelques minutes)"),
             field("Vérifier la provenance", verify_command(version, repo)),
         ],
-    )
-
-
-def pypi_pending_embed(version: str, run_url: str) -> dict[str, Any]:
-    return embed(
-        f"PyPI : {PACKAGE} {version} en attente d'approbation",
-        f"La publication attend l'approbation de l'environnement « pypi » : {link('run', run_url)}",
-        url=run_url,
-        color=AMBER,
     )
 
 
@@ -739,8 +730,6 @@ def build(args: argparse.Namespace) -> tuple[str, list[dict[str, Any]]]:
     if command == "release":
         release = github_api(f"/repos/{_repo()}/releases/tags/{quote(args.tag, safe='')}")
         return "DISCORD_WEBHOOK_RELEASES", [release_embed(release, _repo())]
-    if command == "pypi-pending":
-        return "DISCORD_WEBHOOK_DEPLOIEMENTS", [pypi_pending_embed(args.version, args.run_url)]
     if command == "pypi-published":
         return "DISCORD_WEBHOOK_DEPLOIEMENTS", [pypi_published_embed(args.version)]
     if command == "pages":
@@ -787,9 +776,6 @@ def parser() -> argparse.ArgumentParser:
     sub.add_parser("dependabot", help="workflow_run CI d'une PR Dependabot -> #dependabot")
     release = sub.add_parser("release", help="GitHub Release créée -> #releases")
     release.add_argument("--tag", required=True)
-    pending = sub.add_parser("pypi-pending", help="PyPI en attente -> #deploiements")
-    pending.add_argument("--version", required=True)
-    pending.add_argument("--run-url", required=True)
     published = sub.add_parser("pypi-published", help="publié sur PyPI -> #deploiements")
     published.add_argument("--version", required=True)
     pages = sub.add_parser("pages", help="site déployé -> #deploiements")

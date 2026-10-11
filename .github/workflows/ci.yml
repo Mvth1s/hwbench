@@ -460,7 +460,7 @@ jobs:
     if: "!cancelled() && needs.release.result == 'success'"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Required reviewers sur l'environnement : la publication attend une approbation manuelle
+    # environnement limité à main, sans approbation : publication automatique après la release
     environment:
       name: pypi
       url: https://pypi.org/project/hwbench/
@@ -477,8 +477,8 @@ jobs:
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
 
   # Notifications Discord (scripts/discord_notify.py) dans des jobs à part, sans id-token :
-  # #releases et « PyPI en attente d'approbation » (#deploiements) dès la GitHub Release, puis
-  # « publié sur PyPI » (#deploiements). Un échec de notification ne fait jamais rien échouer.
+  # #releases dès la GitHub Release, puis « publié sur PyPI » (#deploiements). Un échec de
+  # notification ne fait jamais rien échouer.
   notify-release:
     needs: release
     if: "!cancelled() && needs.release.result == 'success'"
@@ -498,14 +498,6 @@ jobs:
           DISCORD_WEBHOOK_RELEASES: ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
           TAG: ${{ needs.release.outputs.tag }}
         run: python3 scripts/discord_notify.py release --tag "$TAG"
-
-      - name: Notifier #deploiements (PyPI en attente d'approbation)
-        continue-on-error: true
-        env:
-          DISCORD_WEBHOOK_DEPLOIEMENTS: ${{ secrets.DISCORD_WEBHOOK_DEPLOIEMENTS }}
-          TAG: ${{ needs.release.outputs.tag }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: python3 scripts/discord_notify.py pypi-pending --version "${TAG#v}" --run-url "$RUN_URL"
 
   notify-pypi:
     needs: [release, pypi]
