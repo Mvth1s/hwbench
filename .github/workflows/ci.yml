@@ -1,43 +1,645 @@
 name: CI
 
+# Pipeline unique : vérifications, release, PyPI et site (voir CLAUDE.md, « CI »).
+#
+# - pull request (toute base) : changes -> lint -> typecheck -> test (Python 3.11 à 3.14,
+#   couverture >= 94 %) -> build ; audit (pip-audit) et commitlint (commits et titre) en
+#   parallèle ; contrôle des liens non bloquant si un .md change. ci-ok est le seul check
+#   requis par les rulesets.
+# - push sur dev : même chaîne, sdist et wheel en artefact (14 jours), puis le site : prod
+#   (depuis main) à la racine et preview (depuis dev, non indexée) sous /preview/.
+# - push sur main : même chaîne, la version est calculée et inscrite avant le build (sans
+#   commit), la wheel testée ; puis release (commit, tag, GitHub Release avec CE dist,
+#   attestation), PR de retour main -> dev, PyPI (même dist), site. Le commit de release
+#   poussé par l'App ne relance rien.
+#
+# Documentation seule (*.md, docs/**, LICENSE ; scripts/ci-changes.sh) : seuls commitlint et
+# ci-ok tournent. Pas de paths-ignore : ci-ok existe toujours, un check requis ne reste jamais
+# en attente. ci-ok échoue si un job vérifié a échoué ou a été annulé, réussit s'ils ont été
+# sautés par le filtre.
+#
+# Toute action est épinglée par SHA de commit avec le tag exact en commentaire.
 on:
+  pull_request:
   push:
     branches: [main, dev]
-  pull_request:
 
 permissions:
   contents: read
 
+# PR : un nouveau push annule le run en cours. Push sur dev ou main : jamais annulé (release,
+# déploiement), les runs d'une même branche se suivent.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash # -eo pipefail
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  # Adoption des conventional commits : les commits antérieurs (déjà dans dev) ne sont pas
+  # vérifiés. C'est le merge de la phase 4 dans dev, parent du premier commit conventionnel.
+  CONVENTIONAL_SINCE: 3a079048a8d1bfbf0e625be1abe123aab2a88ffd
+
 jobs:
-  lint:
+  changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      docs: ${{ steps.filter.outputs.docs }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Commit de release (poussé par l'App après une release, déjà construit et testé) :
+      # rien ne tourne. Un humain ne peut pas être un acteur « …[bot] ».
+      - name: Fichiers modifiés (documentation seule ?)
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          RELEASE_COMMIT: >-
+            ${{ github.event_name == 'push' && endsWith(github.actor, '[bot]')
+            && startsWith(github.event.head_commit.message, 'chore(release):') }}
+        run: |
+          if [ "$RELEASE_COMMIT" = true ]; then
+            echo "Commit de release : rien à vérifier"
+            result="$(printf 'code=false\ndocs=false')"
+          elif [ "$EVENT" = pull_request ]; then
+            result="$(scripts/ci-changes.sh "$PR_BASE" "$PR_HEAD")"
+          else
+            result="$(scripts/ci-changes.sh "$BEFORE" "$GITHUB_SHA")"
+          fi
+          echo "$result"
+          echo "$result" >> "$GITHUB_OUTPUT"
+
+  lint:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - run: pip install -e '.[dev]'
       - run: ruff check .
       - run: ruff format --check .
 
-  test:
+  typecheck:
+    needs: [changes, lint]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e '.[dev]'
+      # portée et options dans [tool.mypy] du pyproject.toml (src/ et scripts/)
+      - run: mypy
+
+  test:
+    needs: [changes, typecheck]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
+        # liste en ligne : seule forme lue par la veille (scripts/discord_notify.py veille)
         python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - run: pip install -e '.[dev]'
+      # échoue sous fail_under ([tool.coverage.report])
       - run: pytest --cov --cov-report=term
       - name: Couverture dans le résumé du job
         if: always()
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
         run: |
           {
-            echo "### Couverture (Python ${{ matrix.python-version }})"
+            echo "### Couverture (Python $PYTHON_VERSION)"
             echo
             coverage report --format=markdown
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # sdist et wheel, vérifiés (twine), puis la suite de tests complète sur la wheel installée.
+  # Sur main : version calculée par semantic-release et inscrite avant le build (pyproject,
+  # __init__, CHANGELOG ; ni commit ni tag), pour que la release publie ce dist-là, tel quel.
+  build:
+    needs: [changes, test]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      released: ${{ steps.next.outputs.released }}
+      version: ${{ steps.version.outputs.version }}
+    env:
+      ON_MAIN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # semantic-release lit l'historique et les tags
+          persist-credentials: false
+
+      # semantic-release refuse un HEAD détaché et exige la branche configurée (main)
+      - name: Se placer sur main au commit testé
+        if: env.ON_MAIN == 'true'
+        run: git checkout -q -B main "$GITHUB_SHA"
+
+      - name: Calculer la prochaine version et l'inscrire (sans commit ni tag)
+        id: next
+        if: env.ON_MAIN == 'true'
+        uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278 # v10.7.0
+        with:
+          github_token: ${{ github.token }}
+          commit: "false"
+          tag: "false"
+          push: "false"
+          vcs_release: "false"
+          build: "false"
+          changelog: "true"
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Version construite
+        id: version
+        run: |
+          version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version construite : $version"
+
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check --strict dist/*
+
+      # Hors du code source : la suite importe le paquet installé depuis la wheel (dont les
+      # données, data/reference.json), jamais src/.
+      - name: Tester la wheel construite
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel"
+          "$RUNNER_TEMP/wheel/bin/pip" install dist/*.whl pytest
+          "$RUNNER_TEMP/wheel/bin/python" -I -c 'import hwbench; assert "site-packages" in hwbench.__file__, hwbench.__file__'
+          test "$("$RUNNER_TEMP/wheel/bin/hwbench" --version)" = "hwbench $VERSION"
+          "$RUNNER_TEMP/wheel/bin/pytest" -q -p no:cacheprovider
+
+      - name: Conserver sdist et wheel
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  audit:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev]'
+      # dépendances installées (runtime et dev), hwbench lui-même exclu (installé en éditable)
+      - run: pip-audit --skip-editable
+
+  commitlint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Vérifier les messages de commit de la PR
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # depuis la base de la PR, ou depuis l'adoption si la base est plus ancienne
+          if git merge-base --is-ancestor "$CONVENTIONAL_SINCE" "$BASE"; then
+            FROM="$BASE"
+          else
+            FROM="$CONVENTIONAL_SINCE"
+          fi
+          echo "Commits vérifiés : $FROM..$HEAD"
+          npx --yes -p @commitlint/cli@21.2.3 -p @commitlint/config-conventional@21.2.3 \
+            commitlint --from "$FROM" --to "$HEAD" --verbose
+      # le titre devient le message du commit de squash : même règle que les commits
+      - name: Vérifier le titre de la PR
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf '%s\n' "$TITLE" \
+            | npx --yes -p @commitlint/cli@21.2.3 -p @commitlint/config-conventional@21.2.3 \
+                commitlint --verbose
+
+  # Non bloquant (continue-on-error, hors de ci-ok) : un site tiers en panne ne bloque rien.
+  links:
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.docs == 'true'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # CHANGELOG.md : des centaines de liens de commits, générés ; fixtures : pas de la doc
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: >-
+            --no-progress --max-concurrency 8
+            --exclude-path 'CHANGELOG\.md' --exclude-path 'tests/fixtures'
+            './**/*.md'
+
+  ci-ok:
+    needs: [changes, lint, typecheck, test, build, audit, commitlint]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Tous les jobs vérifiés ont réussi ou ont été sautés par le filtre
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          jq -r 'to_entries[] | "\(.key) : \(.value.result)"' <<< "$NEEDS"
+          if [ "$FAILED" = true ]; then
+            echo "::error::au moins un job a échoué ou a été annulé"
+            exit 1
+          fi
+
+  # --- push sur main : release, retour vers dev, PyPI ---------------------------------------
+
+  # Commit « chore(release): X.Y.Z », tag et GitHub Release par semantic-release (sans
+  # reconstruire), avec le jeton de l'App de release (contourne la protection de main, et ses
+  # push et PR déclenchent les workflows, contrairement à GITHUB_TOKEN). Puis le dist du job
+  # build : vérification de la version, attestation de provenance, ajout à la GitHub Release.
+  release:
+    needs: [build, ci-ok]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && needs.build.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # environnement limité à main : variable RELEASE_APP_CLIENT_ID, secret RELEASE_APP_PRIVATE_KEY
+    environment: release
+    permissions:
+      contents: read # checkout ; le reste passe par le jeton de l'App
+      id-token: write # attestation de provenance (certificat Sigstore)
+      attestations: write # enregistrement de l'attestation sur le dépôt
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      commit: ${{ steps.release.outputs.commit_sha }}
+    steps:
+      - name: Jeton de l'App de release
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Identité git du bot de l'App
+        id: bot
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          id="$(gh api "/users/${SLUG}%5Bbot%5D" --jq .id)"
+          echo "name=${SLUG}[bot]" >> "$GITHUB_OUTPUT"
+          echo "email=${id}+${SLUG}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+
+      # sans identifiants persistés : semantic-release pousse avec le jeton qu'on lui passe
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Se placer sur main au commit testé
+        run: git checkout -q -B main "$GITHUB_SHA"
+
+      - name: Commit de release, tag et GitHub Release
+        id: release
+        uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278 # v10.7.0
+        with:
+          github_token: ${{ steps.app.outputs.token }}
+          git_committer_name: ${{ steps.bot.outputs.name }}
+          git_committer_email: ${{ steps.bot.outputs.email }}
+          build: "false"
+
+      - name: La version publiée est celle construite et testée
+        env:
+          RELEASED: ${{ steps.release.outputs.released }}
+          GOT: ${{ steps.release.outputs.version }}
+          WANT: ${{ needs.build.outputs.version }}
+        run: |
+          if [ "$RELEASED" != true ] || [ "$GOT" != "$WANT" ]; then
+            echo "::error::release : released=$RELEASED, version $GOT ; dist construit : $WANT"
+            exit 1
+          fi
+
+      - name: Récupérer sdist et wheel du job build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - name: Attester la provenance de sdist et wheel
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+
+      - name: Joindre sdist et wheel à la GitHub Release
+        uses: python-semantic-release/publish-action@99d4062dd393b5a7a62c5fe9ed78fb364b5674f2 # v10.7.0
+        with:
+          github_token: ${{ steps.app.outputs.token }}
+          tag: ${{ steps.release.outputs.tag }}
+
+  # Le commit de release n'existe que sur main : PR main -> dev depuis une branche dédiée
+  # (« Update branch » y fusionne dev sans toucher à main). Ouverte avec le jeton de l'App
+  # pour que la CI de la PR tourne. À fusionner en merge commit, jamais en squash.
+  backmerge:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions: {} # tout passe par le jeton de l'App
+    steps:
+      - name: Jeton de l'App de release
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: PR de retour main -> dev
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          TAG: ${{ needs.release.outputs.tag }}
+          COMMIT: ${{ needs.release.outputs.commit }}
+        run: |
+          branch="backmerge/$TAG"
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/heads/$branch" -f sha="$COMMIT" > /dev/null
+          gh pr create --repo "$GITHUB_REPOSITORY" --base dev --head "$branch" \
+            --title "chore: merge main into dev after $TAG" \
+            --body "Ramène sur dev le commit de release $TAG (version, CHANGELOG), qui n'existe que sur main. **À fusionner en merge commit**, pas en squash."
+
+  pypi:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Required reviewers sur l'environnement : la publication attend une approbation manuelle
+    environment:
+      name: pypi
+      url: https://pypi.org/project/hwbench/
+    permissions:
+      id-token: write # trusted publishing (jeton OIDC échangé contre un jeton PyPI éphémère)
+    steps:
+      - name: Récupérer sdist et wheel du job build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publier sur PyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+
+  # Notifications Discord (scripts/discord_notify.py) dans des jobs à part, sans id-token :
+  # #releases et « PyPI en attente d'approbation » (#deploiements) dès la GitHub Release, puis
+  # « publié sur PyPI » (#deploiements). Un échec de notification ne fait jamais rien échouer.
+  notify-release:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/discord_notify.py
+          sparse-checkout-cone-mode: false
+
+      - name: Notifier #releases
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DISCORD_WEBHOOK_RELEASES: ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: python3 scripts/discord_notify.py release --tag "$TAG"
+
+      - name: Notifier #deploiements (PyPI en attente d'approbation)
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_DEPLOIEMENTS: ${{ secrets.DISCORD_WEBHOOK_DEPLOIEMENTS }}
+          TAG: ${{ needs.release.outputs.tag }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 scripts/discord_notify.py pypi-pending --version "${TAG#v}" --run-url "$RUN_URL"
+
+  notify-pypi:
+    needs: [release, pypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/discord_notify.py
+          sparse-checkout-cone-mode: false
+
+      - name: Notifier #deploiements (publié sur PyPI)
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_DEPLOIEMENTS: ${{ secrets.DISCORD_WEBHOOK_DEPLOIEMENTS }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: python3 scripts/discord_notify.py pypi-published --version "${TAG#v}"
+
+  # --- push sur dev ou main : site du classement (GitHub Pages) -----------------------------
+
+  # deploy-pages remplace tout le site : chaque déploiement reconstruit la prod (main) à la
+  # racine et la preview (dev, `site --preview` : bandeau, noindex) sous /preview/. La branche
+  # poussée utilise la wheel testée par ce run ; l'autre est installée depuis ses sources. Sur
+  # main, après la release et PyPI s'il y en a une ; toute mise à jour de results/ sur main
+  # passe donc par ici (pas de filtre documentation sur results/).
+  site:
+    needs: [build, ci-ok, release, pypi]
+    if: >-
+      always() && github.event_name == 'push'
+      && needs.build.result == 'success' && needs.ci-ok.result == 'success'
+      && contains(fromJSON('["success", "skipped"]'), needs.release.result)
+      && contains(fromJSON('["success", "skipped"]'), needs.pypi.result)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      summary: ${{ steps.new.outputs.summary }}
+    env:
+      ON_MAIN: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - name: Prod (main)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref == 'refs/heads/main' && github.sha || 'main' }}
+          path: prod
+          fetch-depth: 0 # comparaison avec le push précédent (nouvelles machines)
+          persist-credentials: false
+
+      - name: Preview (dev)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref == 'refs/heads/dev' && github.sha || 'dev' }}
+          path: preview
+          persist-credentials: false
+
+      - name: Wheel testée par ce run
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            prod/pyproject.toml
+            preview/pyproject.toml
+
+      - name: Installer hwbench (prod et preview, chacun dans son venv)
+        run: |
+          python -m venv "$RUNNER_TEMP/prod"
+          python -m venv "$RUNNER_TEMP/preview"
+          if [ "$ON_MAIN" = true ]; then
+            "$RUNNER_TEMP/prod/bin/pip" install dist/*.whl
+            "$RUNNER_TEMP/preview/bin/pip" install ./preview
+          else
+            "$RUNNER_TEMP/prod/bin/pip" install ./prod
+            "$RUNNER_TEMP/preview/bin/pip" install dist/*.whl
+          fi
+
+      - name: Générer le site
+        run: |
+          "$RUNNER_TEMP/prod/bin/python" -I -m hwbench.leaderboard site \
+            --results prod/results --out _site
+          "$RUNNER_TEMP/preview/bin/python" -I -m hwbench.leaderboard site \
+            --results preview/results --out _site/preview --preview
+
+      # Sur main : fichiers results/*.json ajoutés depuis le push précédent -> JSON sur une ligne
+      # (rang au classement combiné), passé au job notify-site par env. Noms par -z / xargs -0.
+      # Sans commit précédent connu (premier push, historique réécrit) : rien.
+      - name: Nouvelles machines (notification)
+        id: new
+        if: env.ON_MAIN == 'true'
+        continue-on-error: true
+        working-directory: prod
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          summary=""
+          if git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            summary="$(git diff -z --name-only --diff-filter=A "$BEFORE" HEAD -- 'results/*.json' \
+              | xargs -0 --no-run-if-empty "$RUNNER_TEMP/prod/bin/python" -I -m hwbench.leaderboard summary \
+                  --results results --new)"
+          fi
+          echo "summary=$summary" >> "$GITHUB_OUTPUT"
+
+      - name: Préparer l'artefact Pages
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    needs: site
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # un déploiement à la fois (dev et main publient le même site)
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    permissions:
+      pages: write # publication sur GitHub Pages
+      id-token: write # authentification du déploiement
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Déployer
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  # #deploiements et #classement : déploiements de main seulement (pas à chaque push sur dev)
+  notify-site:
+    needs: [site, deploy]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/discord_notify.py
+          sparse-checkout-cone-mode: false
+
+      - name: Notifier #deploiements
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_DEPLOIEMENTS: ${{ secrets.DISCORD_WEBHOOK_DEPLOIEMENTS }}
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: python3 scripts/discord_notify.py pages --url "$PAGE_URL"
+
+      # noms de machines venus des exports : par env (SUMMARY), jamais interpolés dans run
+      - name: Notifier #classement (nouvelles machines)
+        if: needs.site.outputs.summary != ''
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_CLASSEMENT: ${{ secrets.DISCORD_WEBHOOK_CLASSEMENT }}
+          SUMMARY: ${{ needs.site.outputs.summary }}
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: python3 scripts/discord_notify.py new-machines --site-url "$PAGE_URL"
