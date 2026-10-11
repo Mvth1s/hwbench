@@ -168,7 +168,7 @@ def test_results_on_main_redeploy_the_production_site(ci: dict) -> None:
     assert {"site", "site-prod", "build"} <= ancestors(jobs, "deploy")
     for name in ("site-prod", "site-preview"):
         condition = " ".join(jobs[name]["if"].split())
-        assert condition.startswith("always() && github.event_name == 'push'")
+        assert condition.startswith("!cancelled() && github.event_name == 'push'")
         assert "needs.build.result == 'success'" in condition
         assert "needs.ci-ok.result == 'success'" in condition
         assert "changes" not in condition
@@ -194,19 +194,30 @@ def test_preview_is_built_apart_from_production(ci: dict) -> None:
     ]
 
 
-def test_site_chain_runs_without_a_release(ci: dict) -> None:
-    """Sans if, un job est sauté dès qu'un job en amont (même indirect) a été sauté : release
-    et pypi le sont sur dev et sur main sans release, ce qui avait sauté l'assemblage et le
-    déploiement du site. Toute la chaîne du site vérifie donc ses needs avec always()."""
+def test_jobs_after_ci_ok_check_each_need_explicitly(ci: dict) -> None:
+    """Sans fonction de statut, un if reçoit un success() implicite qui porte sur tous les jobs
+    en amont, même indirects : commitlint et links sont sautés sur un push, release et pypi sur
+    dev ou sans release. Le site (PR #38) puis la release 0.7.0 ont été sautés ainsi. Tout job
+    en aval de ci-ok commence donc par !cancelled() (une annulation ne publie rien) et vérifie
+    le résultat de chacun de ses needs."""
     jobs = ci["jobs"]
-    chain = {"site-prod", "site-preview"}
-    chain |= {name for name in jobs if ancestors(jobs, name) & chain}
-    assert chain == {"site-prod", "site-preview", "site", "deploy", "notify-site"}
-    for name in chain:
+    downstream = {name for name in jobs if "ci-ok" in ancestors(jobs, name)}
+    assert downstream == {
+        "release", "backmerge", "pypi", "notify-release", "notify-pypi",
+        "site-prod", "site-preview", "site", "deploy", "notify-site",
+    }  # fmt: skip
+    for name in downstream:
         condition = " ".join(str(jobs[name].get("if", "")).split())
-        assert condition.startswith("always()"), name
+        assert condition.startswith("!cancelled() && "), name
         for need in needs(jobs[name]):
+            # == 'success', ou success/skipped pour release et pypi en amont du site
             assert f"needs.{need}.result" in condition, (name, need)
+
+
+def test_release_runs_on_main_when_a_version_is_due(ci: dict) -> None:
+    condition = " ".join(ci["jobs"]["release"]["if"].split())
+    assert "github.event_name == 'push' && github.ref == 'refs/heads/main'" in condition
+    assert "needs.build.outputs.released == 'true'" in condition
 
 
 def test_run_name_tells_checks_from_deployments(ci: dict) -> None:
