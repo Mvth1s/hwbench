@@ -94,3 +94,5 @@ conventionnels. Avant
 d'ouvrir une pull request, `scripts/ci-local.sh` reproduit la CI (venv neuf, ruff, mypy, pytest
 avec couverture minimale, pip-audit, build, commitlint). Le titre de la pull request suit
 aussi les conventional commits (il devient le message du commit fusionné). Voir aussi le README pour l'installation de développement.
+
+<!-- PR de test du filtre documentation seule de la CI, fermée sans fusion -->
