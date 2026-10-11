@@ -8,7 +8,7 @@ Rien n'est comparé « à peu près » :
   combiné, les mêmes pondérations).
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -109,11 +109,11 @@ def _delta(value: float, base: float, higher_is_better: bool) -> tuple[float, bo
 def _bench_rows(exports: list[MachineExport]) -> list[BenchRow]:
     by_file = [{r.name: r for r in e.results} for e in exports]
     names: list[str] = []
-    for results in by_file:
-        names += [n for n in results if n not in names]
+    for found in by_file:
+        names += [n for n in found if n not in names]
     first: dict[str, Result] = {}
-    for results in by_file:
-        for name, r in results.items():
+    for found in by_file:
+        for name, r in found.items():
             first.setdefault(name, r)
     names.sort(
         key=lambda n: (CATEGORY_ORDER.index(first[n].category), first[n].backend != "native", n)
@@ -146,11 +146,16 @@ def _bench_rows(exports: list[MachineExport]) -> list[BenchRow]:
                         ref.category,
                         ref.detail_units.get(key, ""),
                         identities,
-                        _cells(results, lambda r, key=key: r.details.get(key)),
+                        _cells(results, _detail(key)),
                         detail=key,
                     )
                 )
     return rows
+
+
+def _detail(key: str) -> Callable[[Result], float | None]:
+    """Valeur d'un détail (débit, IOPS) d'un résultat, None s'il ne l'a pas."""
+    return lambda r: r.details.get(key)
 
 
 def _cells(results: list[Result | None], value_of: Callable[[Result], float | None]) -> list[Cell]:
@@ -179,7 +184,7 @@ def _composition(score: CategoryScore | CombinedScore) -> list[BackendId]:
 
 
 def _score_cells(
-    exports: list[MachineExport], scores: list[CategoryScore | CombinedScore | None]
+    exports: list[MachineExport], scores: Sequence[CategoryScore | CombinedScore | None]
 ) -> list[Cell]:
     base_export, base = exports[0], scores[0]
     cells = []

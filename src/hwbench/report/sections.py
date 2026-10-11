@@ -219,7 +219,7 @@ def conditions(ctx: Context) -> str:
     if not states:
         return ""
     first = ctx.session.results[0].state_before
-    rows = []
+    rows: list[tuple[str, str | None, Status, str]] = []
 
     on_ac = {st.on_ac for st in states}
     if on_ac == {True}:

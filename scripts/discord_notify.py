@@ -28,6 +28,7 @@ import sys
 import time
 from collections.abc import Callable, Iterable
 from datetime import UTC, date, datetime
+from functools import partial
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -367,7 +368,7 @@ def find_pull_request(event: dict[str, Any], api: Api) -> dict[str, Any] | None:
 
 
 def _pr_line(run: dict[str, Any], pr: dict[str, Any] | None) -> str:
-    title = escape_md(truncate(pr.get("title") if pr else run.get("display_title") or "", 200))
+    title = escape_md(truncate((pr.get("title") if pr else run.get("display_title")) or "", 200))
     if not pr:
         return title or "pull request introuvable"
     return link(f"\\#{int(pr['number'])} {title}", pr.get("html_url"))
@@ -579,6 +580,12 @@ def arch_version(search: dict[str, Any], package: str) -> str | None:
     return None
 
 
+def arch_package_version(package: str) -> str | None:
+    """pkgver du paquet, d'après l'API de recherche d'archlinux.org."""
+    url = f"https://archlinux.org/packages/search/json/?name={quote(package)}"
+    return arch_version(fetch_json(url), package)
+
+
 def ci_python_versions(ci_yaml: str) -> list[str]:
     """Versions de la matrice python-version de ci.yml (liste en ligne, seule forme utilisée)."""
     match = re.search(r"python-version:\s*\[([^\]]*)\]", ci_yaml)
@@ -707,7 +714,7 @@ def hebdo_stats(repo: str, results_dir: Path, api: Api, fetch: Api) -> dict[str,
         "stars": _safely("dépôt", lambda: api(f"/repos/{repo}")["stargazers_count"]),
         "open_prs": _safely("PR ouvertes", lambda: count("pr")),
         "open_issues": _safely("issues ouvertes", lambda: count("issue")),
-        "ci": {b: _safely(f"CI {b}", lambda b=b: latest_ci(b)) for b in WATCHED_BRANCHES[::-1]},
+        "ci": {b: _safely(f"CI {b}", partial(latest_ci, b)) for b in WATCHED_BRANCHES[::-1]},
         "machines": _safely("results/", lambda: len(list(results_dir.glob("*.json")))),
         "release": _safely("release", lambda: api(f"/repos/{repo}/releases/latest")),
     }
@@ -746,9 +753,7 @@ def build(args: argparse.Namespace) -> tuple[str, list[dict[str, Any]]]:
         arch = {
             backend: _safely(
                 f"Arch Linux ({package})",
-                lambda p=package: arch_version(
-                    fetch_json(f"https://archlinux.org/packages/search/json/?name={p}"), p
-                ),
+                partial(arch_package_version, package),
             )
             for backend, package in ARCH_PACKAGES.items()
         }
