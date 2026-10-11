@@ -198,8 +198,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          # pas de cache : ce job produit un artefact publié (cache poisoning)
 
       - name: Version construite
         id: version
@@ -548,8 +547,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          # pas de cache : ce job produit un artefact publié (cache poisoning)
 
       - name: Installer hwbench (wheel testée sur main, sources de main sinon)
         run: |
@@ -618,8 +616,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          # pas de cache : ce job produit un artefact publié (cache poisoning)
 
       - name: Installer hwbench (wheel testée sur dev, sources de dev sinon)
         run: |

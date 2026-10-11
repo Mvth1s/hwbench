@@ -77,12 +77,21 @@ def test_id_token_only_where_it_is_needed() -> None:
     assert jobs == {"ci.yml:release", "ci.yml:pypi", "ci.yml:deploy"}
 
 
-def test_pip_is_cached_wherever_python_is_set_up() -> None:
+# produisent le dist publié (PyPI, GitHub Release) ou le site déployé : aucun cache restauré
+PUBLISHING = {"ci.yml:build", "ci.yml:site-prod", "ci.yml:site-preview"}
+
+
+def test_pip_is_cached_except_where_a_published_artifact_is_built() -> None:
+    seen = set()
     for path in FILES:
         for name, job in load(path)["jobs"].items():
             for step in job.get("steps", []):
                 if "actions/setup-python@" in step.get("uses", ""):
-                    assert step["with"].get("cache") == "pip", f"{path.name}:{name}"
+                    key = f"{path.name}:{name}"
+                    seen.add(key)
+                    expected = None if key in PUBLISHING else "pip"
+                    assert step["with"].get("cache") == expected, key
+    assert seen >= PUBLISHING
 
 
 def test_no_path_filter_can_leave_ci_ok_pending(ci: dict) -> None:
