@@ -1,46 +1,359 @@
-"""Site statique du classement : index.html (classements par catégorie) + une page par machine.
+"""Site statique du classement (GitHub Pages), rendu par des templates Jinja2.
 
-HTML et CSS intégrés (moteur commun report/html.py), sans JavaScript (onglets en CSS pur). La
-page machine assemble les sections du rapport (report/sections.py), sans recommandations ni
-JSON embarqué, avec les seuils par défaut. Les points sont recalculés à partir des résultats
-bruts contre la référence actuelle du paquet, jamais repris de l'export. Tout texte venu d'un
-export passe par html.escape (un export peut venir de n'importe qui).
+Pages : index.html (classement combiné) et une page par catégorie classée (cpu-single.html,
+cpu-multi.html, gpu.html : onglets lisibles sans JavaScript), une page par machine, data.json et
+classement.csv. CSS, JavaScript, polices et images sont des fichiers statiques du paquet
+(leaderboard/static/), copiés dans <out>/assets/ ; aucune ressource externe. Chaque page est
+complète sans JavaScript, qui n'ajoute que tri, filtres, pagination, bascule de thème et popups.
+
+Les points sont recalculés à partir des résultats bruts contre la référence actuelle du paquet,
+jamais repris de l'export (entries.py). Jinja échappe tout texte (autoescape) : un export peut
+venir de n'importe qui. Les textes du site viennent du catalogue (catalog.py).
 """
 
-from collections.abc import Iterable
-from dataclasses import dataclass, replace
+import json
+import math
+import shutil
+from dataclasses import replace
 from datetime import UTC, datetime
+from importlib.resources import files
+from importlib.resources.abc import Traversable
 from pathlib import Path
+from typing import Any
 
+from jinja2 import Environment, PackageLoader, StrictUndefined, select_autoescape
+from markupsafe import Markup
+
+from hwbench import __version__
 from hwbench.analysis import analyze
-from hwbench.display.fmt import compact, fr_date, num
-from hwbench.export import ExportError, MachineExport, from_dict
+from hwbench.display.fmt import compact, fr_date, grouped, num
 from hwbench.labels import CATEGORY_LABELS
-from hwbench.leaderboard.validate import (
-    SubmissionError,
-    read_bounded,
-    resolves_to_itself,
-    stale_reference,
-    strict_json,
+from hwbench.leaderboard import charts
+from hwbench.leaderboard.catalog import (
+    FR,
+    GITHUB,
+    category_label,
+    machines,
+    unranked_machines,
+)
+from hwbench.leaderboard.entries import (
+    INFO_CATEGORIES,
+    Entry,
+    category_points,
+    load_entries,
+    ranking,
+)
+from hwbench.leaderboard.views import (
+    CATEGORY_KEYS,
+    PAGE_FILES,
+    MachineView,
+    csv_text,
+    data_json,
+    machine_view,
+    median,
+    ranked,
 )
 from hwbench.report.html import e, page
 from hwbench.report.sections import Context, render_sections
-from hwbench.report.texts import plural
-from hwbench.results import COMBINED_CATEGORIES, Category, gpu_name
+from hwbench.results import COMBINED_CATEGORIES, Category
 from hwbench.runner import RunSettings
-from hwbench.scoring import Reference, Scores, score_results
+from hwbench.scoring import Reference
 
-# Mémoire et disque : colonnes d'information, jamais classées ni dans le combiné
-INFO_CATEGORIES = tuple(c for c in Category if c not in COMBINED_CATEGORIES)
+__all__ = ["Entry", "build_site", "category_points", "load_entries", "ranking", "settings_note"]
+
+ENV = Environment(
+    loader=PackageLoader("hwbench.leaderboard", "templates"),
+    autoescape=select_autoescape(default=True, default_for_string=True),
+    undefined=StrictUndefined,
+    trim_blocks=True,
+    lstrip_blocks=True,
+    keep_trailing_newline=True,
+)
+
+# Pages du site, dans l'ordre de la navigation : fichier de sortie. Seules les pages déjà
+# générées (PAGES) apparaissent dans la navigation et le pied de page.
+PAGE_HREFS = {
+    "classement": "index.html",
+    "comparaison": "comparaison.html",
+    "methodologie": "methodologie.html",
+    "soumettre": "soumettre.html",
+    "mentions": "mentions-legales.html",
+}
+PAGES = frozenset({"classement"})
+CONTRIBUTING = f"{GITHUB}/blob/main/CONTRIBUTING.md"
+HIST_MIN = 10  # machines classées à partir desquelles la distribution est tracée
+INFO_TOP = 8  # machines affichées par graphique mémoire / disque
+KIND_MARKS = {"desktop": "●", "laptop": "■"}
+REL_MARKS = {"ok": "●", "check": "▲"}
+ROBOTS = "User-agent: *\nDisallow: /\n"
 
 
-@dataclass(frozen=True)
-class Entry:
-    slug: str  # nom du fichier sans .json (validé : minuscules, chiffres, tirets)
-    export: MachineExport
-    scores: Scores
-    stale: bool = False  # noté contre une référence antérieure : à ré-exporter
+def _json_script(data: object) -> Markup:
+    """JSON à placer dans un <script type="application/json"> : <, > et & échappés, aucune
+    chaîne ne peut fermer la balise."""
+    text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    for char, code in (("<", "\\u003c"), (">", "\\u003e"), ("&", "\\u0026")):
+        text = text.replace(char, code)
+    return Markup(text)
 
+
+def _href(key: str, root: str) -> str | None:
+    return root + PAGE_HREFS[key] if key in PAGES else None
+
+
+def _common(
+    page_key: str, title: str, root: str, generated: datetime, preview: bool
+) -> dict[str, Any]:
+    """Contexte commun à toutes les pages (layout, en-tête, pied de page)."""
+    t = FR
+    links = {key: _href(key, root) for key in PAGE_HREFS}
+    nav = [
+        {"key": key, "href": href, "label": t["header"]["nav"][key]}
+        for key in ("classement", "comparaison", "methodologie", "soumettre")
+        if (href := links[key])
+    ]
+    flinks = t["footer"]["links"]
+    rank_col = [
+        {"href": href, "label": flinks[key], "external": False}
+        for key in ("classement", "comparaison", "methodologie", "soumettre")
+        if (href := links[key])
+    ]
+    if not links["soumettre"]:
+        rank_col.append({"href": CONTRIBUTING, "label": flinks["contributing"], "external": True})
+    project = [
+        {"href": href, "label": flinks[key], "external": True}
+        for key, href in (
+            ("github", GITHUB),
+            ("issues", f"{GITHUB}/issues"),
+            ("releases", f"{GITHUB}/releases"),
+            ("license", f"{GITHUB}/blob/main/LICENSE"),
+        )
+    ]
+    columns = [
+        {"title": t["footer"]["col_rank"], "links": rank_col},
+        {"title": t["footer"]["col_project"], "links": project},
+    ]
+    if links["mentions"]:
+        columns.append(
+            {
+                "title": t["footer"]["col_legal"],
+                "links": [
+                    {"href": f"{links['mentions']}#{anchor}", "label": flinks[anchor]}
+                    | {"external": False}
+                    for anchor in ("mentions", "confidentialite", "accessibilite", "cookies")
+                ],
+            }
+        )
+    return {
+        "t": t,
+        "page": page_key,
+        "title": title,
+        "root": root,
+        "assets": root + "assets/",
+        "preview": preview,
+        "version": __version__,
+        "generated_txt": generated.strftime("%d/%m/%Y %H:%M"),
+        "generated_day": generated.date().isoformat(),
+        "links": links,
+        "nav": nav,
+        "footer_columns": columns,
+        "submit_href": links["soumettre"] or CONTRIBUTING,
+        "cv_threshold": compact(RunSettings().high_variance_cv_percent),
+        "tip_keys": [],
+        "i18n_json": _json_script(t["js"]),
+    }
+
+
+def _frac(value: float, top: float) -> str:
+    return f"{max(0.004, value / top if top else 0.0):.4f}"
+
+
+def _row(rank: int | None, v: MachineView, key: str, top: float) -> dict[str, Any]:
+    score = v.points[key]
+    rel = "ok" if v.reliable else "check"
+    return {
+        "rank": rank,
+        "rank_txt": f"{rank:02d}" if rank else "—",
+        "href": f"machines/{v.slug}.html",
+        "name": v.name,
+        "cpu": v.cpu or "—",
+        "gpu": v.gpu or "—",
+        "kind": v.kind,
+        "kind_mark": KIND_MARKS[v.kind],
+        "kind_label": FR["kinds"][v.kind],
+        "cpu_brand": v.cpu_brand,
+        "gpu_brand": v.gpu_brand or "",
+        "score": None if score is None else grouped(score),
+        "score_raw": "" if score is None else f"{score:.1f}",
+        "frac": _frac(score or 0.0, top),
+        "rel": rel,
+        "rel_mark": REL_MARKS[rel],
+        "rel_label": FR["reliability"][rel],
+        "cv": "" if v.cv_max is None else f"{v.cv_max:.2f}",
+        "stale": v.stale,
+        "date": v.date or "",
+        "date_txt": fr_date(v.date) or "—",
+    }
+
+
+def _bars(views: list[MachineView], value: Any, scale: float = 1.0, suffix: str = "") -> list:
+    """Barres d'information (mémoire, disque) : meilleures machines, valeur brute."""
+    measured = sorted(
+        ((v, x) for v in views if (x := value(v)) is not None), key=lambda item: -item[1]
+    )[:INFO_TOP]
+    top = measured[0][1] if measured else 0.0
+    return [
+        {"label": v.name, "frac": _frac(x, top), "display": grouped(x / scale) + suffix}
+        for v, x in measured
+    ]
+
+
+def classement_context(
+    views: list[MachineView],
+    key: str,
+    reference: Reference,
+    generated: datetime,
+    skipped: list[str],
+    preview: bool,
+) -> dict[str, Any]:
+    c = FR["classement"]
+    label = category_label(key)
+    title = c["title"].replace("{category}", label)
+    ctx = _common("classement", title, "", generated, preview)
+    ctx["tip_keys"] = ["points", "geomean", "cv", "fio", "iops"]
+    table = ranked(views, key)
+    scores = [s for _, v in table if (s := v.points[key]) is not None]
+    top = scores[0] if scores else 0.0
+    podium = []
+    for pos in (1, 2, 3):
+        if pos <= len(scores):
+            v = table[pos - 1][1]
+            podium.append(
+                {
+                    "pos": pos,
+                    "filled": True,
+                    "href": f"machines/{v.slug}.html",
+                    "name": v.name,
+                    "sub": f"{v.cpu or '—'} · {v.gpu or '—'}",
+                    "score": grouped(scores[pos - 1]),
+                    "score_raw": f"{scores[pos - 1]:.1f}",
+                }
+            )
+        else:
+            podium.append({"pos": pos, "filled": False})
+    med = median(scores)
+    hist = None
+    if len(scores) >= HIST_MIN and med is not None:
+        hist = charts.histogram(scores, med, f"{c['hist_h']} · {label}", FR["charts"]["median"])
+    if not scores:
+        hist_few = c["few_none"]
+    else:
+        hist_few = (
+            c["few"]
+            .replace("{min}", str(HIST_MIN))
+            .replace("{machines}", machines(len(scores)))
+            .replace("{median}", grouped(med or 0.0))
+        )
+    cats = [cat.value for cat in COMBINED_CATEGORIES]
+    full = [v for v in views if all(v.points[k] is not None for k in cats)]
+    points = [
+        charts.Point(
+            math.sqrt((v.points[cats[0]] or 0.0) * (v.points[cats[1]] or 0.0)),
+            v.points[cats[2]] or 0.0,
+            v.kind,
+            v.name,
+        )
+        for v in full
+    ]
+    ch = FR["charts"]
+    scatter = (
+        charts.scatter(points, c["scatter_caption"], ch["x_cpu"], ch["y_gpu"], ch["reference"])
+        if points
+        else None
+    )
+    unranked = len(table) - len(scores)
+    note = ""
+    if unranked:
+        note = c["unranked_note"].replace("{machines}", unranked_machines(unranked))
+        note += (c["unranked_note_combined"] if key == "combined" else "") + "."
+    missing = sum(1 for v in views if v.memory_mibs is None and v.disk_seq_mibs is None)
+    ctx.update(
+        category=key,
+        category_label=label,
+        kicker=c["kicker"]
+        .replace("{machines}", machines(len(views)))
+        .replace("{date}", fr_date(generated.date().isoformat()) or ""),
+        reference_machine=reference.machine,
+        tabs=[
+            {
+                "href": PAGE_FILES[k],
+                "label": category_label(k),
+                "short": c["short"][k],
+                "current": k == key,
+            }
+            for k in CATEGORY_KEYS
+        ],
+        podium=podium,
+        rows=[_row(rank, v, key, top) for rank, v in table],
+        unranked_note=note,
+        hist=hist,
+        hist_few=hist_few,
+        scatter=scatter,
+        scatter_rows=[{"label": p.label, "x": grouped(p.x), "y": grouped(p.y)} for p in points],
+        info_blocks=[
+            {
+                "title": c["mem_h"],
+                "unit": c["mem_unit"],
+                "tip": None,
+                "rows": _bars(views, lambda v: v.memory_mibs),
+            },
+            {
+                "title": c["seq_h"],
+                "unit": c["seq_unit"],
+                "tip": None,
+                "rows": _bars(views, lambda v: v.disk_seq_mibs),
+            },
+            {
+                "title": c["rand_h"],
+                "unit": c["rand_unit"],
+                "tip": "iops",
+                "rows": _bars(views, lambda v: v.disk_rand_iops, 1000.0, " k"),
+            },
+        ],
+        info_missing=c["info_missing"].replace("{machines}", machines(missing)) if missing else "",
+        skipped=skipped,
+    )
+    return ctx
+
+
+def render_classement(
+    views: list[MachineView],
+    key: str,
+    reference: Reference,
+    generated: datetime,
+    skipped: list[str] | None = None,
+    preview: bool = False,
+) -> str:
+    ctx = classement_context(views, key, reference, generated, skipped or [], preview)
+    return ENV.get_template("classement.html").render(ctx)
+
+
+def _copy_tree(source: Traversable, target: Path) -> None:
+    target.mkdir(parents=True, exist_ok=True)
+    for item in source.iterdir():
+        if item.is_dir():
+            _copy_tree(item, target / item.name)
+        elif not item.name.startswith("."):
+            with item.open("rb") as src, (target / item.name).open("wb") as dst:
+                shutil.copyfileobj(src, dst)
+
+
+def copy_assets(out_dir: Path) -> None:
+    """CSS, JavaScript, polices et images du paquet -> <out>/assets/."""
+    _copy_tree(files("hwbench.leaderboard") / "static", out_dir / "assets")
+
+
+# --- Page machine : rendu du rapport (report/), provisoire jusqu'à la page machine du design ---
 
 STALE_BADGE = '<span class="status status-check">à ré-exporter</span>'
 STALE_NOTE = (
@@ -48,41 +361,6 @@ STALE_NOTE = (
     "recalculés contre la référence actuelle à partir de ses résultats bruts ; les benchs dont "
     "la version d'outil ou de protocole a changé depuis ne sont pas notés."
 )
-
-
-def load_entries(results_dir: Path, reference: Reference) -> tuple[list[Entry], list[str]]:
-    """Exports lisibles du dossier, et la liste des fichiers ignorés (avec la raison)."""
-    entries, skipped = [], []
-    if not resolves_to_itself(results_dir):
-        return [], [f"{results_dir} : lien symbolique refusé, aucun résultat lu"]
-    for path in sorted(results_dir.glob("*.json")):
-        try:
-            export = from_dict(strict_json(read_bounded(path)))
-        except (SubmissionError, ExportError, UnicodeDecodeError, ValueError) as exc:
-            skipped.append(f"{path.name} : {exc}")
-            continue
-        scores = score_results(export.results, reference)
-        entries.append(Entry(path.stem, export, scores, stale_reference(export, reference)))
-    return entries, skipped
-
-
-def category_points(entry: Entry, category: Category | None) -> float | None:
-    """Points de la catégorie, ou du combiné (None) s'il porte sur toutes les catégories."""
-    if category is None:
-        combined = entry.scores.combined
-        # un combiné sans GPU n'a pas la même composition que la référence : pas classé
-        if combined is None or combined.gpu_missing:
-            return None
-        return combined.points
-    score = next((c for c in entry.scores.categories if c.category is category), None)
-    return score.points if score else None
-
-
-def ranking(entries: Iterable[Entry], category: Category | None) -> list[tuple[Entry, float]]:
-    ranked = [
-        (entry, p) for entry in entries if (p := category_points(entry, category)) is not None
-    ]
-    return sorted(ranked, key=lambda item: (-item[1], item[0].slug))
 
 
 def info_value(entry: Entry, category: Category) -> str | None:
@@ -103,15 +381,6 @@ def info_value(entry: Entry, category: Category) -> str | None:
         ]
         return " · ".join(p for p in parts if p) or None
     return None
-
-
-def _gpu(export: MachineExport) -> str | None:
-    gpu = export.snapshot.gpu
-    return (
-        gpu.opengl_renderer
-        or gpu.vulkan_device_name
-        or (gpu.pci_devices[0].model if gpu.pci_devices else None)
-    )
 
 
 # Preview (branche dev, publiée sous /preview/ du site) : bandeau en tête de chaque page, lien
@@ -148,107 +417,6 @@ def _page(title: str, body: str, generated: datetime, preview: bool = False, roo
         "résultat</a>"
     )
     return page(title, body, footer, noindex=preview)
-
-
-def _reference_block(reference: Reference) -> str:
-    rows = "".join(
-        f"<tr><td>{e(entry.id.name)}</td><td>v{e(entry.id.version)}</td>"
-        f"<td>{e(entry.tool_version or '—')}</td><td>{e(entry.id.presentation or '—')}</td>"
-        f"<td>{e(CATEGORY_LABELS[entry.category])}</td></tr>"
-        for entry in reference.entries
-    )
-    return f"""<h2>Référence et versions</h2>
-<p>Chaque bench vaut <strong>1000 points</strong> sur la machine de référence
-<strong>{e(reference.machine)}</strong> (mesurée le {e(fr_date(reference.created))},
-empreinte <code>{e(reference.digest[:19])}</code>). Seuls les résultats obtenus avec les mêmes
-versions de protocole, d'outil et le même mode de présentation sont notés.</p>
-<table><thead><tr><th>Bench</th><th>Protocole</th><th>Outil</th><th>Présentation</th>
-<th>Catégorie</th></tr></thead><tbody>{rows}</tbody></table>"""
-
-
-def _ranking_table(ranked: list[tuple[Entry, float]]) -> str:
-    if not ranked:
-        return '<p class="muted">Aucune machine classée dans cette catégorie.</p>'
-    rows = []
-    for rank, (entry, points) in enumerate(ranked, start=1):
-        ex = entry.export
-        rows.append(
-            f'<tr><td class="num">{rank}</td>'
-            f'<td><a href="machines/{e(entry.slug)}.html">{e(ex.machine)}</a>'
-            + (f" {STALE_BADGE}" if entry.stale else "")
-            + "</td>"
-            # nom normalisé (sans pilote, noyau ni DRM), casse d'origine
-            f"<td>{e(ex.snapshot.cpu.model or '?')}</td><td>{e(gpu_name(_gpu(ex)) or '?')}</td>"
-            f'<td class="num"><strong>{e(num(points, 0))}</strong></td>'
-            + "".join(
-                f'<td class="num small">{e(info_value(entry, c) or "—")}</td>'
-                for c in INFO_CATEGORIES
-            )
-            + f'<td class="small muted">{e(fr_date(ex.created))}</td></tr>'
-        )
-    info_headers = "".join(f'<th class="num">{e(CATEGORY_LABELS[c])}</th>' for c in INFO_CATEGORIES)
-    return (
-        '<table><thead><tr><th class="num">#</th><th>Machine</th><th>CPU</th><th>GPU</th>'
-        f'<th class="num">Points</th>{info_headers}<th>Date</th></tr></thead><tbody>'
-        + "".join(rows)
-        + "</tbody></table>"
-        + '<p class="muted small">Mémoire (bande passante de copie multi-processus) et disque '
-        "(lecture séquentielle, lecture aléatoire 4K) : colonnes d'information, hors classement "
-        "et hors score combiné.</p>"
-    )
-
-
-def render_index(
-    entries: list[Entry],
-    reference: Reference,
-    skipped: list[str],
-    generated: datetime,
-    preview: bool = False,
-) -> str:
-    tabs: list[tuple[str, str, Category | None]] = [("combined", "Score combiné", None)]
-    tabs += [(c.value, CATEGORY_LABELS[c], c) for c in COMBINED_CATEGORIES]
-    radios = "".join(
-        f'<input type="radio" name="cat" id="tab-{key}"{" checked" if i == 0 else ""}>'
-        f'<label for="tab-{key}">{e(label)}</label>'
-        for i, (key, label, _) in enumerate(tabs)
-    )
-    panels = []
-    for key, label, category in tabs:
-        ranked = ranking(entries, category)
-        unranked = len(entries) - len(ranked)
-        unranked_text = plural(unranked, "machine non classée", "machines non classées")
-        note = (
-            f'<p class="muted small">{unranked_text} ici : catégorie non '
-            "mesurée, non comparable à la référence"
-            + (", ou score combiné calculé sans GPU" if category is None else "")
-            + ".</p>"
-            if unranked
-            else ""
-        )
-        panels.append(
-            f'<section class="panel" id="panel-{key}"><h2>{e(label)}</h2>'
-            f"{_ranking_table(ranked)}{note}</section>"
-        )
-    skipped_html = (
-        "<h2>Fichiers ignorés</h2><ul>" + "".join(f"<li>{e(s)}</li>" for s in skipped) + "</ul>"
-        if skipped
-        else ""
-    )
-    stale_html = (
-        f'<p class="muted small">{STALE_BADGE} : fichier {STALE_NOTE}</p>'
-        if any(entry.stale for entry in entries)
-        else ""
-    )
-    count = plural(len(entries), "machine", "machines")
-    body = f"""<h1>hwbench · classement</h1>
-<p class="muted">{count}. Benchmarks CPU et GPU notés contre une machine de
-référence (1000 points). Score combiné : moyenne géométrique des trois catégories. Mémoire et
-disque : information, hors classement.</p>
-<div class="tabs">{radios}{"".join(panels)}</div>
-{stale_html}
-{_reference_block(reference)}
-{skipped_html}"""
-    return _page("hwbench · classement", body, generated, preview)
 
 
 SETTING_LABELS = {
@@ -345,16 +513,23 @@ def build_site(
     du site officiel (bandeau, titres préfixés, noindex, robots.txt)."""
     generated = generated or datetime.now(UTC)
     entries, skipped = load_entries(results_dir, reference)
+    views = [machine_view(entry) for entry in entries]
     (out_dir / "machines").mkdir(parents=True, exist_ok=True)
-    (out_dir / "index.html").write_text(
-        render_index(entries, reference, skipped, generated, preview), encoding="utf-8"
-    )
+    copy_assets(out_dir)
+    for key in CATEGORY_KEYS:
+        html = render_classement(views, key, reference, generated, skipped, preview)
+        (out_dir / PAGE_FILES[key]).write_text(html, encoding="utf-8")
     for entry in entries:
         (out_dir / "machines" / f"{entry.slug}.html").write_text(
             render_machine(entry, reference, generated, preview), encoding="utf-8"
         )
+    (out_dir / "data.json").write_text(
+        json.dumps(data_json(views, reference, generated), ensure_ascii=False, indent=1) + "\n",
+        encoding="utf-8",
+    )
+    (out_dir / "classement.csv").write_text(csv_text(views), encoding="utf-8")
     # GitHub Pages : pas de traitement Jekyll
     (out_dir / ".nojekyll").write_text("", encoding="utf-8")
     if preview:
-        (out_dir / "robots.txt").write_text(PREVIEW_ROBOTS, encoding="utf-8")
+        (out_dir / "robots.txt").write_text(ROBOTS, encoding="utf-8")
     return entries

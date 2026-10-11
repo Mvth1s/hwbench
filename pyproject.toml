@@ -32,6 +32,8 @@ dependencies = [
     "rich>=13.7",
     "psutil>=5.9",
     "py-cpuinfo>=9.0",
+    # site du classement (templates)
+    "jinja2>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -61,7 +63,17 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 # référence du scoring, générée sur la machine de référence par `hwbench reference`
-hwbench = ["data/*.json"]
+hwbench = [
+    "data/*.json",
+    # site du classement : templates Jinja2 et assets statiques (la CI génère depuis la wheel)
+    "leaderboard/templates/*.html",
+    "leaderboard/templates/partials/*.html",
+    "leaderboard/static/*.css",
+    "leaderboard/static/*.js",
+    "leaderboard/static/*.svg",
+    "leaderboard/static/fonts/*",
+    "leaderboard/static/img/*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

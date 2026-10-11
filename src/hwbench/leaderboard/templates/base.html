@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="{{ t.lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+{% if preview %}<meta name="robots" content="noindex, nofollow">
+{% endif %}<title>{% if preview %}{{ t.preview.title_prefix }}{% endif %}{{ title }} · {{ t.site.title_suffix }}</title>
+<meta name="description" content="{{ t.site.description }}">
+<link rel="icon" href="{{ assets }}favicon.svg" type="image/svg+xml">
+<link rel="preload" href="{{ assets }}fonts/SchibstedGrotesk-400_700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{{ assets }}hwbench.css">
+<script>document.documentElement.classList.add("js");try{var m=localStorage.getItem("hwbench.theme");if(m==="light"||m==="dark")document.documentElement.dataset.theme=m}catch(e){}</script>
+<script type="module" src="{{ assets }}hwbench.js"></script>
+</head>
+<body>
+<a class="hw-skip" href="#main">{{ t.site.skip }}</a>
+<div class="hw-page" id="top">
+{% if preview %}<p class="hw-preview">{{ t.preview.banner }} <a href="{{ root }}../index.html">{{ t.preview.banner_link }}</a>.</p>
+{% endif %}{% include "partials/header.html" %}
+<main id="main">
+{% block main %}{% endblock %}
+</main>
+{% include "partials/footer.html" %}
+</div>
+{% for key in tip_keys %}{% set tip = t.tips.entries[key] %}<template id="tip-{{ key }}"><strong class="hw-pop__title">{{ tip.t }}</strong><p>{{ tip.d }}</p><p class="hw-pop__why"><strong>{{ t.tips.why }} · </strong>{{ tip.w | replace("{cv}", cv_threshold) }}</p>{% if tip.e %}<p class="hw-pop__ex"><strong>{{ t.tips.example }} · </strong>{{ tip.e }}</p>{% endif %}{% if tip.links %}<ul class="hw-pop__links">{% for label, href in tip.links %}<li><a href="{{ href }}" rel="noopener">{{ label }} ↗</a></li>{% endfor %}</ul>{% endif %}</template>
+{% endfor %}<script type="application/json" id="hw-i18n">{{ i18n_json }}</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<footer class="hw-footer">
+  <div class="hw-footer__main">
+    <div class="hw-footer__brand">
+      <span class="hw-logo">{{ t.site.name }}</span>
+      <p>{{ t.footer.pitch }}</p>
+      <a class="hw-btn hw-btn--primary" href="{{ submit_href }}">{{ t.footer.submit }}<span class="hw-btn__icon" aria-hidden="true">→</span></a>
+    </div>
+    {% for column in footer_columns %}<nav class="hw-footer__col" aria-label="{{ column.title }}">
+      <h2 class="hw-kicker hw-kicker--ink">{{ column.title }}</h2>
+      <ul>{% for item in column.links %}<li><a href="{{ item.href }}"{% if item.external %} rel="noopener"{% endif %}>{{ item.label }}</a></li>{% endfor %}</ul>
+    </nav>
+    {% endfor %}
+  </div>
+  <div class="hw-footer__legal">
+    <p><strong>{{ t.footer.publisher_t }}</strong> {{ t.footer.publisher }}</p>
+    <p><strong>{{ t.footer.host_t }}</strong> {{ t.footer.host }}</p>
+    <p><strong>{{ t.footer.data_t }}</strong> {{ t.footer.data }}</p>
+  </div>
+  <div class="hw-footer__bottom">
+    <span>{{ t.footer.copyright | replace("{date}", generated_txt) }}</span>
+    <span>{{ t.footer.trademarks }}</span>
+    <a href="#top">{{ t.footer.top }}</a>
+  </div>
+</footer>

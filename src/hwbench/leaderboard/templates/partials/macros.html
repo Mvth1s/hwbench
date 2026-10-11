@@ -1,0 +1,16 @@
+{# Bouton « i » : caché sans JavaScript (le texte est dans un <template> de la page). #}
+{% macro tip(key) -%}
+<button type="button" class="hw-i" data-tip="{{ key }}" hidden aria-label="{{ t.tips.aria | replace('{term}', t.tips.entries[key].term) }}" aria-expanded="false">{{ t.tips.button }}</button>
+{%- endmacro %}
+
+{# Barres horizontales (HTML), suivies d'un tableau équivalent masqué. #}
+{% macro bars(rows, caption, unit) -%}
+<figure class="hw-hbars" data-reveal>
+  <div class="hw-hbars__rows" aria-hidden="true">
+    {% for row in rows %}<div class="hw-hbars__row"><span class="hw-hbars__label">{{ row.label }}</span><span class="hw-bar hw-bar--mute"><i style="--f:{{ row.frac }}"></i></span><span class="hw-num">{{ row.display }}</span></div>
+    {% endfor %}
+  </div>
+  <div class="hw-sr"><table><caption>{{ caption }}</caption><thead><tr><th scope="col">{{ t.charts.machine }}</th><th scope="col">{{ t.charts.value }} ({{ unit }})</th></tr></thead>
+  <tbody>{% for row in rows %}<tr><th scope="row">{{ row.label }}</th><td>{{ row.display }}</td></tr>{% endfor %}</tbody></table></div>
+</figure>
+{%- endmacro %}
