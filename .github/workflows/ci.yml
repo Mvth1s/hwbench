@@ -58,6 +58,9 @@ jobs:
 
       # Commit de release (poussé par l'App après une release, déjà construit et testé) :
       # rien ne tourne. Un humain ne peut pas être un acteur « …[bot] ».
+      # PR : le filtre vient du commit de base, jamais de la PR (sinon une PR pourrait le
+      # modifier pour se déclarer « documentation seule » et passer ci-ok sans aucun test).
+      # Filtre absent de la base : tout tourne.
       - name: Fichiers modifiés (documentation seule ?)
         id: filter
         env:
@@ -73,7 +76,13 @@ jobs:
             echo "Commit de release : rien à vérifier"
             result="$(printf 'code=false\ndocs=false')"
           elif [ "$EVENT" = pull_request ]; then
-            result="$(scripts/ci-changes.sh "$PR_BASE" "$PR_HEAD")"
+            filter="$RUNNER_TEMP/ci-changes.sh"
+            if git show "$PR_BASE:scripts/ci-changes.sh" > "$filter" 2>/dev/null; then
+              result="$(bash "$filter" "$PR_BASE" "$PR_HEAD")"
+            else
+              echo "Filtre absent de la branche de base : tout tourne"
+              result="$(printf 'code=true\ndocs=true')"
+            fi
           else
             result="$(scripts/ci-changes.sh "$BEFORE" "$GITHUB_SHA")"
           fi
