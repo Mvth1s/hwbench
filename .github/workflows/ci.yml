@@ -1,4 +1,11 @@
 name: CI
+# titre de chaque run dans l'onglet Actions (le nom du workflow reste « CI » : notify.yml,
+# hebdo et les checks s'y réfèrent)
+run-name: >-
+  ${{ github.event_name == 'pull_request'
+  && format('Vérifications PR #{0}', github.event.pull_request.number)
+  || github.ref == 'refs/heads/main' && 'Déploiement prod'
+  || 'Déploiement dev' }}
 
 # Pipeline unique : vérifications, release, PyPI et site (voir CLAUDE.md, « CI »).
 #

@@ -207,3 +207,11 @@ def test_site_chain_runs_without_a_release(ci: dict) -> None:
         assert condition.startswith("always()"), name
         for need in needs(jobs[name]):
             assert f"needs.{need}.result" in condition, (name, need)
+
+
+def test_run_name_tells_checks_from_deployments(ci: dict) -> None:
+    assert ci["name"] == "CI"  # notify.yml (workflow_run) et les checks s'y réfèrent
+    run_name = " ".join(ci["run-name"].split())
+    assert "format('Vérifications PR #{0}', github.event.pull_request.number)" in run_name
+    assert "github.ref == 'refs/heads/main' && 'Déploiement prod'" in run_name
+    assert run_name.endswith("|| 'Déploiement dev' }}")
