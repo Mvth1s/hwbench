@@ -41,6 +41,9 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
     "types-psutil",
+    "pip-audit>=2.7",
+    "build>=1.2",
+    "twine>=6.1",
 ]
 
 [project.urls]
