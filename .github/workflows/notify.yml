@@ -27,6 +27,7 @@ jobs:
           || github.event.workflow_run.head_branch == 'main')
       && github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read # extraction du script (branche par défaut)
       actions: read # jobs du run et runs précédents
@@ -49,6 +50,7 @@ jobs:
       github.event.workflow_run.name == 'Results'
       && github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read # extraction du script (branche par défaut)
       actions: read # jobs du run de validation
@@ -76,6 +78,7 @@ jobs:
       && github.event.workflow_run.event == 'pull_request'
       && github.event.workflow_run.actor.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read # extraction du script (branche par défaut)
       pull-requests: read # PR liée au run
