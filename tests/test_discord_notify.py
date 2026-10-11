@@ -406,11 +406,16 @@ def test_release_embed() -> None:
     assert "https://pypi.org/project/hwbench/0.5.0/" in values
     assert "pip download hwbench==0.5.0 --no-deps" in values
     assert f"gh attestation verify hwbench-0.5.0-py3-none-any.whl --repo {REPO}" in values
+    # publication PyPI automatique (plus de Required reviewers sur l'environnement pypi)
+    assert "approbation" not in values
+
+
+def test_no_pypi_pending_command() -> None:
+    with pytest.raises(SystemExit):
+        dn.parser().parse_args(["pypi-pending", "--version", "0.5.0", "--run-url", "u"])
 
 
 def test_pypi_and_pages_embeds() -> None:
-    pending = dn.pypi_pending_embed("0.5.0", "https://github.com/x/actions/runs/1")
-    assert "attente" in pending["title"] and pending["url"].endswith("/runs/1")
     assert dn.pypi_published_embed("0.5.0")["url"] == "https://pypi.org/project/hwbench/0.5.0/"
     assert dn.pages_embed("https://mvth1s.github.io/hwbench/")["color"] == dn.GREEN
 
