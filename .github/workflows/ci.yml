@@ -219,7 +219,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           python -m venv "$RUNNER_TEMP/wheel"
-          "$RUNNER_TEMP/wheel/bin/pip" install dist/*.whl pytest
+          "$RUNNER_TEMP/wheel/bin/pip" install dist/*.whl pytest pyyaml # dépendances des tests
           "$RUNNER_TEMP/wheel/bin/python" -I -c 'import hwbench; assert "site-packages" in hwbench.__file__, hwbench.__file__'
           test "$("$RUNNER_TEMP/wheel/bin/hwbench" --version)" = "hwbench $VERSION"
           "$RUNNER_TEMP/wheel/bin/pytest" -q -p no:cacheprovider
