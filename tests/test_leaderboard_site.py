@@ -165,6 +165,15 @@ def test_cli_site(tmp_path, monkeypatch, capsys) -> None:
     assert (out / "index.html").exists()
 
 
+def test_cli_site_preview(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    results = str(results_dir(tmp_path))
+    out = tmp_path / "preview"
+    assert cli.main(["site", "--results", results, "--out", str(out), "--preview"]) == 0
+    assert ROBOTS_META in (out / "index.html").read_text()
+    assert (out / "robots.txt").exists()
+
+
 def test_cli_summary_gives_combined_ranks(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
     d = results_dir(tmp_path)
