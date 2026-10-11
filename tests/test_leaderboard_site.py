@@ -103,6 +103,38 @@ def test_site_files_and_escaping(tmp_path) -> None:
     assert "1 machine non classée ici" in index  # le portable, dans le combiné
 
 
+ROBOTS_META = '<meta name="robots" content="noindex, nofollow">'
+
+
+def test_production_site_has_no_preview_marks(tmp_path) -> None:
+    out = tmp_path / "_site"
+    build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW)
+    assert not (out / "robots.txt").exists()
+    for path in [out / "index.html", *(out / "machines").glob("*.html")]:
+        html = path.read_text()
+        assert ROBOTS_META not in html and "preview-banner" not in html
+        assert "<title>Preview" not in html
+
+
+def test_preview_site_is_marked_and_not_indexed(tmp_path) -> None:
+    out = tmp_path / "_site"
+    build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW, preview=True)
+    assert (out / "robots.txt").read_text() == "User-agent: *\nDisallow: /\n"
+    index = (out / "index.html").read_text()
+    pages = [index, *(p.read_text() for p in (out / "machines").glob("*.html"))]
+    assert len(pages) == 5
+    for html in pages:
+        assert html.count(ROBOTS_META) == 1
+        assert "<title>Preview · " in html
+        # bandeau en tête du contenu, avant le titre de la page
+        assert html.index('class="preview-banner"') < html.index("<h1>")
+    # lien vers le classement officiel, dossier parent de /preview/
+    assert 'href="../index.html">le classement officiel</a>' in index
+    machine_page = (out / "machines" / "rapide.html").read_text()
+    assert 'href="../../index.html">le classement officiel</a>' in machine_page
+    assert 'href="../index.html">← Classement</a>' in machine_page  # reste dans la preview
+
+
 def test_machine_page_details(tmp_path) -> None:
     out = tmp_path / "_site"
     build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW)
