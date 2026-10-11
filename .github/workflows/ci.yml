@@ -330,6 +330,12 @@ jobs:
           fi
 
   # --- push sur main : release, retour vers dev, PyPI ---------------------------------------
+  #
+  # Tous les jobs en aval de ci-ok commencent par !cancelled() et vérifient le résultat de
+  # chacun de leurs needs : sans fonction de statut, un if reçoit un success() implicite qui
+  # porte sur TOUS les jobs en amont, même indirects. commitlint et links sont sautés sur un
+  # push, release et pypi sur dev ou sans release : le job serait sauté. !cancelled() plutôt
+  # que always() : une annulation du run ne lance ni publication ni déploiement.
 
   # Commit « chore(release): X.Y.Z », tag et GitHub Release par semantic-release (sans
   # reconstruire), avec le jeton de l'App de release (contourne la protection de main, et ses
@@ -338,7 +344,8 @@ jobs:
   release:
     needs: [build, ci-ok]
     if: >-
-      github.event_name == 'push' && github.ref == 'refs/heads/main'
+      !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && needs.build.result == 'success' && needs.ci-ok.result == 'success'
       && needs.build.outputs.released == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -421,6 +428,7 @@ jobs:
   # pour que la CI de la PR tourne. À fusionner en merge commit, jamais en squash.
   backmerge:
     needs: release
+    if: "!cancelled() && needs.release.result == 'success'"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: release
@@ -449,6 +457,7 @@ jobs:
 
   pypi:
     needs: release
+    if: "!cancelled() && needs.release.result == 'success'"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Required reviewers sur l'environnement : la publication attend une approbation manuelle
@@ -472,6 +481,7 @@ jobs:
   # « publié sur PyPI » (#deploiements). Un échec de notification ne fait jamais rien échouer.
   notify-release:
     needs: release
+    if: "!cancelled() && needs.release.result == 'success'"
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -499,6 +509,8 @@ jobs:
 
   notify-pypi:
     needs: [release, pypi]
+    if: >-
+      !cancelled() && needs.release.result == 'success' && needs.pypi.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -527,7 +539,7 @@ jobs:
   site-prod:
     needs: [build, ci-ok, release, pypi]
     if: >-
-      always() && github.event_name == 'push'
+      !cancelled() && github.event_name == 'push'
       && needs.build.result == 'success' && needs.ci-ok.result == 'success'
       && contains(fromJSON('["success", "skipped"]'), needs.release.result)
       && contains(fromJSON('["success", "skipped"]'), needs.pypi.result)
@@ -599,7 +611,7 @@ jobs:
   site-preview:
     needs: [build, ci-ok, release, pypi]
     if: >-
-      always() && github.event_name == 'push'
+      !cancelled() && github.event_name == 'push'
       && needs.build.result == 'success' && needs.ci-ok.result == 'success'
       && contains(fromJSON('["success", "skipped"]'), needs.release.result)
       && contains(fromJSON('["success", "skipped"]'), needs.pypi.result)
@@ -648,12 +660,10 @@ jobs:
           retention-days: 1
 
   # Assemblage sans exécuter de code du dépôt : prod à la racine, preview sous /preview/.
-  # always() + résultat explicite : sans if, un job est sauté dès qu'un job en amont, même
-  # indirect, l'a été (release et pypi sont sautés sur dev et sur main sans release).
   site:
     needs: [site-prod, site-preview]
     if: >-
-      always() && needs.site-prod.result == 'success'
+      !cancelled() && needs.site-prod.result == 'success'
       && needs.site-preview.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -674,7 +684,7 @@ jobs:
 
   deploy:
     needs: site
-    if: always() && needs.site.result == 'success'
+    if: "!cancelled() && needs.site.result == 'success'"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # un déploiement à la fois (dev et main publient le même site)
@@ -698,7 +708,7 @@ jobs:
   notify-site:
     needs: [site-prod, deploy]
     if: >-
-      always() && github.ref == 'refs/heads/main'
+      !cancelled() && github.ref == 'refs/heads/main'
       && needs.site-prod.result == 'success' && needs.deploy.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
