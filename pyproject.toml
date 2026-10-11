@@ -71,6 +71,8 @@ branch = true
 
 [tool.coverage.report]
 skip_empty = true
+# la CI échoue sous ce seuil (95 % en octobre 2026, sur Python 3.11 à 3.14)
+fail_under = 94
 
 [tool.ruff]
 line-length = 100
