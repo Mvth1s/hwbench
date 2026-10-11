@@ -18,14 +18,17 @@ from html import escape as html_escape
 from pathlib import Path
 
 import pytest
-from conftest import make_result
+from conftest import COOL_AC_STATE, make_result
 from test_fixtures_privacy import _live_identifiers
 from test_leaderboard_site import EVIL
-from test_scoring import REFERENCE, snapshot
+from test_scoring import REFERENCE, machine, snapshot
 
 from hwbench import __version__, privacy
 from hwbench.export import build_export, load_export, to_dict, write_export
 from hwbench.report import DEFAULT_SETTINGS_NOTE, render_report
+from hwbench.report.html import page
+from hwbench.results import CooldownOutcome
+from hwbench.runner import RunSettings
 from hwbench.scoring import score_results
 
 FIXTURES = Path(__file__).parent / "fixtures" / "report"
@@ -100,6 +103,14 @@ def test_offline_single_file() -> None:
     assert '<link rel="stylesheet"' not in html
 
 
+def test_noindex_only_on_request() -> None:
+    robots = '<meta name="robots" content="noindex, nofollow">'
+    assert robots not in page("t", "<p>b</p>", "f")
+    noindex = page("t", "<p>b</p>", "f", noindex=True)
+    assert noindex.count(robots) == 1
+    assert noindex.index(robots) < noindex.index("</head>")
+
+
 def test_embedded_json_is_the_scrubbed_session() -> None:
     session = load_export(SESSION)
     data = embedded(render_report(session))
@@ -171,3 +182,65 @@ def test_start_temperature_row_gives_the_range() -> None:
 def test_no_ambiguous_plural_or_strict_threshold_wording(path: Path) -> None:
     html = render_report(load_export(path))
     assert "(s)" not in html and "au-dessus du seuil" not in html
+
+
+def _session_html(results, settings: RunSettings) -> str:
+    scores = score_results(results, REFERENCE)
+    return render_report(build_export(snapshot(), "m", results, scores, settings=settings))
+
+
+def test_cooldown_pauses_are_listed_in_the_conditions() -> None:
+    results = [
+        replace(r, cooldown_s=42.0 if r.name == "native-cpu-multi" else 0.0) for r in machine(1.0)
+    ]
+    html = _session_html(results, RunSettings(cooldown_auto=True, cooldown_timeout_s=120.0))
+    assert "Refroidissement" in html and "42 s au total" in html
+    assert (
+        "Mode auto : attente du passage sous 70 °C, au plus 120 s, arrêtée si la baisse est "
+        "inférieure à 1 °C en 30 s, avant chaque catégorie."
+    ) in html
+    assert "Pauses : CPU multi-core (natif) 42 s." in html
+
+
+def test_no_cooldown_row_without_the_option() -> None:
+    assert "Refroidissement" not in _session_html(machine(1.0), RunSettings())
+
+
+def test_cooldown_enabled_without_any_pause() -> None:
+    html = _session_html(machine(1.0), RunSettings(cooldown_s=30.0))
+    assert "aucune attente" in html
+    assert "Pause fixe de 30 s à chaque changement de catégorie." in html
+
+
+def test_key_figures_say_why_the_gpu_is_left_out() -> None:
+    def html(results):
+        scores = score_results(results, REFERENCE)
+        return render_report(build_export(snapshot(), "m", results, scores))
+
+    assert "sans GPU (incomplet)" in html([r for r in machine(1.0) if r.name != "vkmark"])
+    cpu_only = [r for r in machine(1.0) if r.name not in ("glmark2", "vkmark")]
+    assert "sans GPU (non mesuré)" in html(cpu_only)
+
+
+def test_cooldown_without_stall_detection() -> None:
+    settings = RunSettings(cooldown_auto=True, cooldown_stall_s=0.0)
+    html = _session_html(machine(1.0), settings)
+    assert "au plus 300 s, avant chaque catégorie." in html and "arrêtée si" not in html
+
+
+def test_cpu_multi_alone_report_says_nothing_about_the_gpu() -> None:
+    results = [r for r in machine(1.0) if r.name == "native-cpu-multi"]
+    html = _session_html(results, RunSettings())
+    assert "sans GPU" not in html and "GPU non mesuré" not in html
+
+
+def test_idle_hot_start_is_information_in_the_conditions() -> None:
+    hot = replace(COOL_AC_STATE, cpu_temp_c=34.0)
+    results = [
+        replace(r, state_before=hot, cooldown_outcome=CooldownOutcome.STALLED, cooldown_s=34.0)
+        for r in machine(1.0)
+    ]
+    html = _session_html(results, RunSettings(hot_start_c=30.0, cooldown_auto=True))
+    assert "ont démarré à leur température de repos, au-dessus de 30 °C" in html
+    assert "Laisser refroidir la machine" not in html  # aucune recommandation
+    assert "départs chauds" not in html  # la tuile Conditions n'en compte aucun

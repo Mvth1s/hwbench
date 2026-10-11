@@ -48,6 +48,30 @@ def test_rankings_follow_points_and_composition(tmp_path) -> None:
     assert "portable" not in gpu
 
 
+def test_incomplete_gpu_is_ranked_nowhere_but_in_the_cpu_tabs(tmp_path) -> None:
+    """vkmark en échec : combiné CPU seul (partiel), ni au combiné ni à l'onglet GPU."""
+    d = tmp_path / "results"
+    d.mkdir()
+    no_vulkan = [r for r in machine(3.0) if r.name != "vkmark"]
+    write_export(export(no_vulkan, "Sans Vulkan"), d / "sans-vulkan.json")
+    write_export(export(machine(1.0), "Desktop moyen"), d / "moyen.json")
+    entries, _ = load_entries(d, REFERENCE)
+    assert [e.slug for e, _ in ranking(entries, None)] == ["moyen"]
+    assert [e.slug for e, _ in ranking(entries, Category.GPU)] == ["moyen"]
+    assert [e.slug for e, _ in ranking(entries, Category.CPU_MULTI)] == ["sans-vulkan", "moyen"]
+
+
+def test_cpu_multi_alone_is_ranked_only_in_its_tab(tmp_path) -> None:
+    d = tmp_path / "results"
+    d.mkdir()
+    multi_only = [r for r in machine(2.0) if r.name == "native-cpu-multi"]
+    write_export(export(multi_only, "Multi seul"), d / "multi.json")
+    (entry,) = load_entries(d, REFERENCE)[0]
+    assert entry.scores.combined is not None and not entry.scores.combined.gpu_missing
+    assert category_points(entry, None) is None
+    assert round(category_points(entry, Category.CPU_MULTI)) == 2000
+
+
 def test_points_are_recomputed_not_taken_from_the_file(tmp_path) -> None:
     d = tmp_path / "results"
     d.mkdir()
@@ -79,6 +103,38 @@ def test_site_files_and_escaping(tmp_path) -> None:
     assert "1 machine non classée ici" in index  # le portable, dans le combiné
 
 
+ROBOTS_META = '<meta name="robots" content="noindex, nofollow">'
+
+
+def test_production_site_has_no_preview_marks(tmp_path) -> None:
+    out = tmp_path / "_site"
+    build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW)
+    assert not (out / "robots.txt").exists()
+    for path in [out / "index.html", *(out / "machines").glob("*.html")]:
+        html = path.read_text()
+        assert ROBOTS_META not in html and "preview-banner" not in html
+        assert "<title>Preview" not in html
+
+
+def test_preview_site_is_marked_and_not_indexed(tmp_path) -> None:
+    out = tmp_path / "_site"
+    build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW, preview=True)
+    assert (out / "robots.txt").read_text() == "User-agent: *\nDisallow: /\n"
+    index = (out / "index.html").read_text()
+    pages = [index, *(p.read_text() for p in (out / "machines").glob("*.html"))]
+    assert len(pages) == 5
+    for html in pages:
+        assert html.count(ROBOTS_META) == 1
+        assert "<title>Preview · " in html
+        # bandeau en tête du contenu, avant le titre de la page
+        assert html.index('class="preview-banner"') < html.index("<h1>")
+    # lien vers le classement officiel, dossier parent de /preview/
+    assert 'href="../index.html">le classement officiel</a>' in index
+    machine_page = (out / "machines" / "rapide.html").read_text()
+    assert 'href="../../index.html">le classement officiel</a>' in machine_page
+    assert 'href="../index.html">← Classement</a>' in machine_page  # reste dans la preview
+
+
 def test_machine_page_details(tmp_path) -> None:
     out = tmp_path / "_site"
     build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW)
@@ -107,6 +163,15 @@ def test_cli_site(tmp_path, monkeypatch, capsys) -> None:
     assert cli.main(["site", "--results", str(results_dir(tmp_path)), "--out", str(out)]) == 0
     assert "(4 machines)" in capsys.readouterr().out
     assert (out / "index.html").exists()
+
+
+def test_cli_site_preview(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    results = str(results_dir(tmp_path))
+    out = tmp_path / "preview"
+    assert cli.main(["site", "--results", results, "--out", str(out), "--preview"]) == 0
+    assert ROBOTS_META in (out / "index.html").read_text()
+    assert (out / "robots.txt").exists()
 
 
 def test_cli_summary_gives_combined_ranks(tmp_path, monkeypatch, capsys) -> None:

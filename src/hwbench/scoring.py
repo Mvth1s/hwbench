@@ -11,9 +11,11 @@ Règles :
 - mémoire : seul le natif compte (single et multi, moyenne géométrique), sysbench pour
   information ; disque : fio. Ces deux catégories sont notées si la référence contient leurs
   benchs, sinon elles restent en valeurs brutes ; elles ne comptent jamais dans le combiné ;
+- un backend officiel de la référence qui manque (vkmark en échec, absent ou sans Vulkan
+  fonctionnel) rend la catégorie « incomplète » (BACKENDS_INCOMPLETE), sans points ;
 - combiné : moyenne géométrique pondérée des catégories CPU et GPU (COMBINED_CATEGORIES). Sans
-  GPU mesuré, il est calculé sans lui et le signale ; un GPU mesuré mais non comparable rend le
-  combiné non comparable.
+  GPU mesuré, ou avec un GPU incomplet, il est calculé sans lui et le signale (gpu_missing :
+  partiel, jamais classé) ; un GPU mesuré mais non comparable rend le combiné non comparable.
 """
 
 import hashlib
@@ -24,7 +26,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from importlib import resources
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from hwbench.results import (
     COMBINED_CATEGORIES,
@@ -54,6 +56,8 @@ class ScoreIssue(StrEnum):
     TOOL_VERSION_MISMATCH = "tool_version_mismatch"
     PRESENTATION_MISMATCH = "presentation_mismatch"
     BACKENDS_DIFFER = "backends_differ"  # composition de la catégorie ≠ référence
+    # une partie seulement des backends de la référence, tous comparables (vkmark en échec)
+    BACKENDS_INCOMPLETE = "backends_incomplete"
     CATEGORY_NOT_COMPARABLE = "category_not_comparable"  # combiné : une catégorie ne l'est pas
     CPU_NOT_MEASURED = "cpu_not_measured"  # combiné : single ou multi manquant
 
@@ -123,8 +127,9 @@ class BackendScore:
     reference_driver: str | None = None
     gpu: str | None = None
     reference_gpu: str | None = None
-    # Version de l'outil hors identité (TOOL_VERSION_NOT_IN_IDENTITY, fio) et modèle du disque,
-    # mesurés / de la référence : même règle que le pilote, signalée sur le disque de la référence.
+    # Version brute de l'outil et modèle du disque, mesurés / de la référence. Hors identité
+    # (TOOL_VERSION_NOT_IN_IDENTITY, fio) : même règle que le pilote, signalée sur le disque de
+    # la référence. Dans l'identité : seule la version amont compte, un autre build est cité.
     tool_version: str | None = None
     reference_tool_version: str | None = None
     device: str | None = None
@@ -156,6 +161,18 @@ class BackendScore:
         )
 
     @property
+    def tool_build_differs(self) -> bool:
+        """Noté, même version amont que la référence mais autre build (« 1.0.20-1472a05 » contre
+        « 1.0.20 ») : information, sans ⚠."""
+        return (
+            self.backend.name not in TOOL_VERSION_NOT_IN_IDENTITY
+            and self.points is not None
+            and self.tool_version is not None
+            and self.reference_tool_version is not None
+            and self.tool_version != self.reference_tool_version
+        )
+
+    @property
     def same_gpu(self) -> bool:
         ours, theirs = gpu_key(self.gpu), gpu_key(self.reference_gpu)
         return ours is not None and ours == theirs
@@ -180,13 +197,19 @@ class CategoryScore:
     reference_backends: list[BackendId]
     issue: ScoreIssue | None = None
 
+    @property
+    def missing(self) -> list[str]:
+        """Backends de la référence non mesurés, dans l'ordre de la référence."""
+        measured = {b.name for b in self.backends}
+        return [b.name for b in self.reference_backends if b.name not in measured]
+
 
 @dataclass(frozen=True)
 class CombinedScore:
     points: float | None
     weights: dict[Category, float]  # poids effectifs, normalisés sur les catégories utilisées
     backends: list[BackendId]
-    gpu_missing: bool
+    gpu_missing: bool  # calculé sans GPU (non mesuré ou incomplet) ; False si points est None
     issue: ScoreIssue | None = None
 
 
@@ -268,22 +291,35 @@ def is_official(result_backend: str, category: Category) -> bool:
     return result_backend == OFFICIAL_CPU_BACKEND
 
 
+class _Context(TypedDict, total=False):
+    """Champs de BackendScore hors identité : pilote, GPU, version d'outil, disque."""
+
+    driver: str | None
+    reference_driver: str | None
+    gpu: str | None
+    reference_gpu: str | None
+    tool_version: str | None
+    reference_tool_version: str | None
+    device: str | None
+    reference_device: str | None
+
+
 def normalize(result: Result, reference: Reference) -> BackendScore:
     ours = result.backend_id
     official = is_official(result.backend, result.category)
     entry = reference.find(ours.name)
     if entry is None:
         return BackendScore(ours, result.category, official, None, ScoreIssue.NOT_IN_REFERENCE)
-    drivers = {
+    drivers: _Context = {
         "driver": result.environment.get("driver"),
         "reference_driver": entry.driver,
         "gpu": result.environment.get("renderer"),
         "reference_gpu": entry.gpu,
+        "tool_version": result.tool_version,
+        "reference_tool_version": entry.tool_version,
     }
     if ours.name in TOOL_VERSION_NOT_IN_IDENTITY:
         drivers |= {
-            "tool_version": result.tool_version,
-            "reference_tool_version": entry.tool_version,
             "device": result.environment.get("device"),
             "reference_device": entry.device,
         }
@@ -321,7 +357,9 @@ def _category_score(
         if e.category is category and is_official(e.backend, category)
     ]
     blocking = next((s.issue for s in official if s.issue is not None), None)
-    if blocking is None and sorted(b.name for b in ours) != sorted(b.name for b in theirs):
+    if blocking is None and {b.name for b in ours} < {b.name for b in theirs}:
+        blocking = ScoreIssue.BACKENDS_INCOMPLETE
+    elif blocking is None and sorted(b.name for b in ours) != sorted(b.name for b in theirs):
         blocking = ScoreIssue.BACKENDS_DIFFER
     if blocking is not None:
         return CategoryScore(category, None, ours, theirs, blocking)
@@ -332,8 +370,12 @@ def _category_score(
 def combine(
     categories: list[CategoryScore], weights: Mapping[Category, float] = DEFAULT_WEIGHTS
 ) -> CombinedScore | None:
-    # mémoire et disque : jamais dans le combiné
-    by_cat = {c.category: c for c in categories if c.category in COMBINED_CATEGORIES}
+    # mémoire et disque : jamais dans le combiné ; GPU incomplet : traité comme non mesuré
+    by_cat = {
+        c.category: c
+        for c in categories
+        if c.category in COMBINED_CATEGORIES and c.issue is not ScoreIssue.BACKENDS_INCOMPLETE
+    }
     if not by_cat:
         return None
     gpu_missing = Category.GPU not in by_cat
@@ -342,12 +384,12 @@ def combine(
     total = sum(weights[c] for c in used)
     effective = {c: weights[c] / total for c in used} if total else {}
     backends = [b for c in used for b in by_cat[c].backends]
+    # gpu_missing : combiné *calculé* sans GPU. Non calculé (points None), il n'a pas lieu
+    # d'être : l'affichage, l'analyse et le site n'ont pas à le tester avec points.
     if Category.CPU_SINGLE not in by_cat or Category.CPU_MULTI not in by_cat:
-        return CombinedScore(None, effective, backends, gpu_missing, ScoreIssue.CPU_NOT_MEASURED)
+        return CombinedScore(None, effective, backends, False, ScoreIssue.CPU_NOT_MEASURED)
     if any(by_cat[c].points is None for c in used):
-        return CombinedScore(
-            None, effective, backends, gpu_missing, ScoreIssue.CATEGORY_NOT_COMPARABLE
-        )
+        return CombinedScore(None, effective, backends, False, ScoreIssue.CATEGORY_NOT_COMPARABLE)
     points = _geometric_mean((by_cat[c].points or 0.0 for c in used), (effective[c] for c in used))
     return CombinedScore(points, effective, backends, gpu_missing)
 

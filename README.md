@@ -125,6 +125,8 @@ hwbench bench cpu-multi --workers 4    # nombre de processus (défaut : CPU logi
 hwbench bench --backend native --runs 5
 hwbench bench cpu-multi --max-warmup 180   # plafond du warm-up en secondes
 hwbench bench --max-cv 3 --hot-start 60    # seuils des avertissements (défaut : 5 %, 70 °C)
+hwbench bench --cooldown 60               # pause de 60 s à chaque changement de catégorie
+hwbench bench --cooldown auto              # attendre que le CPU repasse sous --hot-start
 hwbench bench --weights cpu-single=1,cpu-multi=2,gpu=1   # pondération du score combiné
 hwbench bench disk --disk-path /mnt/data --disk-size 4G  # dossier et taille du fichier de test
 hwbench backends                       # backends disponibles et commande d'installation
@@ -244,11 +246,26 @@ après. hwbench avertit, sans bloquer, si la machine est sur batterie, si le pro
 n'est pas « performance », si le CPU dépasse 70 °C au départ (`--hot-start`) ou si les runs
 varient de plus de 5 % (`--max-cv`).
 
+Pour éviter qu'une catégorie démarre sur un CPU encore chaud de la précédente, `--cooldown`
+insère une pause. Avec un nombre de secondes, la pause a lieu à chaque changement de catégorie.
+Avec `auto`, hwbench attend avant chaque catégorie, la première comprise, que la température
+CPU passe sous le seuil `--hot-start`, en la relevant toutes les 2 s, au plus
+`--cooldown-timeout` secondes (300 par défaut). L'attente s'arrête plus tôt si la température
+ne baisse plus : moins de 1 °C de baisse sur les 30 dernières secondes (`--cooldown-stall-delta`,
+`--cooldown-stall`, 0 pour désactiver), ce qui évite d'attendre tout le délai avant chaque
+catégorie sur une machine dont la température au repos dépasse le seuil. Il n'attend pas si la
+température n'est pas lisible. Avec `auto`, le contrôle global de départ ne signale plus la température au
+lancement : la ligne de refroidissement et chaque panneau donnent l'état après l'attente. Quand
+l'attente s'arrête faute de baisse, le CPU est à sa température de repos : un départ au-dessus de
+`--hot-start` est alors cité pour information, sans avertissement ni conseil de laisser
+refroidir. La pause effective est enregistrée dans chaque résultat (`cooldown_s`, export de
+schéma 4) et citée dans le rapport.
+
 Le score natif est un **indice brut** : la moyenne géométrique de débits hétérogènes, sans
 unité. Les points viennent du scoring, ci-dessous.
 
 ```
-╭─ CPU single-core · native v1 ────────────────────────────────────────────────╮
+╭─ CPU single-core · native-cpu-single v1 ─────────────────────────────────────╮
 │ Score (médiane)    126,0 indice brut  ± 0,8 (CV 0,6 %)                       │
 │ Runs               125,0 · 126,0 · 126,6                                     │
 │ Warm-up            2 itérations, 2,6 s · 6,3 s au total                      │
@@ -293,21 +310,26 @@ Mémoire et disque sont notés (1000 points sur la référence) mais restent hor
 et du classement.
 
 - Un backend n'est noté que s'il a la même identité que dans la référence : même bench, même
-  version du protocole, même version de l'outil, même mode de présentation. Sinon il est
-  déclaré « non comparable », avec la raison. Exception : la version de fio, traitée comme le
-  pilote GPU (voir plus bas).
+  version du protocole, même version amont de l'outil, même mode de présentation. Sinon il
+  est déclaré « non comparable », avec la raison. Seule la version amont compte :
+  `1.0.20-1472a05` (build git) ou `1.0.20+ds-8` (paquet Debian) valent `1.0.20`, et un autre
+  build que celui de la référence est cité pour information. Exception : la version de fio,
+  traitée comme le pilote GPU (voir plus bas).
 - **CPU single et multi** : seul le backend natif compte. sysbench est noté à côté, pour
   information.
 - **GPU** : moyenne géométrique de glmark2 et vkmark. Chaque score de catégorie garde la liste
-  des backends utilisés ; si elle diffère de celle de la référence (vkmark absent par exemple),
-  le score GPU est « non comparable ». Jamais de moyenne sur « ce qui est installé ».
+  des backends utilisés. S'il manque un backend de la référence (vkmark absent, en échec, ou
+  sans Vulkan fonctionnel, comme sur un Intel Haswell où il plante en SIGSEGV), le GPU est
+  « incomplet » : pas de points GPU, et glmark2 reste noté seul pour information. Jamais de
+  moyenne sur « ce qui est installé ».
 - **Mémoire et disque** : catégories d'information. Mémoire = moyenne géométrique des deux
   benchs natifs (single et multi), sysbench à côté pour information ; disque = fio. Elles sont
   notées quand la référence contient ces benchs, sinon elles restent en valeurs brutes. Elles
   n'entrent **jamais** dans le score combiné ni dans le classement.
 - **Score combiné** : moyenne géométrique pondérée des catégories CPU single, CPU multi et GPU
-  (1/3 chacune par défaut, `--weights`). Sans GPU mesuré, il est calculé sur le CPU seul et le
-  signale ; un GPU mesuré mais non comparable rend le combiné non comparable.
+  (1/3 chacune par défaut, `--weights`). Sans GPU mesuré, ou avec un GPU incomplet, il est
+  calculé sur le CPU seul et signalé comme partiel. Il n'est alors pas classé. Un GPU mesuré
+  mais non comparable (autre version de bench ou d'outil) rend le combiné non comparable.
 
 La référence est `src/hwbench/data/reference.json`, versionnée dans le repo. Elle se régénère
 sur le desktop B850, depuis la session graphique (pour glmark2 et vkmark), rien d'autre ne
@@ -319,8 +341,8 @@ tournant :
 
 À refaire seulement quand ce qui fait l'identité d'un bench change : version du protocole
 hwbench (un test l'impose) ou version de l'outil (sysbench, glmark2, vkmark, fio) installée sur
-le desktop. Un résultat mesuré avec une autre version d'outil que la référence est déclaré non
-comparable.
+le desktop. Un résultat mesuré avec une autre version amont de l'outil que la référence est
+déclaré non comparable ; un suffixe de build ou de paquet ne compte pas.
 
 Le pilote GPU (Mesa, RADV…) n'en fait pas partie : il change trop souvent (à chaque mise à
 jour sur une distribution rolling comme Arch). Il reste relevé à titre d'information. Un
@@ -365,8 +387,9 @@ brutes de chaque bench, avec l'écart en pourcentage par rapport au premier fich
 meilleur, rouge si moins bon). Rien n'est comparé à peu près :
 
 - un bench n'a d'écart que si son identité est la même dans les deux fichiers (version du
-  protocole, version de l'outil, mode de présentation) ; sinon « non comparé (version
-  différente) » et un avertissement ;
+  protocole, version amont de l'outil, mode de présentation) ; sinon « non comparé (version
+  différente) » et un avertissement. Deux builds de la même version amont sont comparés et
+  cités pour information ;
 - un score de catégorie ou le combiné n'a d'écart que si les deux fichiers ont été notés contre
   la même référence (même empreinte) avec la même liste de backends (et, pour le combiné, les
   mêmes pondérations) ;
@@ -454,13 +477,16 @@ Les messages de commit suivent les [conventional commits](https://www.convention
 Chaque push sur `main` lance [python-semantic-release](https://python-semantic-release.readthedocs.io/),
 qui déduit la version de ces messages (`fix` → correctif, `feat` → mineure), met à jour
 `pyproject.toml` et `CHANGELOG.md`, crée le tag `vX.Y.Z` et la GitHub Release avec la wheel
-et le sdist. Le développement se fait sur `dev`, les releases par pull request `dev` → `main`.
+et le sdist. Ce sont les fichiers construits et testés par la CI du même push (la suite de
+tests tourne aussi sur la wheel installée), publiés tels quels sur la GitHub Release et sur
+PyPI. Le développement se fait sur `dev`, les releases par pull request `dev` → `main`.
 
 ### Vérifier la provenance d'une version
 
 Chaque wheel et chaque sdist publiés sont accompagnés d'une attestation de provenance (SLSA,
-signée par Sigstore) produite par le workflow de release : elle prouve que le fichier a été
-construit par ce dépôt, à partir du commit tagué. Ce sont les mêmes fichiers sur la page
+signée par Sigstore) produite par le workflow de CI : elle prouve que le fichier a été
+construit par ce dépôt, à partir du commit fusionné dans `main` (le commit tagué n'y ajoute
+que la version et le changelog, déjà inscrits dans les fichiers construits). Ce sont les mêmes fichiers sur la page
 Releases et sur PyPI. Pour vérifier, avec la [CLI GitHub](https://cli.github.com/) :
 
 ```sh
@@ -470,7 +496,7 @@ VERSION=$(gh release view --repo Mvth1s/hwbench --json tagName --jq '.tagName | 
 # depuis la GitHub Release
 gh release download "v$VERSION" --repo Mvth1s/hwbench --pattern '*.whl'
 gh attestation verify "hwbench-$VERSION-py3-none-any.whl" --repo Mvth1s/hwbench \
-  --signer-workflow Mvth1s/hwbench/.github/workflows/release.yml
+  --signer-workflow Mvth1s/hwbench/.github/workflows/ci.yml
 
 # ou depuis PyPI
 pip download "hwbench==$VERSION" --no-deps
@@ -480,8 +506,9 @@ gh attestation verify "hwbench-$VERSION-py3-none-any.whl" --repo Mvth1s/hwbench
 Sous fish : `set VERSION (gh release view …)` à la place de `VERSION=$(…)`.
 
 La commande échoue si le fichier a été modifié ou s'il n'a pas été construit par le workflow
-de release de ce dépôt. Les versions antérieures à l'ajout de l'attestation (0.1.0, 0.2.0) n'en
-ont pas.
+de ce dépôt. Les versions 0.3.0 à 0.6.0 ont été construites par l'ancien workflow de release :
+`--signer-workflow Mvth1s/hwbench/.github/workflows/release.yml`. Les versions antérieures à
+l'ajout de l'attestation (0.1.0, 0.2.0) n'en ont pas.
 
 ### Notifications
 

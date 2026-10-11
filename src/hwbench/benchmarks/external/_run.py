@@ -6,6 +6,7 @@ ToolError au lieu de renvoyer None.
 
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -73,10 +74,27 @@ def run(args: list[str], timeout: float) -> Completed:
     return Completed(proc.returncode, proc.stdout, proc.stderr)
 
 
+def failure_message(tool: str, returncode: int) -> str:
+    """« vkmark interrompu par le signal SIGSEGV (code -11) » pour un code négatif (processus
+    tué par un signal, convention de subprocess), « sysbench a échoué (code 1) » sinon."""
+    if returncode < 0:
+        try:
+            name = signal.Signals(-returncode).name
+        except ValueError:
+            name = str(-returncode)
+        return f"{tool} interrompu par le signal {name} (code {returncode})"
+    return f"{tool} a échoué (code {returncode})"
+
+
 def output_or_raise(args: list[str], timeout: float) -> str:
-    """Sortie standard, ou ToolError avec la fin de stderr si l'outil échoue."""
+    """Sortie standard, ou ToolError avec la fin de stderr si l'outil échoue.
+
+    La fin de stderr est citée comme telle, pas comme la cause : un outil qui plante peut avoir
+    écrit avant un simple avertissement sans rapport (« MESA-INTEL: warning: … »).
+    """
     done = run(args, timeout)
     if done.returncode != 0:
+        message = failure_message(args[0], done.returncode)
         tail = " / ".join((done.stderr or done.stdout).strip().splitlines()[-3:])
-        raise ToolError(f"{args[0]} a échoué (code {done.returncode}) : {tail}")
+        raise ToolError(f"{message}. Fin de la sortie d'erreur : {tail}" if tail else message)
     return done.stdout

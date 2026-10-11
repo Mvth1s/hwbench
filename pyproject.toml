@@ -39,6 +39,12 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "ruff>=0.6",
+    "mypy>=1.11",
+    "types-psutil",
+    "pip-audit>=2.7",
+    "build>=1.2",
+    "twine>=6.1",
+    "pyyaml>=6.0",
 ]
 
 [project.urls]
@@ -66,6 +72,8 @@ branch = true
 
 [tool.coverage.report]
 skip_empty = true
+# la CI échoue sous ce seuil (95 % en octobre 2026, sur Python 3.11 à 3.14)
+fail_under = 94
 
 [tool.ruff]
 line-length = 100
@@ -73,6 +81,16 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+# mode standard (pas --strict) ; tests/ exclu pour l'instant
+[tool.mypy]
+python_version = "3.11"
+files = ["src", "scripts"]
+
+# py-cpuinfo : ni stubs ni py.typed
+[[tool.mypy.overrides]]
+module = ["cpuinfo"]
+ignore_missing_imports = true
 
 # --- Release : python-semantic-release (workflow .github/workflows/release.yml) -------------
 # Version calculée à partir des conventional commits depuis le dernier tag vX.Y.Z.

@@ -79,14 +79,16 @@ def e(value: object) -> str:
     return html.escape("" if value is None else str(value), quote=True)
 
 
-def page(title: str, body: str, footer: str) -> str:
-    """Page complète ; `body` et `footer` sont déjà du HTML (textes échappés par l'appelant)."""
+def page(title: str, body: str, footer: str, noindex: bool = False) -> str:
+    """Page complète ; `body` et `footer` sont déjà du HTML (textes échappés par l'appelant).
+    `noindex` : page à ne pas indexer par les moteurs de recherche (preview du site)."""
+    robots = '<meta name="robots" content="noindex, nofollow">\n' if noindex else ""
     return f"""<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="{FAVICON}">
+{robots}<link rel="icon" href="{FAVICON}">
 <title>{e(title)}</title>
 <style>{CSS}</style>
 </head>

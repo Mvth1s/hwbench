@@ -9,7 +9,7 @@ from conftest import make_result
 from rich.console import Console
 
 from hwbench import privacy
-from hwbench.display.scores import render_scores
+from hwbench.display.scores import PARTIAL_NOTE, combined_points, render_scores
 from hwbench.models import (
     BoardData,
     CpuData,
@@ -21,7 +21,15 @@ from hwbench.models import (
     SensorsData,
 )
 from hwbench.reference import build_reference
-from hwbench.results import BackendId, Category, Result, driver_key, gpu_key, gpu_name
+from hwbench.results import (
+    BackendId,
+    Category,
+    Result,
+    driver_key,
+    gpu_key,
+    gpu_name,
+    upstream_version,
+)
 from hwbench.scoring import (
     ReferenceError,
     ScoreIssue,
@@ -133,16 +141,37 @@ def test_gpu_category_is_geometric_mean_of_its_backends() -> None:
     assert [b.name for b in gpu.backends] == ["glmark2", "vkmark"]
 
 
-def test_gpu_with_fewer_backends_than_reference_is_not_comparable() -> None:
-    """Règle 2 : pas de moyenne silencieuse sur ce qui est installé."""
+def test_gpu_with_fewer_backends_than_reference_is_incomplete() -> None:
+    """Règle 2 : pas de moyenne silencieuse sur ce qui est installé (vkmark en échec, absent ou
+    sans Vulkan fonctionnel) ; le combiné porte alors sur le CPU seul, signalé partiel."""
     scores = score_results(machine(2.0, vkmark=False), REFERENCE)
     gpu = next(c for c in scores.categories if c.category is Category.GPU)
-    assert (gpu.points, gpu.issue) == (None, ScoreIssue.BACKENDS_DIFFER)
+    assert (gpu.points, gpu.issue) == (None, ScoreIssue.BACKENDS_INCOMPLETE)
     assert [b.name for b in gpu.backends] == ["glmark2"]
     assert [b.name for b in gpu.reference_backends] == ["glmark2", "vkmark"]
+    assert gpu.missing == ["vkmark"]
     # glmark2 reste noté seul, pour information
     glmark2 = next(s for s in scores.backends if s.backend.name == "glmark2")
     assert glmark2.points == pytest.approx(2000)
+    combined = scores.combined
+    assert combined is not None and combined.issue is None
+    assert combined.points == pytest.approx(2000) and combined.gpu_missing
+    assert set(combined.weights) == {Category.CPU_SINGLE, Category.CPU_MULTI}
+    assert "glmark2" not in [b.name for b in combined.backends]
+    out = _panel(scores)
+    assert "incomplet (vkmark non mesuré)" in out
+    assert "⚠ Score combiné calculé sans GPU : vkmark non mesuré" in out
+    assert "Score partiel, non classé." in out
+
+
+def test_incomplete_gpu_with_an_identity_issue_stays_not_comparable() -> None:
+    """Un backend GPU mesuré mais d'une autre version prime : combiné non comparable."""
+    results = [
+        replace(r, version="99") if r.name == "glmark2" else r for r in machine(2.0, vkmark=False)
+    ]
+    scores = score_results(results, REFERENCE)
+    gpu = next(c for c in scores.categories if c.category is Category.GPU)
+    assert gpu.issue is ScoreIssue.VERSION_MISMATCH
     assert scores.combined is not None
     assert (scores.combined.points, scores.combined.issue) == (
         None,
@@ -484,6 +513,59 @@ def test_sysbench_memory_tool_version_stays_in_the_identity() -> None:
     assert (score.points, score.issue) == (None, ScoreIssue.TOOL_VERSION_MISMATCH)
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("1.0.20", "1.0.20"),
+        ("1.0.20-1472a05", "1.0.20"),  # build git (Arch)
+        ("1.0.20+ds-8", "1.0.20"),  # Debian
+        ("2025.01", "2025.01"),
+        (" 3.42 ", "3.42"),
+        ("git-1472a05", "git-1472a05"),  # pas de version numérotée : chaîne brute
+        (None, None),
+    ],
+)
+def test_upstream_version(raw, expected) -> None:
+    assert upstream_version(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["1.0.20-1472a05", "1.0.20+ds-8"])
+def test_build_suffix_keeps_sysbench_comparable(raw) -> None:
+    reference = reference_from_dict(
+        build_reference(
+            [make_result("sysbench-cpu-single", 9000.0, tool_version="1.0.20")], snapshot(), []
+        )
+    )
+    result = make_result("sysbench-cpu-single", 4500.0, tool_version=raw)
+    assert result.tool_version == raw  # chaîne brute conservée
+    assert result.backend_id == BackendId("sysbench-cpu-single", "1", "1.0.20", None)
+    score = normalize(result, reference)
+    assert (score.points, score.issue) == (pytest.approx(500), None)
+    assert score.tool_build_differs and not score.tool_differs and not score.tool_info
+    out = _panel(score_results([result], reference))
+    assert f"sysbench-cpu-single : outil {raw} (référence : 1.0.20, même version amont)" in out
+    assert "⚠ sysbench" not in out
+
+
+def test_same_build_says_nothing() -> None:
+    result = make_result("sysbench-cpu-single", 9000.0, tool_version="1.0.20")
+    reference = reference_from_dict(build_reference([result], snapshot(), []))
+    assert not normalize(result, reference).tool_build_differs
+    assert "même version amont" not in _panel(score_results([result], reference))
+
+
+def test_other_upstream_version_stays_not_comparable() -> None:
+    reference = reference_from_dict(
+        build_reference(
+            [make_result("sysbench-cpu-single", 9000.0, tool_version="1.0.20")], snapshot(), []
+        )
+    )
+    score = normalize(
+        make_result("sysbench-cpu-single", 9000.0, tool_version="1.0.21-abc"), reference
+    )
+    assert (score.points, score.issue) == (None, ScoreIssue.TOOL_VERSION_MISMATCH)
+
+
 def test_same_disk_other_fio_version_is_scored_and_flagged() -> None:
     score = normalize(_fio(3000.0, "3.40"), _fio_reference())
     assert (score.points, score.issue) == (pytest.approx(1500), None)
@@ -512,4 +594,46 @@ def test_other_disk_shows_fio_version_as_information(device) -> None:
 def test_tool_rule_does_not_apply_to_gpu_backends() -> None:
     score = normalize(_glmark2(2000.0, "Mesa 26.2.3"), _reference("Mesa 26.2.3"))
     assert not score.tool_differs and not score.tool_info
-    assert score.tool_version is None and score.device is None
+    # version brute relevée (même build que la référence), aucun disque
+    assert score.tool_version == "2023.01" and score.device is None
+    assert not score.tool_build_differs
+
+
+def test_partial_combined_is_marked_on_its_own_line() -> None:
+    def line(results) -> str:
+        combined = score_results(results, REFERENCE).combined
+        assert combined is not None
+        return combined_points(combined).plain
+
+    assert line(machine(2.0, glmark2=False, vkmark=False)) == f"2000 pts  {PARTIAL_NOTE}"
+    assert line(machine(2.0, vkmark=False)) == f"2000 pts  {PARTIAL_NOTE}"  # GPU incomplet
+    assert line(machine(2.0)) == "2000 pts"
+    assert re.search(
+        r"Score combiné +2000 pts  \(partiel, sans GPU\)",
+        _panel(score_results(machine(2.0, vkmark=False), REFERENCE)),
+    )
+
+
+@pytest.mark.parametrize(
+    ("results", "issue"),
+    [
+        # cas constaté : bench cpu-multi seul
+        (
+            machine(2.0, **{"native-cpu-single": False, "glmark2": False, "vkmark": False}),
+            ScoreIssue.CPU_NOT_MEASURED,
+        ),
+        (
+            [
+                replace(r, version="99") if r.name == "native-cpu-single" else r
+                for r in machine(2.0, glmark2=False, vkmark=False)
+            ],
+            ScoreIssue.CATEGORY_NOT_COMPARABLE,
+        ),
+    ],
+)
+def test_uncomputed_combined_is_never_flagged_without_gpu(results, issue) -> None:
+    scores = score_results(results, REFERENCE)
+    combined = scores.combined
+    assert combined is not None
+    assert (combined.points, combined.issue, combined.gpu_missing) == (None, issue, False)
+    assert "calculé sans GPU" not in _panel(scores)

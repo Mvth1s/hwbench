@@ -48,6 +48,18 @@ def test_sysbench_single_run(fake_tools) -> None:
     assert bench.workers is None
 
 
+def test_sysbench_keeps_the_raw_build_suffix(fake_tools) -> None:
+    # sortie réelle, version d'un build git (Arch) : la chaîne brute est conservée ;
+    # seule l'identité (BackendId) la ramène à la version amont
+    text = tool_output("sysbench_cpu_1thread.txt").replace(
+        "sysbench 1.0.20 ", "sysbench 1.0.20-1472a05 ", 1
+    )
+    fake_tools(outputs={"sysbench": text})
+    bench = SysbenchCpuSingle()
+    bench.run()
+    assert bench.tool_version() == "1.0.20-1472a05"
+
+
 def test_sysbench_multi_uses_workers(fake_tools) -> None:
     tools = fake_tools(outputs={"sysbench": tool_output("sysbench_cpu_multi.txt")})
     bench = SysbenchCpuMulti(BenchOptions(workers=6))
@@ -61,6 +73,39 @@ def test_sysbench_missing_and_failing(fake_tools) -> None:
     fake_tools(failing={"sysbench": "FATAL: invalid option"})
     with pytest.raises(_run.ToolError, match="invalid option"):
         SysbenchCpuSingle().run()
+
+
+MESA_WARNING = "MESA-INTEL: warning: Haswell Vulkan support is incomplete"
+
+
+def test_crash_names_the_signal_and_quotes_stderr_as_such(fake_tools) -> None:
+    fake_tools(failing={"vkmark": (-11, MESA_WARNING)}, files=HEADLESS_PLUGIN)
+    with pytest.raises(_run.ToolError) as error:
+        Vkmark().run()
+    assert str(error.value) == (
+        "vkmark interrompu par le signal SIGSEGV (code -11). "
+        f"Fin de la sortie d'erreur : {MESA_WARNING}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        (1, "sysbench a échoué (code 1)"),
+        (-6, "sysbench interrompu par le signal SIGABRT (code -6)"),
+        (-9, "sysbench interrompu par le signal SIGKILL (code -9)"),
+        (-200, "sysbench interrompu par le signal 200 (code -200)"),  # numéro inconnu
+    ],
+)
+def test_failure_message(code, expected) -> None:
+    assert _run.failure_message("sysbench", code) == expected
+
+
+def test_failure_without_stderr(fake_tools) -> None:
+    fake_tools(failing={"sysbench": (-9, "")})
+    with pytest.raises(_run.ToolError) as error:
+        SysbenchCpuSingle().run()
+    assert str(error.value) == "sysbench interrompu par le signal SIGKILL (code -9)"
 
 
 # sysbench memory : sorties réelles du portable Dell (i5-1145G7, DDR4-3200)

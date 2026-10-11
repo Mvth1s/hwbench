@@ -370,7 +370,7 @@ def test_dependabot_ignores_other_actors() -> None:
     assert dn.dependabot_messages(event(event="pull_request"), FakeApi({})) == []
 
 
-# --- release.yml, pages.yml --------------------------------------------------------------------
+# --- ci.yml : release, PyPI, site ---------------------------------------------------------------
 
 RELEASE_BODY = """## v0.5.0 (2026-10-10)
 

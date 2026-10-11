@@ -23,6 +23,7 @@ from hwbench.report.charts import Bar, Segment, bars, timeline
 from hwbench.report.html import e, kv, status_badge, table
 from hwbench.report.texts import (
     finding_text,
+    hot_idle_sentence,
     hot_start_sentence,
     plural,
     recommendations,
@@ -147,7 +148,8 @@ def key_figures(ctx: Context) -> str:
     if s.combined is not None and s.combined.points is not None:
         note = f"référence {s.reference.machine} = 1000" if s.reference else ""
         if s.combined.gpu_missing:
-            note = "sans GPU (non mesuré)"
+            gpu = next((c for c in s.categories if c.category is Category.GPU), None)
+            note = "sans GPU (incomplet)" if gpu is not None else "sans GPU (non mesuré)"
         tiles.append(_tile("Score combiné", e(f"{num(s.combined.points, 0)} pts"), note))
     for category in COMBINED_CATEGORIES:
         points = _category_points(ctx, category)
@@ -183,12 +185,41 @@ def _states(ctx: Context) -> list[MachineState]:
     return [st for r in ctx.session.results for st in (r.state_before, r.state_after)]
 
 
+def _cooldown_rows(ctx: Context) -> list[tuple[str, str | None, Status, str]]:
+    """--cooldown : pauses effectives avant chaque catégorie (rien si l'option n'a pas servi)."""
+    measured = ctx.session.settings
+    paused = [r for r in ctx.session.results if r.cooldown_s > 0]
+    if not paused and not (measured and measured.cooldown_enabled):
+        return []
+    if measured is not None and measured.cooldown_auto:
+        delta, window = measured.cooldown_stall_delta_c, measured.cooldown_stall_s
+        stall = (
+            f", arrêtée si la baisse est inférieure à {compact(delta)} °C en {num(window, 0)} s"
+            if window > 0
+            else ""
+        )
+        mode = (
+            f"Mode auto : attente du passage sous {num(measured.hot_start_c, 0)} °C, "
+            f"au plus {num(measured.cooldown_timeout_s, 0)} s{stall}, avant chaque catégorie."
+        )
+    elif measured is not None and measured.cooldown_s:
+        mode = f"Pause fixe de {num(measured.cooldown_s, 0)} s à chaque changement de catégorie."
+    else:
+        mode = "Pause de refroidissement avant certaines catégories."
+    if not paused:
+        return [("Refroidissement", "aucune attente", Status.INFO, mode)]
+    total = sum(r.cooldown_s for r in paused)
+    detail = ", ".join(f"{bench_label(r.name)} {num(r.cooldown_s, 0)} s" for r in paused)
+    value = f"{num(total, 0)} s au total"
+    return [("Refroidissement", value, Status.INFO, f"{mode} Pauses : {detail}.")]
+
+
 def conditions(ctx: Context) -> str:
     states = _states(ctx)
     if not states:
         return ""
     first = ctx.session.results[0].state_before
-    rows = []
+    rows: list[tuple[str, str | None, Status, str]] = []
 
     on_ac = {st.on_ac for st in states}
     if on_ac == {True}:
@@ -228,13 +259,23 @@ def conditions(ctx: Context) -> str:
             else f"{num(low, 0)} à {num(high, 0)} °C"
         )
         threshold = f"seuil de départ chaud {num(ctx.settings.hot_start_c, 0)} °C"
+        idle = _findings(ctx, FindingCode.HOT_IDLE)
+        idle_text = (
+            f" {hot_idle_sentence(len(idle[0].items), ctx.settings.hot_start_c)} (attente de "
+            "refroidissement arrêtée faute de baisse)."
+            if idle
+            else ""
+        )
         if hot:
             count = len(hot[0].items)
             text = f"{hot_start_sentence(count, ctx.settings.hot_start_c)} (seuil de départ chaud)."
-            rows.append(("Température de départ", span, Status.CHECK, text))
+            rows.append(("Température de départ", span, Status.CHECK, text + idle_text))
+        elif idle:
+            rows.append(("Température de départ", span, Status.INFO, idle_text.strip()))
         else:
             text = f"Tous les tests ont démarré sous le {threshold}."
             rows.append(("Température de départ", span, Status.OK, text))
+    rows += _cooldown_rows(ctx)
 
     html_rows = [
         [e(label), e(value if value not in (None, "") else "—"), status_badge(st), e(text)]

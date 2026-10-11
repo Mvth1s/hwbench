@@ -56,7 +56,7 @@ def parse_lsblk(payload: dict[str, Any]) -> list[Disk]:
 
 def smartctl_supports_json(version_text: str) -> bool:
     match = _SMARTCTL_VERSION_RE.search(version_text)
-    return bool(match) and int(match.group(1)) >= 7
+    return match is not None and int(match.group(1)) >= 7
 
 
 def parse_smart_health(payload: dict[str, Any]) -> tuple[bool | None, float | None]:

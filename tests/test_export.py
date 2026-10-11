@@ -1,5 +1,6 @@
 import json
 import re
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -53,7 +54,7 @@ def test_roundtrip_through_a_file(laptop_export, tmp_path) -> None:
 
 def test_schema_header(laptop_export) -> None:
     data = to_dict(laptop_export)
-    assert data["schema_version"] == EXPORT_SCHEMA_VERSION == 3
+    assert data["schema_version"] == EXPORT_SCHEMA_VERSION == 4
     assert data["created"] == "2026-09-30T08:00:00+00:00"
     assert data["reference"]["digest"] == REFERENCE.digest
     assert data["categories"][0]["category"] == "cpu_single"  # enums en chaînes
@@ -124,10 +125,28 @@ def test_schema_2_files_are_still_read_without_settings() -> None:
         assert ex.settings is None
 
 
+def test_schema_3_files_are_read_without_cooldown() -> None:
+    path = Path(__file__).parent / "fixtures" / "report" / "session.json"
+    assert json.loads(path.read_text())["schema_version"] == 3
+    ex = load_export(path)
+    assert ex.settings is not None and not ex.settings.cooldown_enabled
+    assert all(r.cooldown_s == 0.0 for r in ex.results)
+
+
+def test_cooldown_round_trip(tmp_path) -> None:
+    settings = RunSettings(cooldown_auto=True, cooldown_timeout_s=120.0)
+    results = [replace(r, cooldown_s=37.5) for r in machine(1.0)]
+    path = tmp_path / "m.json"
+    write_export(build_export(snapshot(), "m", results, None, settings=settings), path)
+    loaded = load_export(path)
+    assert loaded.settings == settings
+    assert [r.cooldown_s for r in loaded.results] == [37.5] * len(results)
+
+
 @pytest.mark.parametrize(
     ("change", "message"),
     [
-        ({"schema_version": 4}, "schéma d'export 4 non pris en charge (attendu : 2, 3)"),
+        ({"schema_version": 5}, "schéma d'export 5 non pris en charge (attendu : 2, 3, 4)"),
         ({"schema_version": True}, "non pris en charge"),
         ({"settings": {"runs": 1}}, "au moins 3 runs"),
         ({"schema_version": 2, "settings": {}}, "inattendu dans un schéma 2"),

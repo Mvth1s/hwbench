@@ -1,4 +1,4 @@
-"""python -m hwbench.leaderboard validate FICHIERS… | site [--results DIR] [--out DIR]
+"""python -m hwbench.leaderboard validate FICHIERS… | site [--results DIR] [--out DIR] [--preview]
 | summary [--results DIR] [--new FICHIERS…]"""
 
 import argparse
@@ -45,12 +45,12 @@ def _validate(files: list[Path]) -> int:
     return 1 if failed else 0
 
 
-def _site(results: Path, out: Path) -> int:
+def _site(results: Path, out: Path, preview: bool = False) -> int:
     reference = load_reference()
     if reference is None:
         print("Erreur : pas de référence dans le paquet.", file=sys.stderr)
         return 2
-    entries = build_site(results, out, reference)
+    entries = build_site(results, out, reference, preview=preview)
     print(f"Site écrit dans {out} ({plural(len(entries), 'machine', 'machines')}).")
     return 0
 
@@ -89,6 +89,9 @@ def main(argv: list[str] | None = None) -> int:
     site = sub.add_parser("site", help="génère le site statique du classement")
     site.add_argument("--results", type=Path, default=Path("results"))
     site.add_argument("--out", type=Path, default=Path("_site"))
+    site.add_argument(
+        "--preview", action="store_true", help="preview de la branche dev (bandeau, noindex)"
+    )
     summary = sub.add_parser("summary", help="rangs au classement combiné, en JSON")
     summary.add_argument("--results", type=Path, default=Path("results"))
     summary.add_argument("--new", nargs="+", type=Path, help="seulement ces fichiers")
@@ -97,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         return _validate(args.files)
     if args.command == "summary":
         return _summary(args.results, args.new)
-    return _site(args.results, args.out)
+    return _site(args.results, args.out, args.preview)
 
 
 if __name__ == "__main__":

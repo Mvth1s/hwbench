@@ -4,8 +4,11 @@
 # Usage : scripts/ci-local.sh [base]      (base des commits à vérifier, défaut : dev)
 #
 # Comme .github/workflows/ci.yml : venv neuf (rien ne vient du .venv de dev),
-# pip install -e '.[dev]', ruff check, ruff format --check, pytest --cov. Et comme
-# commitlint.yml : commitlint sur les commits de la branche depuis <base>.
+# pip install -e '.[dev]', ruff check, ruff format --check, mypy (src/ et scripts/, portée
+# dans [tool.mypy] du pyproject.toml), pytest --cov (échec sous fail_under), pip-audit,
+# build + twine check (dist dans un dossier temporaire), commitlint sur les commits de la
+# branche depuis <base>. Pas repris : la suite relancée sur la wheel installée, le titre de
+# la PR (commitlint), le contrôle des liens.
 # GITHUB_ACTIONS=true et CI=true comme sur les runners : certaines bibliothèques changent de
 # comportement (Typer force alors un rendu de terminal, avec codes ANSI, dans l'aide).
 # Seule différence restante : la version de Python locale, la CI teste 3.11 à 3.14.
@@ -27,8 +30,18 @@ echo "== ruff"
 "$VENV/bin/ruff" check .
 "$VENV/bin/ruff" format --check .
 
+echo "== mypy"
+"$VENV/bin/mypy"
+
 echo "== pytest --cov"
 "$VENV/bin/pytest" --cov --cov-report=term -q
+
+echo "== pip-audit"
+"$VENV/bin/pip-audit" --skip-editable
+
+echo "== build + twine check"
+"$VENV/bin/python" -m build -q --outdir "$VENV/dist" .
+"$VENV/bin/twine" check --strict "$VENV"/dist/*
 
 if [[ "$(git rev-parse HEAD)" != "$(git rev-parse "$BASE")" ]]; then
     echo "== commitlint ($BASE..HEAD)"

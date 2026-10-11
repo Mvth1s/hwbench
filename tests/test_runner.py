@@ -8,7 +8,15 @@ from hwbench.machine_state import capture_state, cpu_temperature
 from hwbench.models import SensorsData, TemperatureReading
 from hwbench.reference import ReferenceIssue, state_issues
 from hwbench.results import BenchWarning, Category, MachineState, Measurement, Result
-from hwbench.runner import RunSettings, run_benchmark, start_warnings
+from hwbench.runner import (
+    COOLDOWN_POLL_S,
+    Cooldown,
+    CooldownOutcome,
+    RunSettings,
+    cool_down,
+    run_benchmark,
+    start_warnings,
+)
 
 COOL_AC = MachineState(governors=["performance"], on_ac=True, cpu_temp_c=45.0)
 
@@ -285,3 +293,178 @@ def laptop_with_profile(fake_system):
         "/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference": "balance_power",
     }
     return fake_system(files=files, commands=laptop_commands())
+
+
+# --- Refroidissement entre catégories (--cooldown) : horloge simulée, jamais de vrai temps ---
+
+
+class FakeTime:
+    """Horloge et sommeil simulés ; températures relevées tour à tour (la dernière répétée)."""
+
+    def __init__(self, temps: list[float | None]) -> None:
+        self.now = 0.0
+        self.temps = list(temps)
+        self.sleeps: list[float] = []
+        self.progress: list[tuple[float, float | None]] = []
+
+    def clock(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.now += seconds
+
+    def probe(self) -> MachineState:
+        temp = self.temps.pop(0) if len(self.temps) > 1 else self.temps[0]
+        return MachineState(["performance"], on_ac=True, cpu_temp_c=temp)
+
+    def cool_down(self, **settings) -> Cooldown:
+        return cool_down(
+            RunSettings(**settings),
+            probe=self.probe,
+            progress=lambda elapsed, temp: self.progress.append((elapsed, temp)),
+            sleep=self.sleep,
+            clock=self.clock,
+        )
+
+
+def test_fixed_cooldown_sleeps_the_requested_time() -> None:
+    t = FakeTime([90.0])
+    assert t.cool_down(cooldown_s=2.5) == Cooldown(2.5, CooldownOutcome.FIXED)
+    assert t.sleeps == [1.0, 1.0, 0.5]  # par tranches, pour l'affichage et Ctrl+C
+    assert [p[0] for p in t.progress] == [0.0, 1.0, 2.0]
+
+
+def test_auto_cooldown_does_not_wait_when_already_cool() -> None:
+    t = FakeTime([55.0])
+    assert t.cool_down(cooldown_auto=True) == Cooldown(
+        0.0, CooldownOutcome.ALREADY_COOL, 55.0, 55.0
+    )
+    assert t.sleeps == []
+
+
+def test_auto_cooldown_waits_until_below_the_hot_start_threshold() -> None:
+    t = FakeTime([85.0, 78.0, 70.0, 69.5])  # 70 °C n'est pas sous le seuil de 70 °C
+    result = t.cool_down(cooldown_auto=True)
+    assert result == Cooldown(3 * COOLDOWN_POLL_S, CooldownOutcome.COOLED, 85.0, 69.5)
+    assert t.progress == [(0.0, 85.0), (2.0, 78.0), (4.0, 70.0)]
+
+
+def test_auto_cooldown_follows_the_hot_start_option() -> None:
+    t = FakeTime([65.0, 59.0])
+    assert t.cool_down(cooldown_auto=True, hot_start_c=60.0).outcome is CooldownOutcome.COOLED
+
+
+def test_auto_cooldown_stops_at_the_timeout() -> None:
+    t = FakeTime([90.0, 88.0])
+    result = t.cool_down(cooldown_auto=True, cooldown_timeout_s=5.0)
+    assert result == Cooldown(5.0, CooldownOutcome.TIMEOUT, 90.0, 88.0)
+    assert t.sleeps == [2.0, 2.0, 1.0]  # le dernier sommeil s'arrête au délai
+
+
+@pytest.mark.parametrize(
+    ("temps", "expected"),
+    [
+        ([None], Cooldown(0.0, CooldownOutcome.NO_SENSOR)),
+        ([85.0, None], Cooldown(COOLDOWN_POLL_S, CooldownOutcome.NO_SENSOR, 85.0, 85.0)),
+    ],
+)
+def test_auto_cooldown_without_sensor_does_not_wait(temps, expected) -> None:
+    assert FakeTime(temps).cool_down(cooldown_auto=True) == expected
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        dict(cooldown_s=-1.0),
+        dict(cooldown_timeout_s=-1.0),
+        dict(cooldown_s=30.0, cooldown_auto=True),
+    ],
+)
+def test_invalid_cooldown_settings(settings) -> None:
+    with pytest.raises(ValueError):
+        RunSettings(**settings)
+
+
+def test_cooldown_is_recorded_in_the_result() -> None:
+    def run(**kwargs) -> Result:
+        bench = ScriptedBench([10.0] * 20)
+        return run_benchmark(
+            bench, RunSettings(), probe=lambda: COOL_AC, clock=bench.clock, **kwargs
+        )
+
+    assert run(cooldown_s=42.0).cooldown_s == 42.0
+    assert run().cooldown_s == 0.0
+
+
+def test_auto_cooldown_stops_when_the_temperature_no_longer_drops() -> None:
+    # repos au-dessus du seuil : 75 °C dès 6 s ; à 34 s, la baisse depuis 4 s (76 °C) vaut
+    # encore 1 °C, à 36 s elle est nulle depuis 6 s
+    t = FakeTime([85.0, 80.0, 76.0, 75.0])
+    result = t.cool_down(cooldown_auto=True)
+    assert result == Cooldown(36.0, CooldownOutcome.STALLED, 85.0, 75.0)
+
+
+def test_slow_but_steady_cooling_is_not_a_stall() -> None:
+    # 0,2 °C par relevé (2 s) : 3 °C par fenêtre de 30 s, l'attente continue jusqu'au seuil
+    temps = [round(73.0 - 0.2 * i, 1) for i in range(30)]
+    result = FakeTime(temps).cool_down(cooldown_auto=True)
+    assert result.outcome is CooldownOutcome.COOLED and result.end_c == 69.8
+    assert result.waited_s == 32.0
+
+
+def test_stall_window_follows_the_settings() -> None:
+    temps = [85.0, 80.0, 76.0, 75.0]
+    short = FakeTime(temps).cool_down(cooldown_auto=True, cooldown_stall_s=4.0)
+    assert (short.waited_s, short.outcome) == (10.0, CooldownOutcome.STALLED)
+    tolerant = FakeTime(temps).cool_down(cooldown_auto=True, cooldown_stall_delta_c=5.0)
+    assert (tolerant.waited_s, tolerant.outcome) == (34.0, CooldownOutcome.STALLED)
+
+
+def test_stall_detection_can_be_disabled() -> None:
+    t = FakeTime([85.0, 75.0])
+    result = t.cool_down(cooldown_auto=True, cooldown_stall_s=0.0, cooldown_timeout_s=60.0)
+    assert result.outcome is CooldownOutcome.TIMEOUT and result.waited_s == 60.0
+
+
+@pytest.mark.parametrize(
+    "settings", [dict(cooldown_stall_s=-1.0), dict(cooldown_stall_delta_c=-1.0)]
+)
+def test_invalid_stall_settings(settings) -> None:
+    with pytest.raises(ValueError):
+        RunSettings(**settings)
+
+
+HOT_AC = MachineState(governors=["performance"], on_ac=True, cpu_temp_c=75.0)
+
+
+@pytest.mark.parametrize(
+    ("outcome", "expected"),
+    [
+        (None, BenchWarning.HOT_START),
+        (CooldownOutcome.TIMEOUT, BenchWarning.HOT_START),  # encore en train de refroidir
+        (CooldownOutcome.FIXED, BenchWarning.HOT_START),
+        (CooldownOutcome.STALLED, BenchWarning.HOT_IDLE),  # température de repos
+    ],
+)
+def test_hot_start_after_a_stalled_cooldown_is_idle(outcome, expected) -> None:
+    assert start_warnings(HOT_AC, RunSettings(), outcome) == [expected]
+
+
+def test_hot_idle_only_above_the_threshold() -> None:
+    assert start_warnings(COOL_AC, RunSettings(), CooldownOutcome.STALLED) == []
+
+
+def test_cooldown_outcome_is_recorded_and_drives_the_start_warning() -> None:
+    bench = ScriptedBench([10.0] * 20)
+    result = run_benchmark(
+        bench,
+        RunSettings(),
+        probe=lambda: HOT_AC,
+        clock=bench.clock,
+        cooldown_s=36.0,
+        cooldown_outcome=CooldownOutcome.STALLED,
+    )
+    assert result.cooldown_outcome is CooldownOutcome.STALLED
+    assert BenchWarning.HOT_IDLE in result.warnings
+    assert BenchWarning.HOT_START not in result.warnings

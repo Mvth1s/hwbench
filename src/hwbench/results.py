@@ -27,6 +27,20 @@ class BenchWarning(StrEnum):
     WARMUP_UNSTABLE = "warmup_unstable"
     VSYNC_UNVERIFIED = "vsync_unverified"  # présentation à l'écran, mode non vérifiable
     SOFTWARE_RENDERING = "software_rendering"  # llvmpipe / lavapipe : le CPU fait le rendu
+    # départ au-dessus du seuil chaud, mais à la température de repos (--cooldown auto arrêté
+    # sur stagnation) : information, sans conseil de laisser refroidir
+    HOT_IDLE = "hot_idle"
+
+
+class CooldownOutcome(StrEnum):
+    """Issue d'une pause de refroidissement (--cooldown), enregistrée dans le résultat."""
+
+    FIXED = "fixed"  # pause de durée fixe
+    ALREADY_COOL = "already_cool"  # auto : déjà sous le seuil, aucune attente
+    COOLED = "cooled"  # auto : passé sous le seuil
+    TIMEOUT = "timeout"  # auto : encore au-dessus du seuil au bout du délai
+    STALLED = "stalled"  # auto : température stable au-dessus du seuil (repos trop chaud)
+    NO_SENSOR = "no_sensor"  # auto : température CPU illisible, aucune attente
 
 
 class Availability(StrEnum):
@@ -80,9 +94,22 @@ def disk_key(model: str | None) -> str | None:
 TOOL_VERSION_NOT_IN_IDENTITY = frozenset({"fio-disk"})
 
 
+def upstream_version(version: str | None) -> str | None:
+    """Version amont d'un outil, sans suffixe de build ni révision de paquet.
+
+    « 1.0.20-1472a05 » (build git), « 1.0.20+ds-8 » (Debian) et « 1.0.20 » -> « 1.0.20 ».
+    Une chaîne qui ne commence pas par une version numérotée reste telle quelle.
+    """
+    if version is None:
+        return None
+    match = _UPSTREAM_VERSION_RE.match(version.strip())
+    return match.group(0) if match else version
+
+
 def identity_tool_version(name: str, tool_version: str | None) -> str | None:
-    """Version de l'outil telle qu'elle entre dans BackendId (None si simple information)."""
-    return None if name in TOOL_VERSION_NOT_IN_IDENTITY else tool_version
+    """Version de l'outil telle qu'elle entre dans BackendId : version amont, ou None si simple
+    information (TOOL_VERSION_NOT_IN_IDENTITY). La chaîne brute reste dans Result.tool_version."""
+    return None if name in TOOL_VERSION_NOT_IN_IDENTITY else upstream_version(tool_version)
 
 
 def gpu_key(renderer: str | None) -> str | None:
@@ -93,9 +120,9 @@ def gpu_key(renderer: str | None) -> str | None:
 
 @dataclass(frozen=True)
 class BackendId:
-    """Ce qui rend deux mesures comparables : même bench, même version, même version d'outil
-    (sauf TOOL_VERSION_NOT_IN_IDENTITY), même mode de présentation (GPU : hors écran, headless,
-    à l'écran ; disque : taille du fichier de test)."""
+    """Ce qui rend deux mesures comparables : même bench, même version, même version amont de
+    l'outil (sauf TOOL_VERSION_NOT_IN_IDENTITY), même mode de présentation (GPU : hors écran,
+    headless, à l'écran ; disque : taille du fichier de test)."""
 
     name: str
     version: str
@@ -184,6 +211,10 @@ class Result:
     state_before: MachineState
     state_after: MachineState
     warnings: list[BenchWarning]
+    # pause de refroidissement juste avant ce bench (--cooldown), 0 sans pause ; absente des
+    # exports de schéma 2 et 3
+    cooldown_s: float = 0.0
+    cooldown_outcome: CooldownOutcome | None = None  # issue de cette pause, None sans pause
 
     @property
     def backend_id(self) -> BackendId:

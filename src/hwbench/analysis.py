@@ -41,6 +41,7 @@ class FindingCode(StrEnum):
     SOFTWARE_RENDERING = "software_rendering"
     CONDITIONS_OK = "conditions_ok"  # secteur, profil plateforme et EPP au meilleur réglage
     HOT_START = "hot_start"
+    HOT_IDLE = "hot_idle"  # départ chaud à la température de repos (--cooldown auto, stagnation)
     HIGH_VARIANCE = "high_variance"
     WARMUP_UNSTABLE = "warmup_unstable"
     VSYNC_UNVERIFIED = "vsync_unverified"
@@ -82,7 +83,11 @@ def _with(results: list[Result], warning: BenchWarning) -> list[Result]:
 def _at_start(results: list[Result], warning: BenchWarning, settings: RunSettings) -> list[Result]:
     """Tests dont l'état de départ déclenche l'avertissement avec ces seuils (même calcul que
     le runner : runner.start_warnings)."""
-    return [r for r in results if warning in start_warnings(r.state_before, settings)]
+    return [
+        r
+        for r in results
+        if warning in start_warnings(r.state_before, settings, r.cooldown_outcome)
+    ]
 
 
 def _bench_items(results: list[Result]) -> list[dict[str, Any]]:
@@ -159,6 +164,22 @@ def _per_bench_warnings(results: list[Result], settings: RunSettings) -> list[Fi
     if hot:
         findings.append(
             Finding(FindingCode.HOT_START, Status.CHECK, {"threshold_c": settings.hot_start_c}, hot)
+        )
+    if idle := _at_start(results, BenchWarning.HOT_IDLE, settings):
+        findings.append(
+            Finding(
+                FindingCode.HOT_IDLE,
+                Status.INFO,
+                {"threshold_c": settings.hot_start_c},
+                [
+                    {
+                        "bench": r.name,
+                        "category": r.category.value,
+                        "temp_c": r.state_before.cpu_temp_c,
+                    }
+                    for r in idle
+                ],
+            )
         )
     unstable = [r for r in results if r.cv_percent > settings.high_variance_cv_percent]
     if unstable:
@@ -263,7 +284,11 @@ def _multi_factors(session: MachineExport) -> list[Finding]:
 def _context(session: MachineExport) -> list[Finding]:
     findings = []
     if session.combined is not None and session.combined.gpu_missing:
-        findings.append(Finding(FindingCode.GPU_NOT_MEASURED, Status.INFO))
+        # GPU incomplet (backend de la référence en échec ou absent) : on nomme ce qui manque
+        gpu = next((c for c in session.categories if c.category is Category.GPU), None)
+        missing = gpu.missing if gpu is not None else []
+        params = {"missing": missing} if missing else {}
+        findings.append(Finding(FindingCode.GPU_NOT_MEASURED, Status.INFO, params))
     snapshot = session.snapshot
     missing = [
         name

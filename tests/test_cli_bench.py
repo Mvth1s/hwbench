@@ -1,16 +1,20 @@
+import json
 import re
 from pathlib import Path
 
 import pytest
 from conftest import TINY, TINY_MEMORY, tool_output
 from rich.console import Console
+from rich.text import Text
+from test_scoring import snapshot
 from typer.testing import CliRunner
 
 from hwbench import cli
 from hwbench import runner as bench_runner
 from hwbench.benchmarks.native import cpu, memory
-from hwbench.display.bench import render_result
+from hwbench.display.bench import render_failure, render_result
 from hwbench.results import BenchWarning, Category, MachineState, Result
+from hwbench.runner import Cooldown, CooldownOutcome
 
 runner = CliRunner()
 WIDE = {"COLUMNS": "200"}
@@ -32,7 +36,7 @@ def fast_and_isolated(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_bench_single_core() -> None:
     result = runner.invoke(cli.app, ["bench", "cpu-single"], env=WIDE)
     assert result.exit_code == 0, result.output
-    assert "CPU single-core · native v1" in result.output
+    assert "CPU single-core · native-cpu-single v1" in result.output
     assert "Score (médiane)" in result.output
     assert "SHA-256" in result.output and "Mio/s" in result.output
     assert "multi-core" not in result.output
@@ -43,9 +47,10 @@ def test_bench_all_with_workers() -> None:
         cli.app, ["bench", "all", "--backend", "native", "--workers", "2", "--runs", "3"], env=WIDE
     )
     assert result.exit_code == 0, result.output
-    assert "CPU single-core · native v1" in result.output
-    assert "CPU multi-core · native v1" in result.output
-    assert "Mémoire · native v1" in result.output
+    assert "CPU single-core · native-cpu-single v1" in result.output
+    assert "CPU multi-core · native-cpu-multi v1" in result.output
+    assert "Mémoire · native-memory-single v1" in result.output
+    assert "Mémoire · native-memory-multi v1" in result.output
     assert re.search(r"Processus +2 ", result.output)
     assert "GPU : le backend « native » ne couvre pas cette catégorie." in result.output
 
@@ -53,7 +58,9 @@ def test_bench_all_with_workers() -> None:
 def test_bench_memory_native() -> None:
     result = runner.invoke(cli.app, ["bench", "memory", "--backend", "native"], env=WIDE)
     assert result.exit_code == 0, result.output
-    assert "Mémoire · native v1" in result.output and "Mio/s" in result.output
+    # single et multi : deux panneaux, deux titres distincts (#24)
+    assert "Mémoire · native-memory-single v1" in result.output
+    assert "Mémoire · native-memory-multi v1" in result.output and "Mio/s" in result.output
     assert "CPU single-core" not in result.output
 
 
@@ -68,8 +75,8 @@ def test_bench_disk_with_fio(fake_tools) -> None:
     result = runner.invoke(cli.app, ["bench", "disk", "--disk-path", "/mnt/data"], env=WIDE)
     assert result.exit_code == 0, result.output
     out = result.output
-    assert "Disque · fio : fichier de test de 1 Gio dans /mnt/data, supprimé à la fin" in out
-    assert "Disque · fio v1 · outil 3.40" in out
+    assert "Disque · fio-disk : fichier de test de 1 Gio dans /mnt/data, supprimé à la fin" in out
+    assert "Disque · fio-disk v1 · outil 3.40" in out
     assert re.search(r"Fichier de test +1 Gio", out)
     assert "Lecture aléatoire 4K (QD32)" in out and "IOPS" in out
     assert "système de fichiers btrfs" in out and "Samsung SSD 990 EVO Plus 1TB" in out
@@ -96,7 +103,7 @@ def test_bench_disk_size_is_validated(size: str) -> None:
 def test_bench_disk_without_fio_fails() -> None:
     result = runner.invoke(cli.app, ["bench", "disk"], env=WIDE)
     assert result.exit_code == 1
-    assert "Disque · fio : indisponible (outil absent), ignoré." in result.output
+    assert "Disque · fio-disk : indisponible (outil absent), ignoré." in result.output
 
 
 def test_memory_weight_is_refused() -> None:
@@ -248,3 +255,205 @@ def test_tool_error_text_is_not_rich_markup(fake_tools) -> None:
     result = runner.invoke(cli.app, ["bench", "cpu-single", "--backend", "sysbench"], env=WIDE)
     assert result.exit_code == 1  # aucun résultat, mais pas de MarkupError
     assert "[/boom] FATAL: invalid option" in result.output
+
+
+# --- --cooldown : cool_down simulé (aucune vraie attente) ---------------------------------
+
+
+@pytest.fixture
+def cooldowns(monkeypatch: pytest.MonkeyPatch) -> dict:
+    """cool_down remplacé : renvoie 12 s (ou l'issue choisie) ; enregistre les appels et la
+    pause transmise à chaque bench."""
+    seen: dict = {"calls": [], "runs": [], "outcome": CooldownOutcome.COOLED}
+    real = cli.run_benchmark
+
+    def fake_cool_down(settings, **kwargs):
+        seen["calls"].append(settings)
+        return Cooldown(12.0, seen["outcome"], 82.0, 66.0)
+
+    def spy(bench, settings, **kwargs):
+        seen["runs"].append((bench.name, kwargs.get("cooldown_s")))
+        return real(bench, settings, **kwargs)
+
+    monkeypatch.setattr(cli, "cool_down", fake_cool_down)
+    monkeypatch.setattr(cli, "run_benchmark", spy)
+    return seen
+
+
+def test_without_cooldown_nothing_waits(cooldowns) -> None:
+    result = runner.invoke(cli.app, ["bench", "all", "--backend", "native"], env=WIDE)
+    assert result.exit_code == 0, result.output
+    assert cooldowns["calls"] == []
+
+
+def test_fixed_cooldown_between_categories_only(cooldowns) -> None:
+    args = ["bench", "all", "--backend", "native", "--cooldown", "30"]
+    result = runner.invoke(cli.app, args, env=WIDE)
+    assert result.exit_code == 0, result.output
+    assert [(s.cooldown_s, s.cooldown_auto) for s in cooldowns["calls"]] == [(30.0, False)] * 2
+    # pas avant la première catégorie, ni entre deux benchs d'une même catégorie
+    assert cooldowns["runs"] == [
+        ("native-cpu-single", 0.0),
+        ("native-cpu-multi", 12.0),
+        ("native-memory-single", 12.0),
+        ("native-memory-multi", 0.0),
+    ]
+    assert "CPU multi-core · refroidissement : CPU de 82 °C à 66 °C en 12 s" in result.output
+    assert re.search(r"Refroidissement +12 s de pause avant le test", result.output)
+
+
+def test_auto_cooldown_before_every_category(cooldowns) -> None:
+    args = ["bench", "all", "--backend", "native", "--cooldown", "auto"]
+    result = runner.invoke(cli.app, [*args, "--cooldown-timeout", "60", "--hot-start", "65"])
+    assert result.exit_code == 0, result.output
+    settings = cooldowns["calls"]
+    assert len(settings) == 3  # CPU single (la première comprise), CPU multi, mémoire
+    assert all(s.cooldown_auto and s.cooldown_timeout_s == 60 for s in settings)
+    assert all(s.hot_start_c == 65 for s in settings)
+
+
+def test_cooldown_timeout_is_a_warning(cooldowns) -> None:
+    cooldowns["outcome"] = CooldownOutcome.TIMEOUT
+    args = ["bench", "cpu-single", "--backend", "native", "--cooldown", "auto"]
+    result = runner.invoke(cli.app, args, env=WIDE)
+    assert result.exit_code == 0, result.output
+    assert "⚠ CPU single-core · refroidissement : CPU encore à 66 °C après 12 s" in result.output
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("auto", (0.0, True)), ("AUTO", (0.0, True)), ("30", (30.0, False)), ("7,5", (7.5, False))],
+)
+def test_parse_cooldown(value, expected) -> None:
+    assert cli.parse_cooldown(value) == expected
+
+
+@pytest.mark.parametrize("value", ["-5", "chaud", "inf", "nan", ""])
+def test_invalid_cooldown_is_refused(value) -> None:
+    result = runner.invoke(cli.app, ["bench", "cpu-single", "--cooldown", value])
+    assert result.exit_code == 2
+    assert "--cooldown" in result.output
+
+
+def test_cooldown_settings_are_exported(cooldowns, tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        cli, "collect_snapshot", lambda include_identifiers=False: (snapshot(), None)
+    )
+    out = tmp_path / "m.json"
+    args = ["export", "-o", str(out), "all", "--backend", "native", "--cooldown", "auto"]
+    result = runner.invoke(cli.app, args, env=WIDE)
+    assert result.exit_code == 0, result.output
+    data = json.loads(out.read_text())
+    assert data["schema_version"] == 4 and data["settings"]["cooldown_auto"] is True
+    assert [r["cooldown_s"] for r in data["results"]] == [12.0, 12.0, 12.0, 0.0]
+
+
+def test_render_failure_is_a_panel_of_its_category() -> None:
+    panel = render_failure(Category.GPU, "vkmark", "1", "[/x] vkmark interrompu")
+    assert panel.title == "GPU · vkmark v1" and panel.border_style == "red"
+    message = panel.renderable.columns[1]._cells[1]
+    assert isinstance(message, Text) and message.plain == "[/x] vkmark interrompu"
+
+
+def test_failed_bench_is_shown_in_its_panel(fake_tools, monkeypatch) -> None:
+    fake_tools(failing={"sysbench": (-11, "MESA-INTEL: warning: something")})
+    shown = []
+    monkeypatch.setattr(cli, "render_failure", lambda *args: shown.append(args) or "")
+    result = runner.invoke(cli.app, ["bench", "cpu-single", "--backend", "sysbench"], env=WIDE)
+    assert result.exit_code == 1  # aucun résultat, mais pas de plantage
+    ((category, name, version, message),) = shown
+    assert (category, name, version) == (Category.CPU_SINGLE, "sysbench-cpu-single", "1")
+    assert message.startswith("sysbench interrompu par le signal SIGSEGV (code -11).")
+
+
+def test_stalled_cooldown_is_information_not_a_warning(cooldowns) -> None:
+    cooldowns["outcome"] = CooldownOutcome.STALLED
+    args = ["bench", "cpu-single", "--backend", "native", "--cooldown", "auto"]
+    result = runner.invoke(cli.app, args, env=WIDE)
+    assert result.exit_code == 0, result.output
+    assert (
+        "CPU single-core · refroidissement : CPU stabilisé à 66 °C après 12 s (départ à 82 °C, "
+        "baisse de moins de 1 °C en 30 s ; seuil 70 °C non atteint) : test lancé."
+    ) in result.output
+    assert "⚠ CPU single-core · refroidissement" not in result.output
+
+
+def test_stall_options_reach_the_settings(cooldowns) -> None:
+    args = ["bench", "cpu-single", "--backend", "native", "--cooldown", "auto"]
+    stall = ["--cooldown-stall", "60", "--cooldown-stall-delta", "0.5"]
+    assert runner.invoke(cli.app, [*args, *stall]).exit_code == 0
+    (settings,) = cooldowns["calls"]
+    assert (settings.cooldown_stall_s, settings.cooldown_stall_delta_c) == (60.0, 0.5)
+
+
+class _SimulatedTime:
+    now = 0.0
+
+    def clock(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+def _real_cool_down_without_waiting(monkeypatch, temps: list[float]) -> None:
+    """Vrai cool_down sur horloge simulée ; capture_state renvoie les températures tour à
+    tour (la dernière répétée), au lancement comme pendant l'attente et autour des benchs."""
+    readings = list(temps)
+    time = _SimulatedTime()
+
+    def capture_state() -> MachineState:
+        temp = readings.pop(0) if len(readings) > 1 else readings[0]
+        return MachineState(["performance"], on_ac=True, cpu_temp_c=temp)
+
+    def cool_down(settings, **kwargs):
+        return bench_runner.cool_down(settings, **kwargs, sleep=time.sleep, clock=time.clock)
+
+    monkeypatch.setattr(cli, "capture_state", capture_state)
+    monkeypatch.setattr(cli, "cool_down", cool_down)
+
+
+def test_auto_cooldown_replaces_the_upfront_hot_start_warning(monkeypatch) -> None:
+    """Cas constaté : `bench all --backend native --cooldown auto --hot-start 30`, 49 °C au
+    lancement, 34 °C après l'attente : pas de « CPU déjà chaud au départ (49 °C) » global."""
+    _real_cool_down_without_waiting(monkeypatch, [49.0, 49.0, 40.0, 34.0])
+    args = ["bench", "all", "--backend", "native", "--cooldown", "auto", "--hot-start", "30"]
+    result = runner.invoke(cli.app, args, env=WIDE)
+    assert result.exit_code == 0, result.output
+    assert "CPU déjà chaud au départ (49 °C)" not in result.output
+    assert "CPU single-core · refroidissement : CPU stabilisé à 34 °C" in result.output
+
+
+@pytest.mark.parametrize("cooldown", [[], ["--cooldown", "30"]])
+def test_upfront_hot_start_warning_without_auto_cooldown(monkeypatch, cooldown) -> None:
+    # sans attente avant la première catégorie, le contrôle global reste utile
+    warm = MachineState(["performance"], on_ac=True, cpu_temp_c=49.0)
+    monkeypatch.setattr(cli, "capture_state", lambda: warm)
+    monkeypatch.setattr(
+        cli, "cool_down", lambda settings, **kw: Cooldown(30.0, CooldownOutcome.FIXED)
+    )
+    args = ["bench", "cpu-single", "--backend", "native", "--hot-start", "30", *cooldown]
+    result = runner.invoke(cli.app, args, env=WIDE)
+    assert result.output.index("CPU déjà chaud au départ (49 °C)") < result.output.index("╭")
+
+
+def test_upfront_warnings_keep_battery_and_profile_with_auto_cooldown() -> None:
+    state = MachineState(["powersave"], on_ac=False, cpu_temp_c=80.0)
+    settings = cli.RunSettings(cooldown_auto=True)
+    assert cli.upfront_warnings(state, settings) == [BenchWarning.ON_BATTERY]
+    assert BenchWarning.HOT_START in cli.upfront_warnings(state, cli.RunSettings())
+
+
+def test_stalled_cooldown_turns_the_hot_start_into_information(monkeypatch) -> None:
+    """Cas constaté : refroidissement arrêté sur stagnation à 34 °C (--hot-start 30). Les
+    benchs précédés d'une attente démarrent à leur température de repos : information, sans
+    « laissez refroidir ». Le second bench d'une catégorie (mémoire multi), sans attente,
+    garde l'avertissement."""
+    _real_cool_down_without_waiting(monkeypatch, [49.0, 49.0, 40.0, 34.0])
+    args = ["bench", "all", "--backend", "native", "--cooldown", "auto", "--hot-start", "30"]
+    result = runner.invoke(cli.app, args, env=WIDE)
+    assert result.exit_code == 0, result.output
+    idle = "CPU à 34 °C au départ, sa température de repos"
+    assert result.output.count(idle) == 3  # CPU single, CPU multi, mémoire single
+    assert result.output.count("Laissez refroidir avant de relancer.") == 1  # mémoire multi
+    assert f"⚠ {idle}" not in result.output
