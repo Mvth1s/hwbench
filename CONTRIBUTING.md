@@ -91,5 +91,6 @@ cas.
 Le code de hwbench est sous licence AGPL-3.0-or-later : une contribution de code est acceptée
 sous cette même licence. Développement sur `dev`, pull requests vers `dev`, messages de commit
 conventionnels. Avant
-d'ouvrir une pull request, `scripts/ci-local.sh` reproduit la CI (venv neuf, ruff, pytest,
-commitlint). Voir aussi le README pour l'installation de développement.
+d'ouvrir une pull request, `scripts/ci-local.sh` reproduit la CI (venv neuf, ruff, mypy, pytest
+avec couverture minimale, pip-audit, build, commitlint). Le titre de la pull request suit
+aussi les conventional commits (il devient le message du commit fusionné). Voir aussi le README pour l'installation de développement.
