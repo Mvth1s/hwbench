@@ -26,6 +26,7 @@ from test_scoring import REFERENCE, machine, snapshot
 from hwbench import __version__, privacy
 from hwbench.export import build_export, load_export, to_dict, write_export
 from hwbench.report import DEFAULT_SETTINGS_NOTE, render_report
+from hwbench.report.html import page
 from hwbench.results import CooldownOutcome
 from hwbench.runner import RunSettings
 from hwbench.scoring import score_results
@@ -100,6 +101,14 @@ def test_offline_single_file() -> None:
     assert "@import" not in html and "url(" not in html
     assert re.search(r"<script(?![^>]*application/json)", html) is None
     assert '<link rel="stylesheet"' not in html
+
+
+def test_noindex_only_on_request() -> None:
+    robots = '<meta name="robots" content="noindex, nofollow">'
+    assert robots not in page("t", "<p>b</p>", "f")
+    noindex = page("t", "<p>b</p>", "f", noindex=True)
+    assert noindex.count(robots) == 1
+    assert noindex.index(robots) < noindex.index("</head>")
 
 
 def test_embedded_json_is_the_scrubbed_session() -> None:
