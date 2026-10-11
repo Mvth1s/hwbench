@@ -2,9 +2,14 @@ name: CodeQL
 
 # Analyse statique du code Python (requêtes de sécurité par défaut). Sur chaque PR, chaque push
 # sur main et chaque semaine (nouvelles requêtes sur un code inchangé). Résultats dans
-# Security > Code scanning. Hors de ci-ok : ce n'est pas un check requis.
+# Security > Code scanning. Hors de ci-ok : ce n'est pas un check requis, d'où le paths-ignore
+# (même liste que scripts/ci-changes.sh) : une PR de documentation seule ne l'attend pas.
 on:
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
   push:
     branches: [main]
   schedule:
