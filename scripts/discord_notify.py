@@ -461,7 +461,7 @@ def dependabot_messages(event: dict[str, Any], api: Api) -> list[dict[str, Any]]
     return [dependabot_embed(run, find_pull_request(event, api))]
 
 
-# --- #releases et #deploiements (release.yml) --------------------------------------------------
+# --- #releases et #deploiements (ci.yml, jobs notify-release et notify-pypi) -------------------
 
 _COMMIT_REF = re.compile(r"\s*\(\[`[0-9a-f]{7,40}`\]\([^)\s]*\)\)")
 
@@ -526,7 +526,7 @@ def pypi_published_embed(version: str) -> dict[str, Any]:
     )
 
 
-# --- pages.yml : déploiement et nouvelles machines ---------------------------------------------
+# --- ci.yml, job notify-site : déploiement et nouvelles machines -------------------------------
 
 
 def pages_embed(site_url: str) -> dict[str, Any]:

@@ -1,6 +1,7 @@
 name: Notify
 
-# Notifications Discord après les workflows CI, Results, Release et Pages.
+# Notifications Discord après les workflows CI (vérifications, release, PyPI et site, tous dans
+# ci.yml) et Results.
 #
 # workflow_run tourne dans le contexte du dépôt, avec les secrets, même pour une PR de fork :
 # le code de la PR n'est JAMAIS récupéré ni exécuté. Seul scripts/discord_notify.py est
@@ -12,7 +13,7 @@ name: Notify
 # workflow_run ne se déclenche que depuis la version de ce fichier présente sur main.
 on:
   workflow_run:
-    workflows: [CI, Results, Release, Pages]
+    workflows: [CI, Results]
     types: [completed]
 
 permissions: {}
