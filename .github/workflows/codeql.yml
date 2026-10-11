@@ -1,0 +1,39 @@
+name: CodeQL
+
+# Analyse statique du code Python (requêtes de sécurité par défaut). Sur chaque PR, chaque push
+# sur main et chaque semaine (nouvelles requêtes sur un code inchangé). Résultats dans
+# Security > Code scanning. Hors de ci-ok : ce n'est pas un check requis.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1" # lundi, 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write # envoi des résultats (code scanning)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Python est interprété : pas de build (build-mode none), donc pas de pip
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: python
+          build-mode: none
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: /language:python
