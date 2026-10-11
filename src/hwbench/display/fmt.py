@@ -7,6 +7,12 @@ def num(value: float, decimals: int = 1) -> str:
     return f"{value:.{decimals}f}".replace(".", ",")
 
 
+def grouped(value: float, decimals: int = 0) -> str:
+    """Milliers séparés par une espace fine insécable (U+202F), virgule décimale : la même
+    sortie que Intl.NumberFormat("fr-FR") côté navigateur (site du classement)."""
+    return f"{value:,.{decimals}f}".replace(",", " ").replace(".", ",")
+
+
 def compact(value: float) -> str:
     """8.0 -> « 8 », 8.5 -> « 8,5 », 0.00048828125 -> « 0,000488281 »."""
     return f"{value:g}".replace(".", ",")
