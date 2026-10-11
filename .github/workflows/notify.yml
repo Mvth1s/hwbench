@@ -1,6 +1,7 @@
 name: Notify
 
-# Notifications Discord après les workflows CI, Results, Release et Pages.
+# Notifications Discord après les workflows CI (vérifications, release, PyPI et site, tous dans
+# ci.yml) et Results.
 #
 # workflow_run tourne dans le contexte du dépôt, avec les secrets, même pour une PR de fork :
 # le code de la PR n'est JAMAIS récupéré ni exécuté. Seul scripts/discord_notify.py est
@@ -12,7 +13,7 @@ name: Notify
 # workflow_run ne se déclenche que depuis la version de ce fichier présente sur main.
 on:
   workflow_run:
-    workflows: [CI, Results, Release, Pages]
+    workflows: [CI, Results]
     types: [completed]
 
 permissions: {}
@@ -26,6 +27,7 @@ jobs:
           || github.event.workflow_run.head_branch == 'main')
       && github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read # extraction du script (branche par défaut)
       actions: read # jobs du run et runs précédents
@@ -48,6 +50,7 @@ jobs:
       github.event.workflow_run.name == 'Results'
       && github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read # extraction du script (branche par défaut)
       actions: read # jobs du run de validation
@@ -75,6 +78,7 @@ jobs:
       && github.event.workflow_run.event == 'pull_request'
       && github.event.workflow_run.actor.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read # extraction du script (branche par défaut)
       pull-requests: read # PR liée au run

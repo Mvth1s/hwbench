@@ -2,7 +2,7 @@
 # Uniquement les montées de version majeure (les security updates restent actives).
 version: 2
 updates:
-  # actions épinglées par SHA (release.yml…) : « ci(deps): … »
+  # actions épinglées par SHA (tous les workflows) : « ci(deps): … »
   - package-ecosystem: github-actions
     directory: /
     target-branch: dev

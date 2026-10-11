@@ -41,6 +41,10 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
     "types-psutil",
+    "pip-audit>=2.7",
+    "build>=1.2",
+    "twine>=6.1",
+    "pyyaml>=6.0",
 ]
 
 [project.urls]
@@ -68,6 +72,8 @@ branch = true
 
 [tool.coverage.report]
 skip_empty = true
+# la CI échoue sous ce seuil (95 % en octobre 2026, sur Python 3.11 à 3.14)
+fail_under = 94
 
 [tool.ruff]
 line-length = 100

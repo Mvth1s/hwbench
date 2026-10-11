@@ -477,13 +477,16 @@ Les messages de commit suivent les [conventional commits](https://www.convention
 Chaque push sur `main` lance [python-semantic-release](https://python-semantic-release.readthedocs.io/),
 qui déduit la version de ces messages (`fix` → correctif, `feat` → mineure), met à jour
 `pyproject.toml` et `CHANGELOG.md`, crée le tag `vX.Y.Z` et la GitHub Release avec la wheel
-et le sdist. Le développement se fait sur `dev`, les releases par pull request `dev` → `main`.
+et le sdist. Ce sont les fichiers construits et testés par la CI du même push (la suite de
+tests tourne aussi sur la wheel installée), publiés tels quels sur la GitHub Release et sur
+PyPI. Le développement se fait sur `dev`, les releases par pull request `dev` → `main`.
 
 ### Vérifier la provenance d'une version
 
 Chaque wheel et chaque sdist publiés sont accompagnés d'une attestation de provenance (SLSA,
-signée par Sigstore) produite par le workflow de release : elle prouve que le fichier a été
-construit par ce dépôt, à partir du commit tagué. Ce sont les mêmes fichiers sur la page
+signée par Sigstore) produite par le workflow de CI : elle prouve que le fichier a été
+construit par ce dépôt, à partir du commit fusionné dans `main` (le commit tagué n'y ajoute
+que la version et le changelog, déjà inscrits dans les fichiers construits). Ce sont les mêmes fichiers sur la page
 Releases et sur PyPI. Pour vérifier, avec la [CLI GitHub](https://cli.github.com/) :
 
 ```sh
@@ -493,7 +496,7 @@ VERSION=$(gh release view --repo Mvth1s/hwbench --json tagName --jq '.tagName | 
 # depuis la GitHub Release
 gh release download "v$VERSION" --repo Mvth1s/hwbench --pattern '*.whl'
 gh attestation verify "hwbench-$VERSION-py3-none-any.whl" --repo Mvth1s/hwbench \
-  --signer-workflow Mvth1s/hwbench/.github/workflows/release.yml
+  --signer-workflow Mvth1s/hwbench/.github/workflows/ci.yml
 
 # ou depuis PyPI
 pip download "hwbench==$VERSION" --no-deps
@@ -503,8 +506,9 @@ gh attestation verify "hwbench-$VERSION-py3-none-any.whl" --repo Mvth1s/hwbench
 Sous fish : `set VERSION (gh release view …)` à la place de `VERSION=$(…)`.
 
 La commande échoue si le fichier a été modifié ou s'il n'a pas été construit par le workflow
-de release de ce dépôt. Les versions antérieures à l'ajout de l'attestation (0.1.0, 0.2.0) n'en
-ont pas.
+de ce dépôt. Les versions 0.3.0 à 0.6.0 ont été construites par l'ancien workflow de release :
+`--signer-workflow Mvth1s/hwbench/.github/workflows/release.yml`. Les versions antérieures à
+l'ajout de l'attestation (0.1.0, 0.2.0) n'en ont pas.
 
 ### Notifications
 
