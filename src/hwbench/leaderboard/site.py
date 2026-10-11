@@ -114,7 +114,32 @@ def _gpu(export: MachineExport) -> str | None:
     )
 
 
-def _page(title: str, body: str, generated: datetime) -> str:
+# Preview (branche dev, publiée sous /preview/ du site) : bandeau en tête de chaque page, lien
+# vers le classement officiel (dossier parent), pages en noindex. Style en ligne : le CSS commun
+# est aussi celui du rapport, qui n'a pas de preview.
+PREVIEW_STYLE = (
+    "margin:0 0 16px;padding:8px 12px;border:2px dashed var(--check);border-radius:6px;"
+    "color:var(--check);font-weight:600"
+)
+PREVIEW_TITLE = "Preview · "
+# robots.txt n'est lu qu'à la racine de l'hôte : sous /hwbench/preview/, c'est la balise meta
+# robots de chaque page qui empêche l'indexation ; le fichier ne sert que d'indication.
+PREVIEW_ROBOTS = "User-agent: *\nDisallow: /\n"
+
+
+def _preview_banner(root: str) -> str:
+    """`root` : chemin relatif de la page vers la racine de la preview ("" ou "../")."""
+    return (
+        f'<p class="preview-banner" style="{PREVIEW_STYLE}">Preview : site généré depuis la '
+        "branche dev, pour vérification avant une release. Ce n'est pas "
+        f'<a href="{root}../index.html">le classement officiel</a>.</p>'
+    )
+
+
+def _page(title: str, body: str, generated: datetime, preview: bool = False, root: str = "") -> str:
+    if preview:
+        title = PREVIEW_TITLE + title
+        body = _preview_banner(root) + body
     footer = (
         f"Généré le {e(generated.strftime('%d/%m/%Y %H:%M'))} UTC par hwbench. Résultats "
         "déclaratifs, soumis par pull request. "
@@ -122,7 +147,7 @@ def _page(title: str, body: str, generated: datetime) -> str:
         '<a href="https://github.com/Mvth1s/hwbench/blob/main/CONTRIBUTING.md">Soumettre un '
         "résultat</a>"
     )
-    return page(title, body, footer)
+    return page(title, body, footer, noindex=preview)
 
 
 def _reference_block(reference: Reference) -> str:
@@ -174,7 +199,11 @@ def _ranking_table(ranked: list[tuple[Entry, float]]) -> str:
 
 
 def render_index(
-    entries: list[Entry], reference: Reference, skipped: list[str], generated: datetime
+    entries: list[Entry],
+    reference: Reference,
+    skipped: list[str],
+    generated: datetime,
+    preview: bool = False,
 ) -> str:
     tabs: list[tuple[str, str, Category | None]] = [("combined", "Score combiné", None)]
     tabs += [(c.value, CATEGORY_LABELS[c], c) for c in COMBINED_CATEGORIES]
@@ -219,7 +248,7 @@ disque : information, hors classement.</p>
 {stale_html}
 {_reference_block(reference)}
 {skipped_html}"""
-    return _page("hwbench · classement", body, generated)
+    return _page("hwbench · classement", body, generated, preview)
 
 
 SETTING_LABELS = {
@@ -276,7 +305,9 @@ def _ranking_block(entry: Entry) -> str:
     )
 
 
-def render_machine(entry: Entry, reference: Reference, generated: datetime) -> str:
+def render_machine(
+    entry: Entry, reference: Reference, generated: datetime, preview: bool = False
+) -> str:
     """Page machine : sections du rapport (mêmes graphiques, même synthèse), sans
     recommandations ni JSON embarqué. Points recalculés contre la référence du paquet, analyse
     avec les seuils par défaut."""
@@ -300,22 +331,30 @@ def render_machine(entry: Entry, reference: Reference, generated: datetime) -> s
     sections = render_sections(
         ctx, with_recommendations=False, embed_json=False, after_header=_ranking_block(entry)
     )
-    return _page(f"{ex.machine} · hwbench", intro + sections, generated)
+    return _page(f"{ex.machine} · hwbench", intro + sections, generated, preview, root="../")
 
 
 def build_site(
-    results_dir: Path, out_dir: Path, reference: Reference, generated: datetime | None = None
+    results_dir: Path,
+    out_dir: Path,
+    reference: Reference,
+    generated: datetime | None = None,
+    preview: bool = False,
 ) -> list[Entry]:
+    """Site statique dans `out_dir`. `preview` : site de la branche dev, publié sous /preview/
+    du site officiel (bandeau, titres préfixés, noindex, robots.txt)."""
     generated = generated or datetime.now(UTC)
     entries, skipped = load_entries(results_dir, reference)
     (out_dir / "machines").mkdir(parents=True, exist_ok=True)
     (out_dir / "index.html").write_text(
-        render_index(entries, reference, skipped, generated), encoding="utf-8"
+        render_index(entries, reference, skipped, generated, preview), encoding="utf-8"
     )
     for entry in entries:
         (out_dir / "machines" / f"{entry.slug}.html").write_text(
-            render_machine(entry, reference, generated), encoding="utf-8"
+            render_machine(entry, reference, generated, preview), encoding="utf-8"
         )
     # GitHub Pages : pas de traitement Jekyll
     (out_dir / ".nojekyll").write_text("", encoding="utf-8")
+    if preview:
+        (out_dir / "robots.txt").write_text(PREVIEW_ROBOTS, encoding="utf-8")
     return entries
