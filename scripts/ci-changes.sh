@@ -4,10 +4,12 @@
 # Usage : scripts/ci-changes.sh BASE HEAD
 #
 # Écrit « code=false » si tous les fichiers modifiés entre BASE et HEAD sont de la
-# documentation, sinon « code=true ». Documentation : *.md à n'importe quel niveau (dont
-# CLAUDE.md), docs/**, LICENSE. Pour une PR, BASE est la base de la PR et la comparaison part
-# de leur ancêtre commun (BASE...HEAD), comme l'onglet « Files changed ». BASE vide, nul (premier
-# push d'une branche) ou absent de l'historique : code=true (on ne sait pas, tout tourne).
+# documentation, sinon « code=true » ; puis « docs=true » si au moins un fichier .md est
+# modifié (contrôle des liens), sinon « docs=false ». Documentation : *.md à n'importe quel
+# niveau (dont CLAUDE.md), docs/**, LICENSE. Pour une PR, BASE est la base de la PR et la
+# comparaison part de leur ancêtre commun (BASE...HEAD), comme l'onglet « Files changed ».
+# BASE vide, nul (premier push d'une branche) ou absent de l'historique : code=true et
+# docs=true (on ne sait pas, tout tourne).
 # Noms de fichiers lus par -z : un nom avec espace ou retour à la ligne ne casse rien.
 set -euo pipefail
 
@@ -15,7 +17,7 @@ BASE="${1:-}"
 HEAD="${2:?usage : ci-changes.sh BASE HEAD}"
 
 if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]] || ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
-    echo "code=true"
+    printf 'code=true\ndocs=true\n'
     exit 0
 fi
 
@@ -26,14 +28,13 @@ trap 'rm -f "$LIST"' EXIT
 git diff -z --name-only "$BASE...$HEAD" >"$LIST"
 
 code=false
+docs=false
 while IFS= read -r -d '' path; do
     case "$path" in
-        *.md | docs/* | LICENSE) ;;
-        *)
-            code=true
-            break
-            ;;
+        *.md) docs=true ;;
+        docs/* | LICENSE) ;;
+        *) code=true ;;
     esac
 done <"$LIST"
 
-echo "code=$code"
+printf 'code=%s\ndocs=%s\n' "$code" "$docs"

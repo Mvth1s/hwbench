@@ -39,11 +39,15 @@ def repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def changes(repo: Path, base: str, head: str = "HEAD") -> str:
+def outputs(repo: Path, base: str, head: str = "HEAD") -> dict[str, str]:
     out = subprocess.run(
         ["bash", str(SCRIPT), base, head], cwd=repo, check=True, capture_output=True, text=True
     )
-    return out.stdout.strip()
+    return dict(line.split("=", 1) for line in out.stdout.splitlines())
+
+
+def changes(repo: Path, base: str, head: str = "HEAD") -> str:
+    return f"code={outputs(repo, base, head)['code']}"
 
 
 @pytest.mark.parametrize(
@@ -97,6 +101,25 @@ def test_pull_request_compares_from_the_common_ancestor(repo: Path) -> None:
 def test_unknown_base_runs_everything(repo: Path, base: str) -> None:
     commit(repo, {"README.md": "b"})
     assert changes(repo, base) == "code=true"
+
+
+@pytest.mark.parametrize(
+    ("files", "docs"),
+    [
+        ({"README.md": "b"}, "true"),
+        ({"src/hwbench/cli.py": "b", "docs/rapport.md": "b"}, "true"),
+        ({"docs/image.png": "b", "LICENSE": "b"}, "false"),
+        ({"src/hwbench/cli.py": "b"}, "false"),
+    ],
+)
+def test_markdown_changes_ask_for_a_link_check(repo: Path, files: dict, docs: str) -> None:
+    base = git(repo, "rev-parse", "HEAD")
+    commit(repo, files)
+    assert outputs(repo, base)["docs"] == docs
+
+
+def test_unknown_base_checks_the_links_too(repo: Path) -> None:
+    assert outputs(repo, "") == {"code": "true", "docs": "true"}
 
 
 def test_git_failure_is_an_error_not_a_documentation_change(repo: Path) -> None:
