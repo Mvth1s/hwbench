@@ -192,3 +192,18 @@ def test_preview_is_built_apart_from_production(ci: dict) -> None:
         "_site",
         "_site/preview",
     ]
+
+
+def test_site_chain_runs_without_a_release(ci: dict) -> None:
+    """Sans if, un job est sauté dès qu'un job en amont (même indirect) a été sauté : release
+    et pypi le sont sur dev et sur main sans release, ce qui avait sauté l'assemblage et le
+    déploiement du site. Toute la chaîne du site vérifie donc ses needs avec always()."""
+    jobs = ci["jobs"]
+    chain = {"site-prod", "site-preview"}
+    chain |= {name for name in jobs if ancestors(jobs, name) & chain}
+    assert chain == {"site-prod", "site-preview", "site", "deploy", "notify-site"}
+    for name in chain:
+        condition = " ".join(str(jobs[name].get("if", "")).split())
+        assert condition.startswith("always()"), name
+        for need in needs(jobs[name]):
+            assert f"needs.{need}.result" in condition, (name, need)
