@@ -2,6 +2,321 @@
 
 <!-- version list -->
 
+## v0.7.0 (2026-10-11)
+
+### Bug Fixes
+
+- **bench**: Skip the upfront hot start warning with an auto cooldown
+  ([#30](https://github.com/Mvth1s/hwbench/pull/30),
+  [`bb6d7aa`](https://github.com/Mvth1s/hwbench/commit/bb6d7aa4cf7790fc03dbf9b49962f051f3929791))
+
+- **ci**: Deploy the site when no release ran ([#38](https://github.com/Mvth1s/hwbench/pull/38),
+  [`d2eb291`](https://github.com/Mvth1s/hwbench/commit/d2eb291f7ce7e93b9ed4d22d16c209f3f26e9d4e))
+
+- **ci**: Run the release jobs when commitlint was skipped
+  ([#41](https://github.com/Mvth1s/hwbench/pull/41),
+  [`22e6c11`](https://github.com/Mvth1s/hwbench/commit/22e6c11fdab32860fb42f4fa25711ee052781e6b))
+
+- **cli**: Name the bench in progress and availability messages
+  ([#26](https://github.com/Mvth1s/hwbench/pull/26),
+  [`4eb6dc5`](https://github.com/Mvth1s/hwbench/commit/4eb6dc51edcf020221a3e64263516c2b37a19660))
+
+- **cli**: Show a failed bench in a panel of its category
+  ([#21](https://github.com/Mvth1s/hwbench/pull/21),
+  [`8750090`](https://github.com/Mvth1s/hwbench/commit/87500902e53ed35fe2d9c3118b54d86ca676b393))
+
+- **display**: Name the bench in the title of its panel
+  ([#26](https://github.com/Mvth1s/hwbench/pull/26),
+  [`4eb6dc5`](https://github.com/Mvth1s/hwbench/commit/4eb6dc51edcf020221a3e64263516c2b37a19660))
+
+- **gpu**: Name the signal that killed an external tool
+  ([#21](https://github.com/Mvth1s/hwbench/pull/21),
+  [`8750090`](https://github.com/Mvth1s/hwbench/commit/87500902e53ed35fe2d9c3118b54d86ca676b393))
+
+- **gpu**: Show external tool crashes properly and score the combined without a working Vulkan
+  ([#21](https://github.com/Mvth1s/hwbench/pull/21),
+  [`8750090`](https://github.com/Mvth1s/hwbench/commit/87500902e53ed35fe2d9c3118b54d86ca676b393))
+
+- **scoring**: Compare tool versions on their upstream part
+  ([#20](https://github.com/Mvth1s/hwbench/pull/20),
+  [`bf61851`](https://github.com/Mvth1s/hwbench/commit/bf61851008d21b92442e73e986a394cf153f4763))
+
+- **scoring**: Flag gpu_missing only on a computed combined score
+  ([#29](https://github.com/Mvth1s/hwbench/pull/29),
+  [`58b8389`](https://github.com/Mvth1s/hwbench/commit/58b8389384b4a4d8671afae8208c97513a59d37d))
+
+- **scoring**: Score the combined on the CPU when a GPU backend is missing
+  ([#21](https://github.com/Mvth1s/hwbench/pull/21),
+  [`8750090`](https://github.com/Mvth1s/hwbench/commit/87500902e53ed35fe2d9c3118b54d86ca676b393))
+
+### Build System
+
+- **deps-dev**: Add pip-audit, build and twine to the dev extra
+  ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- **deps-dev**: Add pyyaml to read the workflows in tests
+  ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+### Chores
+
+- Configure mypy for src and scripts ([#34](https://github.com/Mvth1s/hwbench/pull/34),
+  [`d61e912`](https://github.com/Mvth1s/hwbench/commit/d61e9120648ae04b7f42b61c083c5467d1607c06))
+
+- **results**: Re-export asrock b850 riptide wifi with hwbench 0.6.0
+  ([`e0fe0cd`](https://github.com/Mvth1s/hwbench/commit/e0fe0cd5bf7aa72cc1adfd36d9d1c19a64ae7ade))
+
+- **results**: Re-export dell latitude 5420
+  ([`a23219b`](https://github.com/Mvth1s/hwbench/commit/a23219b8fe2f428b04f60e2899f343b935a79f1b))
+
+### Continuous Integration
+
+- Add a documentation-only change filter script ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Add a timeout to every job and cache pip in results.yml
+  ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Add CodeQL analysis on pull requests, main and weekly
+  ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Audit the dependencies weekly with pip-audit ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Build the dev preview apart from the production site
+  ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Install pyyaml for the test run on the built wheel
+  ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Name each run after its purpose ([#39](https://github.com/Mvth1s/hwbench/pull/39),
+  [`78cf5bd`](https://github.com/Mvth1s/hwbench/commit/78cf5bd1a22944e8c0651a2a36545686447a540b))
+
+- Notify only after the CI and Results workflows ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Read the change filter from the pull request base
+  ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Report markdown changes for the link check ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Restore no cache in the jobs that build published artifacts
+  ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Run checks, release, PyPI and Pages from a single pipeline
+  ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Run mypy in the local CI script ([#34](https://github.com/Mvth1s/hwbench/pull/34),
+  [`d61e912`](https://github.com/Mvth1s/hwbench/commit/d61e9120648ae04b7f42b61c083c5467d1607c06))
+
+- Run pip-audit, build and twine check in ci-local.sh
+  ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Skip CodeQL on documentation-only pull requests ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- **deps**: Bump actions/download-artifact from 8.0.1 to 8.0.2
+  ([#17](https://github.com/Mvth1s/hwbench/pull/17),
+  [`8b0b3c3`](https://github.com/Mvth1s/hwbench/commit/8b0b3c3e29b4ee2c33cd2862617a9c4e3d84d44c))
+
+- **deps**: Bump actions/upload-artifact from 7.0.1 to 7.0.2
+  ([#18](https://github.com/Mvth1s/hwbench/pull/18),
+  [`f164595`](https://github.com/Mvth1s/hwbench/commit/f164595b2d3021c762131ccbdcd31119af714289))
+
+- **deps**: Limiter Dependabot aux montées de version majeure
+  ([`129b7bc`](https://github.com/Mvth1s/hwbench/commit/129b7bcfcc83ddad59edcc8c5eaa313d57e9637e))
+
+### Documentation
+
+- Deduplicate the cooldown convention in CLAUDE.md
+  ([#32](https://github.com/Mvth1s/hwbench/pull/32),
+  [`941875d`](https://github.com/Mvth1s/hwbench/commit/941875d1712f7870df0a1ad9bdcc162f5cca6bf7))
+
+- Describe the --cooldown option ([#22](https://github.com/Mvth1s/hwbench/pull/22),
+  [`5316baf`](https://github.com/Mvth1s/hwbench/commit/5316baf196b2df9db11e2c5184a819581947958a))
+
+- Describe the cooldown stall rule ([#28](https://github.com/Mvth1s/hwbench/pull/28),
+  [`f082b35`](https://github.com/Mvth1s/hwbench/commit/f082b359dec7ce3f0be04843d50a6bd130f25234))
+
+- Describe the hot start at idle temperature ([#31](https://github.com/Mvth1s/hwbench/pull/31),
+  [`caa6ba8`](https://github.com/Mvth1s/hwbench/commit/caa6ba8bfe98eae5b8e0d9733d6a364725afbbfc))
+
+- Describe the incomplete GPU rule ([#21](https://github.com/Mvth1s/hwbench/pull/21),
+  [`8750090`](https://github.com/Mvth1s/hwbench/commit/87500902e53ed35fe2d9c3118b54d86ca676b393))
+
+- Describe the mypy scope and command in CLAUDE.md
+  ([#34](https://github.com/Mvth1s/hwbench/pull/34),
+  [`d61e912`](https://github.com/Mvth1s/hwbench/commit/d61e9120648ae04b7f42b61c083c5467d1607c06))
+
+- Describe the single CI pipeline and its release flow
+  ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Describe the site preview mode in CLAUDE.md ([#35](https://github.com/Mvth1s/hwbench/pull/35),
+  [`c196521`](https://github.com/Mvth1s/hwbench/commit/c1965217fe02b10708846f34880ea753f02e21db))
+
+- Describe the upfront check with an auto cooldown
+  ([#30](https://github.com/Mvth1s/hwbench/pull/30),
+  [`bb6d7aa`](https://github.com/Mvth1s/hwbench/commit/bb6d7aa4cf7790fc03dbf9b49962f051f3929791))
+
+- Describe the upstream tool version rule ([#20](https://github.com/Mvth1s/hwbench/pull/20),
+  [`bf61851`](https://github.com/Mvth1s/hwbench/commit/bf61851008d21b92442e73e986a394cf153f4763))
+
+- Note that gpu_missing implies a computed combined score
+  ([#29](https://github.com/Mvth1s/hwbench/pull/29),
+  [`58b8389`](https://github.com/Mvth1s/hwbench/commit/58b8389384b4a4d8671afae8208c97513a59d37d))
+
+- Refresh the README screenshots ([#33](https://github.com/Mvth1s/hwbench/pull/33),
+  [`13380f3`](https://github.com/Mvth1s/hwbench/commit/13380f3968b1850b8b5440280444f0810c70ef23))
+
+- Update the bench panel example title ([#26](https://github.com/Mvth1s/hwbench/pull/26),
+  [`4eb6dc5`](https://github.com/Mvth1s/hwbench/commit/4eb6dc51edcf020221a3e64263516c2b37a19660))
+
+### Features
+
+- **bench**: Add a --cooldown option between categories
+  ([#22](https://github.com/Mvth1s/hwbench/pull/22),
+  [`5316baf`](https://github.com/Mvth1s/hwbench/commit/5316baf196b2df9db11e2c5184a819581947958a))
+
+- **bench**: Add the --cooldown option ([#22](https://github.com/Mvth1s/hwbench/pull/22),
+  [`5316baf`](https://github.com/Mvth1s/hwbench/commit/5316baf196b2df9db11e2c5184a819581947958a))
+
+- **bench**: Add the --cooldown-stall options ([#28](https://github.com/Mvth1s/hwbench/pull/28),
+  [`f082b35`](https://github.com/Mvth1s/hwbench/commit/f082b359dec7ce3f0be04843d50a6bd130f25234))
+
+- **bench**: Report a hot start at idle temperature as information
+  ([#31](https://github.com/Mvth1s/hwbench/pull/31),
+  [`caa6ba8`](https://github.com/Mvth1s/hwbench/commit/caa6ba8bfe98eae5b8e0d9733d6a364725afbbfc))
+
+- **bench**: Show a hot start at idle temperature without a warning sign
+  ([#31](https://github.com/Mvth1s/hwbench/pull/31),
+  [`caa6ba8`](https://github.com/Mvth1s/hwbench/commit/caa6ba8bfe98eae5b8e0d9733d6a364725afbbfc))
+
+- **bench**: Stop an auto cooldown when the temperature stalls
+  ([#28](https://github.com/Mvth1s/hwbench/pull/28),
+  [`f082b35`](https://github.com/Mvth1s/hwbench/commit/f082b359dec7ce3f0be04843d50a6bd130f25234))
+
+- **compare**: Cite other builds of the same tool version as information
+  ([#20](https://github.com/Mvth1s/hwbench/pull/20),
+  [`bf61851`](https://github.com/Mvth1s/hwbench/commit/bf61851008d21b92442e73e986a394cf153f4763))
+
+- **display**: Mark a partial combined score on its own line
+  ([#27](https://github.com/Mvth1s/hwbench/pull/27),
+  [`3fcf0ca`](https://github.com/Mvth1s/hwbench/commit/3fcf0caecaf035b7a7d1c3746a9a6640879bb219))
+
+- **leaderboard**: Add --preview to the site command
+  ([#35](https://github.com/Mvth1s/hwbench/pull/35),
+  [`c196521`](https://github.com/Mvth1s/hwbench/commit/c1965217fe02b10708846f34880ea753f02e21db))
+
+- **leaderboard**: Add a marked, non-indexed preview of the site
+  ([#35](https://github.com/Mvth1s/hwbench/pull/35),
+  [`c196521`](https://github.com/Mvth1s/hwbench/commit/c1965217fe02b10708846f34880ea753f02e21db))
+
+- **leaderboard**: Build a marked, non-indexed preview of the site
+  ([#35](https://github.com/Mvth1s/hwbench/pull/35),
+  [`c196521`](https://github.com/Mvth1s/hwbench/commit/c1965217fe02b10708846f34880ea753f02e21db))
+
+- **report**: Describe a hot start at idle temperature as information
+  ([#31](https://github.com/Mvth1s/hwbench/pull/31),
+  [`caa6ba8`](https://github.com/Mvth1s/hwbench/commit/caa6ba8bfe98eae5b8e0d9733d6a364725afbbfc))
+
+- **report**: Describe the cooldown stall rule ([#28](https://github.com/Mvth1s/hwbench/pull/28),
+  [`f082b35`](https://github.com/Mvth1s/hwbench/commit/f082b359dec7ce3f0be04843d50a6bd130f25234))
+
+- **report**: Explain an incomplete GPU in the report
+  ([#21](https://github.com/Mvth1s/hwbench/pull/21),
+  [`8750090`](https://github.com/Mvth1s/hwbench/commit/87500902e53ed35fe2d9c3118b54d86ca676b393))
+
+- **report**: Let a page opt out of search engine indexing
+  ([#35](https://github.com/Mvth1s/hwbench/pull/35),
+  [`c196521`](https://github.com/Mvth1s/hwbench/commit/c1965217fe02b10708846f34880ea753f02e21db))
+
+- **report**: List cooldown pauses in the measurement conditions
+  ([#22](https://github.com/Mvth1s/hwbench/pull/22),
+  [`5316baf`](https://github.com/Mvth1s/hwbench/commit/5316baf196b2df9db11e2c5184a819581947958a))
+
+- **runner**: Add a cooldown before a bench category
+  ([#22](https://github.com/Mvth1s/hwbench/pull/22),
+  [`5316baf`](https://github.com/Mvth1s/hwbench/commit/5316baf196b2df9db11e2c5184a819581947958a))
+
+- **runner**: Report a hot start at idle temperature as information
+  ([#31](https://github.com/Mvth1s/hwbench/pull/31),
+  [`caa6ba8`](https://github.com/Mvth1s/hwbench/commit/caa6ba8bfe98eae5b8e0d9733d6a364725afbbfc))
+
+- **runner**: Stop an auto cooldown when the temperature stalls
+  ([#28](https://github.com/Mvth1s/hwbench/pull/28),
+  [`f082b35`](https://github.com/Mvth1s/hwbench/commit/f082b359dec7ce3f0be04843d50a6bd130f25234))
+
+- **scoring**: Show another build of the same tool version as information
+  ([#20](https://github.com/Mvth1s/hwbench/pull/20),
+  [`bf61851`](https://github.com/Mvth1s/hwbench/commit/bf61851008d21b92442e73e986a394cf153f4763))
+
+### Refactoring
+
+- Make src and scripts pass mypy ([#34](https://github.com/Mvth1s/hwbench/pull/34),
+  [`d61e912`](https://github.com/Mvth1s/hwbench/commit/d61e9120648ae04b7f42b61c083c5467d1607c06))
+
+- **collectors**: Narrow the smartctl version match explicitly
+  ([#34](https://github.com/Mvth1s/hwbench/pull/34),
+  [`d61e912`](https://github.com/Mvth1s/hwbench/commit/d61e9120648ae04b7f42b61c083c5467d1607c06))
+
+- **compare**: Make the bench and score rows type-check
+  ([#34](https://github.com/Mvth1s/hwbench/pull/34),
+  [`d61e912`](https://github.com/Mvth1s/hwbench/commit/d61e9120648ae04b7f42b61c083c5467d1607c06))
+
+- **export**: Build only dataclass types when reading an export
+  ([#34](https://github.com/Mvth1s/hwbench/pull/34),
+  [`d61e912`](https://github.com/Mvth1s/hwbench/commit/d61e9120648ae04b7f42b61c083c5467d1607c06))
+
+- **notify**: Never pass a missing PR title to truncate
+  ([#34](https://github.com/Mvth1s/hwbench/pull/34),
+  [`d61e912`](https://github.com/Mvth1s/hwbench/commit/d61e9120648ae04b7f42b61c083c5467d1607c06))
+
+- **notify**: Replace default-argument lambdas with partial
+  ([#34](https://github.com/Mvth1s/hwbench/pull/34),
+  [`d61e912`](https://github.com/Mvth1s/hwbench/commit/d61e9120648ae04b7f42b61c083c5467d1607c06))
+
+- **report**: Type the measurement condition rows ([#34](https://github.com/Mvth1s/hwbench/pull/34),
+  [`d61e912`](https://github.com/Mvth1s/hwbench/commit/d61e9120648ae04b7f42b61c083c5467d1607c06))
+
+- **scoring**: Type the out-of-identity fields passed to BackendScore
+  ([#34](https://github.com/Mvth1s/hwbench/pull/34),
+  [`d61e912`](https://github.com/Mvth1s/hwbench/commit/d61e9120648ae04b7f42b61c083c5467d1607c06))
+
+### Testing
+
+- Check that every job after ci-ok tests its needs explicitly
+  ([#41](https://github.com/Mvth1s/hwbench/pull/41),
+  [`22e6c11`](https://github.com/Mvth1s/hwbench/commit/22e6c11fdab32860fb42f4fa25711ee052781e6b))
+
+- Check that the site chain runs without a release
+  ([#38](https://github.com/Mvth1s/hwbench/pull/38),
+  [`d2eb291`](https://github.com/Mvth1s/hwbench/commit/d2eb291f7ce7e93b9ed4d22d16c209f3f26e9d4e))
+
+- Check the run names of the CI workflow ([#39](https://github.com/Mvth1s/hwbench/pull/39),
+  [`78cf5bd`](https://github.com/Mvth1s/hwbench/commit/78cf5bd1a22944e8c0651a2a36545686447a540b))
+
+- Check the workflow rules and the CI pipeline structure
+  ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Fail the test run under 94 % coverage ([#36](https://github.com/Mvth1s/hwbench/pull/36),
+  [`0661d7d`](https://github.com/Mvth1s/hwbench/commit/0661d7dcd7aeb11e97bc3e407d2df44f8dcc807d))
+
+- Never depend on the content of results/ outside its own validation
+  ([`8ba91e3`](https://github.com/Mvth1s/hwbench/commit/8ba91e3d36359da3a97d91e901820226b03e0144))
+
+
 ## v0.6.0 (2026-10-09)
 
 ### Bug Fixes
