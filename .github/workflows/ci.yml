@@ -225,7 +225,9 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           python -m venv "$RUNNER_TEMP/wheel"
-          "$RUNNER_TEMP/wheel/bin/pip" install dist/*.whl pytest pyyaml # dépendances des tests
+          # extra « site » (Jinja2) : la suite teste aussi le site du classement
+          wheel=(dist/*.whl)
+          "$RUNNER_TEMP/wheel/bin/pip" install "${wheel[0]}[site]" pytest pyyaml # dépendances des tests
           "$RUNNER_TEMP/wheel/bin/python" -I -c 'import hwbench; assert "site-packages" in hwbench.__file__, hwbench.__file__'
           test "$("$RUNNER_TEMP/wheel/bin/hwbench" --version)" = "hwbench $VERSION"
           "$RUNNER_TEMP/wheel/bin/pytest" -q -p no:cacheprovider
@@ -563,10 +565,12 @@ jobs:
       - name: Installer hwbench (wheel testée sur main, sources de main sinon)
         run: |
           python -m venv "$RUNNER_TEMP/venv"
+          # extra « site » : Jinja2, absent de l'installation de base (CLI de benchmark)
           if [ "$ON_MAIN" = true ]; then
-            "$RUNNER_TEMP/venv/bin/pip" install "$RUNNER_TEMP"/dist/*.whl
+            wheel=("$RUNNER_TEMP"/dist/*.whl)
+            "$RUNNER_TEMP/venv/bin/pip" install "${wheel[0]}[site]"
           else
-            "$RUNNER_TEMP/venv/bin/pip" install .
+            "$RUNNER_TEMP/venv/bin/pip" install '.[site]'
           fi
 
       - name: Générer le site de prod
@@ -632,10 +636,12 @@ jobs:
       - name: Installer hwbench (wheel testée sur dev, sources de dev sinon)
         run: |
           python -m venv "$RUNNER_TEMP/venv"
+          # extra « site » : Jinja2, absent de l'installation de base (CLI de benchmark)
           if [ "$ON_DEV" = true ]; then
-            "$RUNNER_TEMP/venv/bin/pip" install "$RUNNER_TEMP"/dist/*.whl
+            wheel=("$RUNNER_TEMP"/dist/*.whl)
+            "$RUNNER_TEMP/venv/bin/pip" install "${wheel[0]}[site]"
           else
-            "$RUNNER_TEMP/venv/bin/pip" install .
+            "$RUNNER_TEMP/venv/bin/pip" install '.[site]'
           fi
 
       - name: Générer la preview (bandeau, noindex, robots.txt)
