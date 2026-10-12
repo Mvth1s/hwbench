@@ -430,6 +430,60 @@ FR: dict[str, Any] = {
         "seq_unit": "Mio/s · lecture",
         "rand_unit": "k IOPS · lecture",
         "skipped_h": "Fichiers ignorés",
+        "scatter_hint": "cliquez un point pour le sélectionner",
+        "tray_aria": "Machines sélectionnées",
+        "clear_selection": "Vider",
+        "compare_cta": "Comparer",
+        "select_head": "Comparer",
+        "select_aria": "Comparer {name}",
+    },
+    "comparaison": {
+        "title": "Comparaison",
+        "kicker": "Comparaison côte à côte",
+        "h1": "Comparer des machines",
+        "copy_link": "Copier le lien",
+        "csv": "Exporter en CSV",
+        "nojs_p": (
+            "Sans JavaScript, la comparaison choisie dans le classement ne peut pas se "
+            "construire : voici toutes les machines côte à côte, en points (référence 1000)."
+        ),
+        "to_rank": "Aller au classement",
+        "all_caption": "Toutes les machines, en points, par score combiné",
+        "selected": "Machines comparées",
+        "as_base": "Base des écarts",
+        "add": "Ajouter une machine",
+        "choose": "Choisir…",
+        "max": "8 machines au maximum.",
+        "few_h": "Il faut au moins deux machines.",
+        "few_p": "Ajoutez une machine ci-dessus, ou cochez-en plusieurs dans le classement.",
+        "diff_h": "Écarts en %",
+        "cat": "Catégorie",
+        "diff_note": (
+            "▲ au-dessus de la base · ▼ en dessous. Les écarts se lisent en points, jamais en "
+            "fps : glmark2 et vkmark ne se comparent pas entre eux."
+        ),
+        "radar_h": "Profil single / multi / GPU",
+        "radar_cap": (
+            "Le radar superpose les 4 premières machines pour rester lisible ; le tableau les "
+            "montre toutes."
+        ),
+        "group_h": "Points par catégorie",
+        "png": "Exporter en PNG",
+        "info_k": "Informations · hors classement",
+        "info_h": "Mémoire et disque",
+        "info_p": (
+            "Mesures dépendantes du système de fichiers et du SSD : affichées à part, jamais "
+            "intégrées aux écarts ci-dessus."
+        ),
+        "mem_h": "Bande passante mémoire",
+        "seq_h": "Disque séquentiel",
+        "mibs": "Mio/s",
+        "head": {
+            "name": "Machine",
+            "combined": "Combiné",
+            "memory": "Mémoire (Mio/s)",
+            "disk": "Disque séq. (Mio/s)",
+        },
     },
     "machine": {
         "title": "{machine}",
@@ -462,6 +516,7 @@ FR: dict[str, Any] = {
         "reference": "Référence",
         "median": "Médiane ({machines})",
         "add_machine": "Ajouter une machine",
+        "full_cmp": "Comparaison complète →",
         "choose": "Choisir…",
         "added": "ajoutée",
         "same_h": "Même modèle, autres soumissions",
@@ -587,6 +642,37 @@ FR: dict[str, Any] = {
         "menu": "Menu",
         "close": "Fermer",
         "csv_name": "hwbench-classement-{category}.csv",
+        "cmp_csv_name": "hwbench-comparaison.csv",
+        "cmp_csv_head": [
+            "machine",
+            "single",
+            "multi",
+            "gpu",
+            "combine",
+            "memoire_mibs",
+            "disque_seq_mibs",
+        ],
+        "cmp_title": "{n} machines face à face",
+        "cmp_base": "base : {name}",
+        "cmp_base_cell": "base",
+        "cmp_remove": "Retirer {name}",
+        "cmp_added": "{name} ajoutée",
+        "cmp_removed": "{name} retirée",
+        "rank_prefix": "#",
+        "unranked": "non classé",
+        "axes": ["Single", "Multi", "GPU"],
+        "categories": {
+            "cpu_single": "CPU single-core",
+            "cpu_multi": "CPU multi-core",
+            "gpu": "GPU",
+            "combined": "Combiné",
+        },
+        "reliability": {"ok": "Fiable", "check": "À vérifier"},
+        "select_aria": "Comparer {name}",
+        "sel_count": "{n} sélectionnée",
+        "sel_count_many": "{n} sélectionnées",
+        "sel_live_on": "{name} ajoutée à la comparaison",
+        "sel_live_off": "{name} retirée de la comparaison",
         "raw_csv_name": "hwbench-{machine}-resultats.csv",
         "csv_head": [
             "rang",
