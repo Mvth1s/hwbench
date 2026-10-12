@@ -451,6 +451,9 @@ python -m hwbench.leaderboard validate results/*.json      # validation locale
 python -m hwbench.leaderboard site --results results --out _site
 ```
 
+La génération du site demande l'extra `site` (templates Jinja2), absent de l'installation de
+base : `pip install 'hwbench[site]'` (ou `pip install -e '.[site]'` depuis un clone).
+
 ## Dépendances système optionnelles
 
 Aucune n'est obligatoire : si un outil manque, le champ correspondant est affiché

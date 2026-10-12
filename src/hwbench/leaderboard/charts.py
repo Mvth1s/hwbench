@@ -8,7 +8,12 @@ coordonnées arrondies. Tout texte venu d'un export passe par markupsafe.escape.
 import math
 from dataclasses import dataclass
 
-from markupsafe import Markup, escape
+from hwbench.leaderboard import SITE_EXTRA_MISSING
+
+try:  # extra « site » (MarkupSafe vient avec Jinja2)
+    from markupsafe import Markup, escape
+except ModuleNotFoundError as exc:
+    raise ModuleNotFoundError(SITE_EXTRA_MISSING, name=exc.name) from exc
 
 from hwbench.display.fmt import grouped
 

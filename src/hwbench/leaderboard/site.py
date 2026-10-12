@@ -21,8 +21,13 @@ from importlib.resources.abc import Traversable
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment, PackageLoader, StrictUndefined, select_autoescape
-from markupsafe import Markup
+from hwbench.leaderboard import SITE_EXTRA_MISSING
+
+try:  # extra « site » : absent de l'installation de base (CLI de benchmark)
+    from jinja2 import Environment, PackageLoader, StrictUndefined, select_autoescape
+    from markupsafe import Markup
+except ModuleNotFoundError as exc:
+    raise ModuleNotFoundError(SITE_EXTRA_MISSING, name=exc.name) from exc
 
 from hwbench import __version__
 from hwbench.analysis import analyze

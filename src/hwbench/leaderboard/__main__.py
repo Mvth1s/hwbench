@@ -7,7 +7,8 @@ import os
 import sys
 from pathlib import Path
 
-from hwbench.leaderboard.site import build_site, load_entries, ranking
+from hwbench.leaderboard import SITE_EXTRA_MISSING, SITE_EXTRA_MODULES
+from hwbench.leaderboard.entries import load_entries, ranking
 from hwbench.leaderboard.validate import validate_file
 from hwbench.report.texts import plural
 from hwbench.scoring import load_reference
@@ -46,6 +47,13 @@ def _validate(files: list[Path]) -> int:
 
 
 def _site(results: Path, out: Path, preview: bool = False) -> int:
+    try:  # import paresseux : seule cette commande demande l'extra « site » (Jinja2)
+        from hwbench.leaderboard.site import build_site
+    except ModuleNotFoundError as exc:
+        if exc.name not in SITE_EXTRA_MODULES:
+            raise
+        print(f"Erreur : {SITE_EXTRA_MISSING}", file=sys.stderr)
+        return 2
     reference = load_reference()
     if reference is None:
         print("Erreur : pas de référence dans le paquet.", file=sys.stderr)

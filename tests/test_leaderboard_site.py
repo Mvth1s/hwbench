@@ -640,3 +640,37 @@ def test_settings_note() -> None:
     note = settings_note(RunSettings(runs=5, max_warmup_s=180.0))
     assert "runs 5 au lieu de 3" in note
     assert "plafond du warm-up 180 s au lieu de défaut" in note
+
+
+# --- Extra « site » : Jinja2 optionnel ---
+
+
+def test_benchmark_cli_does_not_load_jinja2() -> None:
+    """Le CLI de benchmark (et la validation, lancée par results.yml) n'importe pas Jinja2 :
+    l'extra « site » ne sert qu'à générer le site."""
+    import subprocess
+    import sys
+
+    code = (
+        "import sys, hwbench.cli, hwbench.leaderboard.__main__, hwbench.leaderboard.validate\n"
+        "loaded = sorted(m for m in ('jinja2', 'markupsafe') if m in sys.modules)\n"
+        "assert not loaded, loaded"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_site_without_the_extra_explains_how_to_install_it(tmp_path, monkeypatch, capsys) -> None:
+    import sys
+
+    import pytest
+
+    monkeypatch.setitem(sys.modules, "jinja2", None)  # Jinja2 absent
+    for name in ("hwbench.leaderboard.site", "hwbench.leaderboard.charts"):
+        monkeypatch.delitem(sys.modules, name)
+    with pytest.raises(ModuleNotFoundError, match=r"pip install 'hwbench\[site\]'"):
+        import hwbench.leaderboard.site  # noqa: F401
+    monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    out = tmp_path / "_site"
+    assert cli.main(["site", "--results", str(results_dir(tmp_path)), "--out", str(out)]) == 2
+    assert "pip install 'hwbench[site]'" in capsys.readouterr().err
+    assert not out.exists()
