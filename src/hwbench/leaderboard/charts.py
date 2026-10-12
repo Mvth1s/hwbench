@@ -152,3 +152,152 @@ def histogram(values: list[float], median: float, caption: str, median_label: st
     )
     bands = [(f"{grouped(i * width)}–{grouped((i + 1) * width)}", c) for i, c in enumerate(counts)]
     return Histogram(Markup("".join(parts)), bands)
+
+
+# --- Page machine ---------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RunsRow:
+    label: str
+    runs: list[float]
+    median: float
+    burst: float
+    cv_text: str
+    noisy: bool  # CV au-dessus du seuil
+
+
+RUNS_SPAN = 4.0  # ± % autour de la médiane ; au-delà, le point est posé au bord
+
+
+def runs_chart(rows: list[RunsRow], caption: str, median_label: str) -> Markup:
+    """Chaque run (●) et le burst (◇) en écart relatif à la médiane, CV à droite."""
+    w, ml, mr, mt, row_h = 640, 190, 70, 26, 30
+    h = mt + len(rows) * row_h + 10
+    iw = w - ml - mr
+
+    def sx(delta: float) -> float:
+        clamped = max(-RUNS_SPAN, min(RUNS_SPAN, delta))
+        return ml + (clamped + RUNS_SPAN) / (2 * RUNS_SPAN) * iw
+
+    def delta(value: float, median: float) -> float:
+        d = (value / median - 1) * 100 if median else 0.0
+        return d if math.isfinite(d) else 0.0
+
+    parts = [
+        f'<svg class="hw-svg hw-svg--wide" viewBox="0 0 {w} {h}" role="img" '
+        f'aria-label="{escape(caption)}">'
+    ]
+    for t in (-4, -2, 0, 2, 4):
+        cls = "axis" if t == 0 else "grid"
+        label = escape(median_label) if t == 0 else f"{'+' if t > 0 else '−'}{abs(t)} %"
+        parts.append(
+            f'<line class="{cls}" x1="{_r(sx(t))}" x2="{_r(sx(t))}" y1="{mt - 6}" y2="{h - 10}"/>'
+            f'<text class="mono" x="{_r(sx(t))}" y="{mt - 10}" text-anchor="middle">{label}</text>'
+        )
+    for i, row in enumerate(rows):
+        y = mt + i * row_h + row_h / 2
+        parts.append(
+            f'<text class="ink" x="{ml - 12}" y="{_r(y + 4)}" text-anchor="end">'
+            f"{escape(row.label)}</text>"
+        )
+        for run in row.runs:
+            parts.append(
+                f'<circle class="run" cx="{_r(sx(delta(run, row.median)))}" cy="{_r(y)}" r="4"/>'
+            )
+        bx, s = sx(delta(row.burst, row.median)), 4.6
+        parts.append(
+            f'<polygon class="burst" points="{_r(bx)},{_r(y - s)} {_r(bx + s)},{_r(y)} '
+            f'{_r(bx)},{_r(y + s)} {_r(bx - s)},{_r(y)}"/>'
+            f'<text class="mono{" alert" if row.noisy else ""}" x="{w - 4}" y="{_r(y + 4)}" '
+            f'text-anchor="end">{escape(row.cv_text)}</text>'
+        )
+    parts.append("</svg>")
+    return Markup("".join(parts))
+
+
+@dataclass(frozen=True)
+class TempRow:
+    label: str
+    before: float
+    after: float
+
+
+def dumbbell(rows: list[TempRow], caption: str) -> Markup:
+    """Température avant (○) et après (■) chaque test : deux relevés, jamais une courbe."""
+    w, ml, mr, mt, row_h = 640, 190, 16, 26, 26
+    h = mt + len(rows) * row_h + 14
+    temps = [t for r in rows for t in (r.before, r.after)]
+    lo = math.floor(min([40.0, *temps]) / 10) * 10
+    hi = math.ceil(max([60.0, *temps]) / 10) * 10
+    iw = w - ml - mr
+
+    def sx(t: float) -> float:
+        return ml + (t - lo) / (hi - lo) * iw
+
+    parts = [
+        f'<svg class="hw-svg hw-svg--wide" viewBox="0 0 {w} {h}" role="img" '
+        f'aria-label="{escape(caption)}">'
+    ]
+    for t in range(lo, hi + 1, 10):
+        parts.append(
+            f'<line class="grid" x1="{_r(sx(t))}" x2="{_r(sx(t))}" y1="{mt - 6}" y2="{h - 10}"/>'
+            f'<text class="mono" x="{_r(sx(t))}" y="{mt - 10}" text-anchor="middle">{t} °C</text>'
+        )
+    for i, row in enumerate(rows):
+        y = mt + i * row_h + row_h / 2
+        a, b, s = sx(row.before), sx(row.after), 4.2
+        parts.append(
+            f'<text class="ink" x="{ml - 12}" y="{_r(y + 4)}" text-anchor="end">'
+            f"{escape(row.label)}</text>"
+            f'<line class="link" x1="{_r(a)}" x2="{_r(b)}" y1="{_r(y)}" y2="{_r(y)}"/>'
+            f'<circle class="before" cx="{_r(a)}" cy="{_r(y)}" r="4.5"/>'
+            f'<rect class="after" x="{_r(b - s)}" y="{_r(y - s)}" width="{_r(2 * s)}" '
+            f'height="{_r(2 * s)}"/>'
+        )
+    parts.append("</svg>")
+    return Markup("".join(parts))
+
+
+@dataclass(frozen=True)
+class Slice:
+    label: str
+    value: float
+    tone: str  # classe de couleur : s1, s2, s3, acc, ctl
+
+
+def donut(slices: list[Slice], caption: str, center: str, center_label: str) -> Markup:
+    """Anneau de répartition (réservé au temps de test), légende rendue par le template."""
+    size, thick = 220, 24
+    c, outer = size / 2, size / 2 - 4
+    inner = outer - thick
+    total = sum(s.value for s in slices) or 1.0
+    parts = [
+        f'<svg class="hw-svg hw-donut" viewBox="0 0 {size} {size}" role="img" '
+        f'aria-label="{escape(caption)}">'
+    ]
+    start = -math.pi / 2
+    for s in slices:
+        end = start + s.value / total * 2 * math.pi
+        gap = 0.012 if s.value < total else 0.0
+        a, b = start + gap, max(start + gap, end - gap)
+        large = 1 if b - a > math.pi else 0
+        if b - a >= 2 * math.pi - 0.001:  # une seule part : deux demi-arcs
+            b = a + 2 * math.pi - 0.001
+
+        def pt(r: float, t: float) -> str:
+            return f"{_r(c + math.cos(t) * r)},{_r(c + math.sin(t) * r)}"
+
+        parts.append(
+            f'<path class="slice tone-{s.tone}" d="M{pt(outer, a)} A{_r(outer)},{_r(outer)} 0 '
+            f"{large} 1 {pt(outer, b)} L{pt(inner, b)} A{_r(inner)},{_r(inner)} 0 {large} 0 "
+            f'{pt(inner, a)} Z"/>'
+        )
+        start = end
+    parts.append(
+        f'<text class="center" x="{_r(c)}" y="{_r(c - 2)}" text-anchor="middle">'
+        f"{escape(center)}</text>"
+        f'<text x="{_r(c)}" y="{_r(c + 18)}" text-anchor="middle">{escape(center_label)}</text>'
+        "</svg>"
+    )
+    return Markup("".join(parts))
