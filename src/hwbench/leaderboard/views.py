@@ -7,6 +7,7 @@ tel quel d'un calcul de l'export (points recalculés par entries.category_points
 
 import csv
 import io
+import math
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -100,12 +101,18 @@ def iso_day(created: str) -> str:
         return created
 
 
+def finite(value: float | None) -> float | None:
+    """Valeur affichable : un calcul qui déborde (inf, nan) sur un export retouché devient une
+    donnée absente (non classé), jamais une coordonnée de graphique ni une erreur de rendu."""
+    return value if value is not None and math.isfinite(value) else None
+
+
 def machine_view(entry: Entry, settings: RunSettings | None = None) -> MachineView:
     settings = settings or RunSettings()
     ex = entry.export
     results = {r.name: r for r in ex.results}
-    points: dict[str, float | None] = {"combined": category_points(entry, None)}
-    points |= {c.value: category_points(entry, c) for c in COMBINED_CATEGORIES}
+    points: dict[str, float | None] = {"combined": finite(category_points(entry, None))}
+    points |= {c.value: finite(category_points(entry, c)) for c in COMBINED_CATEGORIES}
     fio = results.get("fio-disk")
     memory = results.get("native-memory-multi")
     worst = cv_max(ex.results)
@@ -118,9 +125,9 @@ def machine_view(entry: Entry, settings: RunSettings | None = None) -> MachineVi
         gpu=gpu_label(ex),
         gpu_brand=gpu_brand(ex),
         points=points,
-        memory_mibs=memory.value if memory else None,
-        disk_seq_mibs=fio.details.get("seq_read") if fio else None,
-        disk_rand_iops=fio.details.get("rand_read_4k") if fio else None,
+        memory_mibs=finite(memory.value) if memory else None,
+        disk_seq_mibs=finite(fio.details.get("seq_read")) if fio else None,
+        disk_rand_iops=finite(fio.details.get("rand_read_4k")) if fio else None,
         cv_max=worst,
         reliable=worst is None or worst <= settings.high_variance_cv_percent,
         stale=entry.stale,

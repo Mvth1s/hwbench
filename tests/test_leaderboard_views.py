@@ -87,3 +87,31 @@ def test_charts_stay_bounded_with_huge_points() -> None:
     assert len(charts.histogram([500.0, 1e300], 700.0, "c", "m").bands) <= charts.HIST_MAX_BINS
     points = [charts.Point(1e300, 1e300, "desktop", "x"), charts.Point(900, 800, "laptop", "y")]
     assert charts.scatter(points, "c", "x", "y", "r").count("<line") <= 14
+
+
+def test_non_finite_values_become_missing() -> None:
+    from hwbench.leaderboard.charts import Point, histogram, scatter
+    from hwbench.leaderboard.views import finite
+
+    assert finite(None) is None and finite(float("inf")) is None and finite(float("nan")) is None
+    assert finite(12.5) == 12.5
+    assert "nan" not in scatter([Point(float("inf"), 900, "desktop", "x")], "c", "x", "y", "r")
+    assert len(histogram([float("inf"), 500.0], 500.0, "c", "m").bands) == 11
+
+
+def test_site_survives_absurd_exports(tmp_path) -> None:
+    """Export retouché aux valeurs démesurées : le site se génère, sans graduation absurde."""
+    from test_leaderboard_site import NOW, REFERENCE
+
+    from hwbench.export import write_export
+    from hwbench.leaderboard.site import build_site
+
+    d = tmp_path / "results"
+    d.mkdir()
+    write_export(export(machine(1e300), "Démesurée"), d / "demesuree.json")
+    write_export(export(machine(1.0), "Normale"), d / "normale.json")
+    out = tmp_path / "_site"
+    build_site(d, out, REFERENCE, generated=NOW)
+    index = (out / "index.html").read_text()
+    assert "nan" not in index.split("<svg", 1)[1].split("</svg>", 1)[0]
+    assert index.count("<line") < 40

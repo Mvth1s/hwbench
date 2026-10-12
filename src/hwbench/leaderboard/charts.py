@@ -49,6 +49,7 @@ def _mark(kind: str, x: float, y: float, r: float, cls: str) -> str:
 
 def scatter(points: list[Point], caption: str, x_label: str, y_label: str, ref: str) -> Markup:
     """Nuage CPU (√ single × multi) contre GPU, référence 1000 en pointillés."""
+    points = [p for p in points if math.isfinite(p.x) and math.isfinite(p.y)]
     w, h, ml, mr, mt, mb = 640, 380, 52, 14, 16, 42
     x_max = max([1250.0, *(p.x for p in points)]) * 1.05
     y_max = max([1250.0, *(p.y for p in points)]) * 1.05
@@ -103,6 +104,7 @@ class Histogram:
 
 def histogram(values: list[float], median: float, caption: str, median_label: str) -> Histogram:
     w, h, ml, mr, mt, mb = 560, 260, 36, 10, 24, 32
+    values = [v for v in values if math.isfinite(v)]
     v_max = max([1100.0, *values])
     width = 200.0 if v_max > 1600 else 100.0
     if v_max / width > HIST_MAX_BINS:  # valeurs démesurées : tranches plus larges, nombre borné
