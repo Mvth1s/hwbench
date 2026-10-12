@@ -649,7 +649,7 @@ def test_machine_page_without_combined_score(tmp_path) -> None:
     page = (site(tmp_path) / "machines" / "portable.html").read_text()
     assert "Non classé : score combiné calculé sans GPU complet" in page
     assert 'id="face-bars"' not in page  # pas de comparaison sans score combiné
-    gpu_row = page.split("<span>GPU</span>", 1)[1].split("</div>", 1)[0]
+    gpu_row = page.split('<span class="hw-wide">GPU</span>', 1)[1].split("</div>", 1)[0]
     assert "non classé" in gpu_row
 
 
@@ -788,3 +788,11 @@ def test_catalog_has_no_personal_contact_details() -> None:
     assert "Mvth1s" not in FR["footer"]["host"]
     assert "6-III" not in json.dumps(FR, ensure_ascii=False)  # article non vérifié
 
+
+def test_machine_page_short_category_labels_for_narrow_screens(tmp_path) -> None:
+    page = (site(tmp_path) / "machines" / "moyen.html").read_text()
+    by_cat = page.split("Par catégorie", 1)[1].split("Valeurs brutes", 1)[0]
+    for label, short in (("CPU single-core", "Single"), ("CPU multi-core", "Multi")):
+        assert (
+            f'<span class="hw-wide">{label}</span><span class="hw-narrow">{short}</span>' in by_cat
+        )

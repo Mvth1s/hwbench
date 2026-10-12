@@ -139,6 +139,7 @@ def machine_context(
         "rows": [
             {
                 "label": CATEGORY_LABELS[c],
+                "short": FR["classement"]["short"][c.value],  # écran étroit
                 "mark": CATEGORY_MARKS[c],
                 "tone": CATEGORY_TONES[c],
                 "frac": f"{max(0.003, (v or 0.0) / top):.4f}",
