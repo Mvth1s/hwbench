@@ -170,9 +170,143 @@ FR: dict[str, Any] = {
                 "e": "",
                 "links": [["Documentation fio", "https://fio.readthedocs.io/"]],
             },
+            "index": {
+                "t": "Indice brut",
+                "term": "indice brut",
+                "d": "Le résultat interne d'un test, sans unité physique.",
+                "w": "Il n'a de sens qu'en comparaison : c'est pourquoi il est converti en points.",
+                "e": "",
+                "links": [],
+            },
+            "native": {
+                "t": "Tests natifs",
+                "term": "tests natifs",
+                "d": (
+                    "Des tests écrits par hwbench : hachage SHA-256, compression zlib et LZMA, "
+                    "exponentiation modulaire sur grands nombres."
+                ),
+                "w": "Ils imitent des tâches réelles et servent de base officielle aux points CPU.",
+                "e": "",
+                "links": [["Code source hwbench", "https://github.com/Mvth1s/hwbench"]],
+            },
+            "fps": {
+                "t": "fps",
+                "term": "fps",
+                "d": "Images calculées par seconde.",
+                "w": "Plus il y en a, plus la carte graphique est rapide sur la scène testée.",
+                "e": "",
+                "links": [],
+            },
+            "glmark2": {
+                "t": "glmark2",
+                "term": "glmark2",
+                "d": (
+                    "Un test graphique OpenGL qui affiche une série de scènes et compte les "
+                    "images par seconde."
+                ),
+                "w": (
+                    "Il représente les applications et jeux OpenGL. Ses fps ne se comparent pas "
+                    "à ceux de vkmark."
+                ),
+                "e": "",
+                "links": [["glmark2 sur GitHub", "https://github.com/glmark2/glmark2"]],
+            },
+            "vkmark": {
+                "t": "vkmark",
+                "term": "vkmark",
+                "d": "L'équivalent de glmark2 pour Vulkan, l'interface graphique plus récente.",
+                "w": (
+                    "Il représente les jeux récents. Ses fps ne se comparent pas à ceux de glmark2."
+                ),
+                "e": "",
+                "links": [["vkmark sur GitHub", "https://github.com/vkmark/vkmark"]],
+            },
+            "burst": {
+                "t": "Burst",
+                "term": "burst",
+                "d": "Le tout premier passage, machine encore froide. Il n'est jamais noté.",
+                "w": (
+                    "Beaucoup de processeurs accélèrent brièvement à froid puis ralentissent en "
+                    "chauffant : l'écart avec la médiane révèle ce comportement."
+                ),
+                "e": "",
+                "links": [],
+            },
+            "median": {
+                "t": "Médiane",
+                "term": "médiane",
+                "d": "La valeur du milieu quand on range les runs du plus petit au plus grand.",
+                "w": "Un run raté (trop haut ou trop bas) ne déforme pas le résultat.",
+                "e": "118, 121, 122 → médiane 121.",
+                "links": [],
+            },
+            "warmup": {
+                "t": "Warm-up (échauffement)",
+                "term": "warm-up",
+                "d": (
+                    "Des passages préliminaires non comptés, répétés jusqu'à deux résultats "
+                    "consécutifs proches (3 % par défaut), dans une durée plafonnée."
+                ),
+                "w": "On mesure la machine dans son régime normal, pas pendant sa mise en route.",
+                "e": "",
+                "links": [],
+            },
+            "qd": {
+                "t": "QD — profondeur de file",
+                "term": "profondeur de file",
+                "d": (
+                    "Le nombre de demandes envoyées au disque en même temps (8 en séquentiel, 32 "
+                    "en aléatoire 4K)."
+                ),
+                "w": (
+                    "Un SSD récent est bien plus rapide quand on lui donne plusieurs demandes à "
+                    "la fois."
+                ),
+                "e": "",
+                "links": [["Documentation fio", "https://fio.readthedocs.io/"]],
+            },
+            "epp": {
+                "t": "EPP",
+                "term": "EPP",
+                "d": (
+                    "Un réglage qui indique au processeur s'il doit privilégier la vitesse ou "
+                    "l'économie d'énergie."
+                ),
+                "w": (
+                    "Le même PC peut perdre une part notable de ses performances en mode économie."
+                ),
+                "e": "« performance » ou « power ».",
+                "links": [
+                    [
+                        "amd-pstate (noyau Linux)",
+                        "https://docs.kernel.org/admin-guide/pm/amd-pstate.html",
+                    ],
+                    [
+                        "intel_pstate (noyau Linux)",
+                        "https://docs.kernel.org/admin-guide/pm/intel_pstate.html",
+                    ],
+                ],
+            },
+            "governor": {
+                "t": "Governor",
+                "term": "governor",
+                "d": "La règle choisie par Linux pour faire varier la fréquence du processeur.",
+                "w": (
+                    "Comme l'EPP, il change les résultats : il est noté pour que la comparaison "
+                    "reste honnête."
+                ),
+                "e": "",
+                "links": [
+                    [
+                        "CPU Performance Scaling (noyau Linux)",
+                        "https://docs.kernel.org/admin-guide/pm/cpufreq.html",
+                    ]
+                ],
+            },
         },
     },
     "kinds": {"desktop": "Fixe", "laptop": "Portable"},
+    "kinds_plural": {"desktop": "fixes", "laptop": "portables"},
     "brands": {"AMD": "AMD", "Intel": "Intel", "NVIDIA": "NVIDIA", "other": "Autres"},
     "reliability": {"ok": "Fiable", "check": "À vérifier"},
     "stale": "à ré-exporter",
@@ -293,6 +427,126 @@ FR: dict[str, Any] = {
         "rand_unit": "k IOPS · lecture",
         "skipped_h": "Fichiers ignorés",
     },
+    "machine": {
+        "title": "{machine}",
+        "crumbs": "Fil d'Ariane",
+        "rank": "Classement",
+        "cv_max": "CV max {cv}",
+        "exported": "{date} · hwbench {version}",
+        "cpu": "CPU",
+        "gpu": "GPU",
+        "ram": "RAM",
+        "cores": "{physical} cœurs / {logical} threads",
+        "ram_visible": "{size} Gio visibles",
+        "stale_p": (
+            "Ce résultat a été noté contre une ancienne machine de référence. Ses points sont "
+            "recalculés contre la référence actuelle à partir de ses résultats bruts ; les "
+            "benchs dont la version a changé depuis ne sont pas notés. Un nouvel export donnera "
+            "une note complète."
+        ),
+        "combined": "Score combiné",
+        "vs_ref": "{delta} vs référence",
+        "combined_missing": "Non classé : score combiné calculé sans GPU complet, ou absent.",
+        "rank_of": "sur {machines}",
+        "rank_kind_of": "sur {count} {kind}",
+        "beat": "des machines derrière elle",
+        "by_cat": "Par catégorie",
+        "raw_vals": "Valeurs brutes",
+        "face_to": "Face à…",
+        "combined_lc": "score combiné",
+        "this": "Cette machine",
+        "reference": "Référence",
+        "median": "Médiane ({machines})",
+        "add_machine": "Ajouter une machine",
+        "choose": "Choisir…",
+        "added": "ajoutée",
+        "same_h": "Même modèle, autres soumissions",
+        "same_p": (
+            "{files} pour ce modèle. Dispersion du score combiné : {low} – {high}. BIOS, "
+            "pilotes, refroidissement et température ambiante, non mesurés, peuvent l'expliquer."
+        ),
+        "same_this": "Ce fichier",
+        "cpu_h": "CPU · tests natifs",
+        "faster": "plus rapide sur {workers} processus",
+        "subtest": "Sous-test",
+        "single": "Single",
+        "multi": "Multi ({workers})",
+        "gain": "Gain multi / single",
+        "ideal": "┆ gain idéal = {workers}× (un processus par thread logique)",
+        "gpu_h": "GPU · fps par scène",
+        "gpu_p": (
+            "glmark2 et vkmark utilisent des échelles différentes : leurs fps ne se comparent "
+            "pas entre eux. Rendu {resolution}."
+        ),
+        "gl_h": "glmark2 · OpenGL",
+        "vk_h": "vkmark · Vulkan",
+        "med_fps": "médiane {value} fps",
+        "rel_h": "Fiabilité des mesures",
+        "runs_l": "● runs",
+        "burst_l": "◇ burst",
+        "median_l": "| médiane",
+        "cv_l": "CV",
+        "warm_l": "warm-up stable sur {stable} tests sur {total}",
+        "temp_h": "Températures CPU",
+        "temp_p": (
+            "○ avant · ■ après chaque test. Deux relevés seulement par test : la ligne "
+            "pointillée relie deux instants, elle ne décrit pas l'évolution pendant le test."
+        ),
+        "time_h": "Répartition du temps de test",
+        "time_p": "Durée totale, warm-up et pauses de refroidissement compris.",
+        "time_center": "min:s au total",
+        "cooldown": "Refroidissement",
+        "info_k": "Informations · hors classement",
+        "mem_h": "Mémoire",
+        "disk_h": "Disque",
+        "mem_unit": "Mio/s",
+        "seq_unit": "Mio/s",
+        "rand_unit": "k IOPS",
+        "tech_h": "Détail technique",
+        "file": "Fichier {file} · points recalculés contre la référence {reference} (1000 points).",
+        "comp": "Composants",
+        "cond": "Conditions de mesure",
+        "sensors": "Capteurs",
+        "raw_h": "Résultats bruts",
+        "comp_k": {
+            "board": "Carte mère",
+            "bios": "BIOS",
+            "cpu": "CPU",
+            "memory": "Mémoire",
+            "gpu": "GPU",
+            "drivers": "Pilotes GPU",
+            "disks": "Disques",
+        },
+        "freq": "{min}–{max} MHz",
+        "cond_k": {
+            "power": "Alimentation",
+            "epp": "EPP",
+            "governor": "Governor",
+            "profile": "Profil plateforme",
+            "driver": "Pilote de fréquence",
+            "total": "Durée totale",
+            "settings": "Seuils",
+        },
+        "on_ac": "secteur",
+        "on_ac_desktop": "secteur (pas de batterie)",
+        "on_battery": "batterie",
+        "head": {
+            "test": "Test",
+            "median": "Médiane",
+            "runs": "Runs",
+            "cv": "CV",
+            "burst": "Burst",
+            "warmup": "Warm-up",
+            "points": "Points",
+            "status": "Statut",
+        },
+        "official": "officiel",
+        "indicative": "indicatif",
+        "unscored": "non noté",
+        "csv": "Exporter en CSV",
+        "json": "Télécharger le JSON source",
+        "none": "—",
+    },
     "charts": {
         "reference": "Référence",
         "reference_1000": "Référence 1000",
@@ -304,6 +558,18 @@ FR: dict[str, Any] = {
         "machines": "Machines",
         "machine": "Machine",
         "value": "Valeur",
+        "test": "Test",
+        "before": "Avant (°C)",
+        "after": "Après (°C)",
+        "runs": "Runs",
+        "burst": "Burst",
+        "cv": "CV",
+        "category": "Catégorie",
+        "duration": "Durée",
+        "share": "Part",
+        "runs_caption": "Dispersion des runs autour de la médiane",
+        "temps_caption": "Température CPU avant et après chaque test",
+        "time_caption": "Répartition du temps de test",
     },
     # Textes lus par le JavaScript (publiés en JSON dans chaque page)
     "js": {
@@ -317,6 +583,7 @@ FR: dict[str, Any] = {
         "menu": "Menu",
         "close": "Fermer",
         "csv_name": "hwbench-classement-{category}.csv",
+        "raw_csv_name": "hwbench-{machine}-resultats.csv",
         "csv_head": [
             "rang",
             "machine",
