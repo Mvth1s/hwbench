@@ -76,3 +76,14 @@ def test_ranked_puts_unranked_last(tmp_path) -> None:
         [view("b", None), view("c", 500.0), view("a", None), view("d", 900.0)], "combined"
     )
     assert [(rank, v.slug) for rank, v in order] == [(1, "d"), (2, "c"), (None, "a"), (None, "b")]
+
+
+def test_charts_stay_bounded_with_huge_points() -> None:
+    """Un export retouché aux points démesurés (mais finis) ne fait pas exploser la génération."""
+    from hwbench.leaderboard import charts
+
+    assert charts.ticks(1312.5) == [0, 500, 1000]
+    assert len(charts.ticks(1e300)) <= 6 and charts.ticks(float("inf")) == [0.0]
+    assert len(charts.histogram([500.0, 1e300], 700.0, "c", "m").bands) <= charts.HIST_MAX_BINS
+    points = [charts.Point(1e300, 1e300, "desktop", "x"), charts.Point(900, 800, "laptop", "y")]
+    assert charts.scatter(points, "c", "x", "y", "r").count("<line") <= 14

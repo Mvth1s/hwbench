@@ -22,9 +22,14 @@ class Point:
 
 
 def ticks(maximum: float) -> list[float]:
-    """Graduations « rondes » de 0 à `maximum`, 5 intervalles au plus."""
-    steps = (50, 100, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000, 50000)
-    step = next((s for s in steps if maximum / s <= 5), 100000)
+    """Graduations « rondes » (1, 2, 2,5 ou 5 × 10^k, au moins 50) de 0 à `maximum`, 5
+    intervalles au plus quelle que soit la valeur : un export retouché aux points démesurés ne
+    doit pas faire générer des milliards de graduations."""
+    if not math.isfinite(maximum) or maximum <= 0:
+        return [0.0]
+    magnitude = 10 ** math.floor(math.log10(maximum / 5))
+    step = next(m * magnitude for m in (1, 2, 2.5, 5, 10) if maximum / (m * magnitude) <= 5)
+    step = max(50.0, step)
     return [i * step for i in range(int(maximum // step) + 1)]
 
 
@@ -87,6 +92,9 @@ def scatter(points: list[Point], caption: str, x_label: str, y_label: str, ref: 
     return Markup("".join(parts))
 
 
+HIST_MAX_BINS = 40
+
+
 @dataclass(frozen=True)
 class Histogram:
     svg: Markup
@@ -96,8 +104,10 @@ class Histogram:
 def histogram(values: list[float], median: float, caption: str, median_label: str) -> Histogram:
     w, h, ml, mr, mt, mb = 560, 260, 36, 10, 24, 32
     v_max = max([1100.0, *values])
-    width = 200 if v_max > 1600 else 100
-    n = math.ceil(v_max / width)
+    width = 200.0 if v_max > 1600 else 100.0
+    if v_max / width > HIST_MAX_BINS:  # valeurs démesurées : tranches plus larges, nombre borné
+        width = ticks(v_max)[1] / 2
+    n = min(math.ceil(v_max / width), HIST_MAX_BINS)
     counts = [sum(1 for v in values if i * width <= v < (i + 1) * width) for i in range(n)]
     c_max = max([1, *counts])
     iw, ih = w - ml - mr, h - mt - mb
