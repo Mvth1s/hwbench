@@ -758,22 +758,33 @@ def test_site_without_the_extra_explains_how_to_install_it(tmp_path, monkeypatch
     assert not out.exists()
 
 
-def test_catalog_has_no_postal_address_or_phone() -> None:
-    """Aucune adresse postale ni aucun numéro de téléphone dans les textes du site."""
+# Seuls textes autorisés à porter une adresse postale : celle de l'hébergeur (obligation légale).
+HOST_ADDRESS_KEYS = {"footer.host"}
+
+
+def test_catalog_has_no_personal_contact_details() -> None:
+    """Aucune coordonnée personnelle de l'éditeur (adresse, téléphone, e-mail) dans les textes du
+    site ; l'adresse de l'hébergeur n'apparaît qu'aux endroits prévus, sans téléphone."""
     address = re.compile(
-        r"\b\d{5}\b|\bCA \d|\b(street|avenue|boulevard|rue|bd|chemin|allée)\b"
-        r"|(\+\d{1,3}|\b0\d)([ .-]?\d{2}){4}",
+        r"\b\d{5}\b|\bCA \d|\b(street|st\.|avenue|boulevard|rue|bd|chemin|allée)\s",
         re.IGNORECASE,
     )
+    phone = re.compile(r"(\+\d{1,3}|\b0\d)([ .-]?\d{2}){4}|\(\d{3}\)\s?\d{3}")
+    email = re.compile(r"[\w.+-]+@[\w-]+\.\w")
 
-    def strings(node: object) -> list[str]:
+    def strings(node: object, path: str) -> list[tuple[str, str]]:
         if isinstance(node, str):
-            return [node]
+            return [(path, node)]
         if isinstance(node, dict):
-            return [s for value in node.values() for s in strings(value)]
+            return [x for k, v in node.items() for x in strings(v, f"{path}.{k}".lstrip("."))]
         if isinstance(node, list):
-            return [s for value in node for s in strings(value)]
+            return [x for v in node for x in strings(v, path)]
         return []
 
-    found = [s for s in strings(FR) if address.search(s)]
-    assert found == []
+    texts = strings(FR, "")
+    assert [p for p, s in texts if phone.search(s) or email.search(s)] == []
+    with_address = {p for p, s in texts if address.search(s)}
+    assert with_address == HOST_ADDRESS_KEYS
+    assert "Mvth1s" not in FR["footer"]["host"]
+    assert "6-III" not in json.dumps(FR, ensure_ascii=False)  # article non vérifié
+

@@ -74,12 +74,16 @@ FR: dict[str, Any] = {
         },
         "publisher_t": "Éditeur.",
         "publisher": (
-            "Projet open source non commercial maintenu par Mvth1s. Éditeur non professionnel : "
-            "conformément à l'article 6-III-2 de la LCEN, ses coordonnées ont été communiquées "
-            "à l'hébergeur. Contact : issues du dépôt GitHub."
+            "Projet open source non commercial, édité à titre non professionnel. Contact : "
+            "issues du dépôt GitHub."
         ),
         "host_t": "Hébergeur.",
-        "host": "GitHub, Inc. (service GitHub Pages), États-Unis.",
+        # adresse vérifiée le 12/10/2026 sur la déclaration de confidentialité de GitHub
+        # (docs.github.com, github-general-privacy-statement, en vigueur au 27/04/2026)
+        "host": (
+            "GitHub, Inc. (service GitHub Pages), 88 Colin P. Kelly Jr. St., San Francisco, "
+            "CA 94107, États-Unis."
+        ),
         "data_t": "Données personnelles.",
         "data": (
             "Aucun cookie, aucun traceur, aucune ressource tierce. Le thème choisi reste dans le "
