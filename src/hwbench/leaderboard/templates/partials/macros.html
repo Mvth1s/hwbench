@@ -3,14 +3,23 @@
 <button type="button" class="hw-i" data-tip="{{ key }}" hidden aria-label="{{ t.tips.aria | replace('{term}', t.tips.entries[key].term) }}" aria-expanded="false">{{ t.tips.button }}</button>
 {%- endmacro %}
 
-{# Barres horizontales (HTML), suivies d'un tableau équivalent masqué. #}
-{% macro bars(rows, caption, unit) -%}
-<figure class="hw-hbars" data-reveal>
-  <div class="hw-hbars__rows" aria-hidden="true">
-    {% for row in rows %}<div class="hw-hbars__row"><span class="hw-hbars__label">{{ row.label }}</span><span class="hw-bar hw-bar--mute"><i style="--f:{{ row.frac }}"></i></span><span class="hw-num">{{ row.display }}</span></div>
+{# Barres horizontales (HTML), suivies d'un tableau équivalent masqué. Chaque ligne : label,
+   frac, display ; facultatif : hl (mise en avant), tone (couleur), mark (forme), delta.
+   ref_frac : repère pointillé de la référence 1000. #}
+{% macro bars(rows, caption, unit, ref_frac=none, tone="mute", id=none, top=none) -%}
+<figure class="hw-hbars" data-reveal{% if id %} id="{{ id }}"{% endif %}{% if top %} data-top="{{ top }}"{% endif %}>
+  <div class="hw-hbars__rows" aria-hidden="true" data-bars>
+    {% for row in rows %}<div class="hw-hbars__row{% if row.get("hl") %} is-hl{% endif %}"><span class="hw-hbars__label">{% if row.get("mark") %}<span class="hw-mark tone-{{ row.get("tone") }}">{{ row.get("mark") }}</span>{% endif %}<span>{{ row.label }}</span></span><span class="hw-bar hw-bar--{{ row.get("tone") or tone }}{% if row.get("hl") %} is-top{% endif %}"><i style="--f:{{ row.frac }}"></i>{% if ref_frac %}<b class="hw-bar__ref" style="--r:{{ ref_frac }}"></b>{% endif %}</span><span class="hw-num">{{ row.display }}{% if row.get("delta") %} <span class="hw-mute">{{ row.get("delta") }}</span>{% endif %}</span></div>
     {% endfor %}
   </div>
-  <div class="hw-sr"><table><caption>{{ caption }}</caption><thead><tr><th scope="col">{{ t.charts.machine }}</th><th scope="col">{{ t.charts.value }} ({{ unit }})</th></tr></thead>
-  <tbody>{% for row in rows %}<tr><th scope="row">{{ row.label }}</th><td>{{ row.display }}</td></tr>{% endfor %}</tbody></table></div>
+  {% if ref_frac %}<div class="hw-hbars__row hw-hbars__refrow" aria-hidden="true"><span></span><span class="hw-hbars__reflabel"><span style="--r:{{ ref_frac }}">┆ {{ t.charts.reference_1000 }}</span></span><span></span></div>{% endif %}
+  <div class="hw-sr"><table><caption>{{ caption }}</caption><thead><tr><th scope="col">{{ t.charts.machine }}</th><th scope="col">{{ t.charts.value }}{% if unit %} ({{ unit }}){% endif %}</th></tr></thead>
+  <tbody data-bars-table>{% for row in rows %}<tr><th scope="row">{{ row.label }}</th><td>{{ row.display }}{% if row.get("delta") %} ({{ row.get("delta") }}){% endif %}</td></tr>{% endfor %}</tbody></table></div>
 </figure>
+{%- endmacro %}
+
+{# Tableau équivalent masqué d'un graphique SVG. #}
+{% macro sr_table(caption, heads, rows) -%}
+<div class="hw-sr"><table><caption>{{ caption }}</caption><thead><tr>{% for h in heads %}<th scope="col">{{ h }}</th>{% endfor %}</tr></thead>
+<tbody>{% for row in rows %}<tr>{% for cell in row %}{% if loop.first %}<th scope="row">{{ cell }}</th>{% else %}<td>{{ cell }}</td>{% endif %}{% endfor %}</tr>{% endfor %}</tbody></table></div>
 {%- endmacro %}

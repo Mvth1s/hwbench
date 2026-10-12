@@ -14,7 +14,6 @@ venir de n'importe qui. Les textes du site viennent du catalogue (catalog.py).
 import json
 import math
 import shutil
-from dataclasses import replace
 from datetime import UTC, datetime
 from importlib.resources import files
 from importlib.resources.abc import Traversable
@@ -30,9 +29,7 @@ except ModuleNotFoundError as exc:
     raise ModuleNotFoundError(SITE_EXTRA_MISSING, name=exc.name) from exc
 
 from hwbench import __version__
-from hwbench.analysis import analyze
-from hwbench.display.fmt import compact, fr_date, grouped, num
-from hwbench.labels import CATEGORY_LABELS
+from hwbench.display.fmt import compact, fr_date, grouped
 from hwbench.leaderboard import charts
 from hwbench.leaderboard.catalog import (
     FR,
@@ -42,12 +39,13 @@ from hwbench.leaderboard.catalog import (
     unranked_machines,
 )
 from hwbench.leaderboard.entries import (
-    INFO_CATEGORIES,
     Entry,
     category_points,
     load_entries,
     ranking,
 )
+from hwbench.leaderboard.machine import machine_context, same_model_groups
+from hwbench.leaderboard.validate import read_bounded
 from hwbench.leaderboard.views import (
     CATEGORY_KEYS,
     PAGE_FILES,
@@ -58,9 +56,7 @@ from hwbench.leaderboard.views import (
     median,
     ranked,
 )
-from hwbench.report.html import e, page
-from hwbench.report.sections import Context, render_sections
-from hwbench.results import COMBINED_CATEGORIES, Category
+from hwbench.results import COMBINED_CATEGORIES
 from hwbench.runner import RunSettings
 from hwbench.scoring import Reference
 
@@ -358,71 +354,7 @@ def copy_assets(out_dir: Path) -> None:
     _copy_tree(files("hwbench.leaderboard") / "static", out_dir / "assets")
 
 
-# --- Page machine : rendu du rapport (report/), provisoire jusqu'à la page machine du design ---
-
-STALE_BADGE = '<span class="status status-check">à ré-exporter</span>'
-STALE_NOTE = (
-    "noté contre une référence antérieure à la référence actuelle. Les points affichés sont "
-    "recalculés contre la référence actuelle à partir de ses résultats bruts ; les benchs dont "
-    "la version d'outil ou de protocole a changé depuis ne sont pas notés."
-)
-
-
-def info_value(entry: Entry, category: Category) -> str | None:
-    """Colonne d'information : points s'ils sont calculables contre la référence, sinon la
-    valeur brute (mémoire : copie multi-processus ; disque : lecture séquentielle et 4K)."""
-    points = category_points(entry, category)
-    if points is not None:
-        return f"{num(points, 0)} pts"
-    results = {r.name: r for r in entry.export.results}
-    if category is Category.MEMORY:
-        r = results.get("native-memory-multi") or results.get("native-memory-single")
-        return f"{num(r.value, 0)} Mio/s" if r else None
-    if category is Category.DISK and (r := results.get("fio-disk")) is not None:
-        seq, rand = r.details.get("seq_read"), r.details.get("rand_read_4k")
-        parts = [
-            f"{num(seq, 0)} Mio/s" if seq else None,
-            f"{num(rand, 0)} IOPS 4K" if rand else None,
-        ]
-        return " · ".join(p for p in parts if p) or None
-    return None
-
-
-# Preview (branche dev, publiée sous /preview/ du site) : bandeau en tête de chaque page, lien
-# vers le classement officiel (dossier parent), pages en noindex. Style en ligne : le CSS commun
-# est aussi celui du rapport, qui n'a pas de preview.
-PREVIEW_STYLE = (
-    "margin:0 0 16px;padding:8px 12px;border:2px dashed var(--check);border-radius:6px;"
-    "color:var(--check);font-weight:600"
-)
-PREVIEW_TITLE = "Preview · "
-# robots.txt n'est lu qu'à la racine de l'hôte : sous /hwbench/preview/, c'est la balise meta
-# robots de chaque page qui empêche l'indexation ; le fichier ne sert que d'indication.
-PREVIEW_ROBOTS = "User-agent: *\nDisallow: /\n"
-
-
-def _preview_banner(root: str) -> str:
-    """`root` : chemin relatif de la page vers la racine de la preview ("" ou "../")."""
-    return (
-        f'<p class="preview-banner" style="{PREVIEW_STYLE}">Preview : site généré depuis la '
-        "branche dev, pour vérification avant une release. Ce n'est pas "
-        f'<a href="{root}../index.html">le classement officiel</a>.</p>'
-    )
-
-
-def _page(title: str, body: str, generated: datetime, preview: bool = False, root: str = "") -> str:
-    if preview:
-        title = PREVIEW_TITLE + title
-        body = _preview_banner(root) + body
-    footer = (
-        f"Généré le {e(generated.strftime('%d/%m/%Y %H:%M'))} UTC par hwbench. Résultats "
-        "déclaratifs, soumis par pull request. "
-        '<a href="https://github.com/Mvth1s/hwbench">Dépôt</a> · '
-        '<a href="https://github.com/Mvth1s/hwbench/blob/main/CONTRIBUTING.md">Soumettre un '
-        "résultat</a>"
-    )
-    return page(title, body, footer, noindex=preview)
-
+# --- Page machine ---
 
 SETTING_LABELS = {
     "runs": ("runs", ""),
@@ -460,51 +392,42 @@ def settings_note(measured: RunSettings | None) -> str:
     )
 
 
-def _ranking_block(entry: Entry) -> str:
-    rows = [(CATEGORY_LABELS[c], category_points(entry, c)) for c in COMBINED_CATEGORIES]
-    rows.append(("Score combiné", category_points(entry, None)))
-    cells = "".join(
-        f'<tr><th>{e(label)}</th><td class="num">'
-        f"{e(num(points, 0) + ' pts' if points is not None else 'non classé')}</td></tr>"
-        for label, points in rows
-    ) + "".join(
-        f'<tr><th>{e(CATEGORY_LABELS[c])} (information)</th><td class="num">{e(value)}</td></tr>'
-        for c in INFO_CATEGORIES
-        if (value := info_value(entry, c)) is not None
-    )
-    return (
-        '<section id="classement"><h2>Classement</h2>'
-        f"<table><tbody>{cells}</tbody></table></section>"
-    )
-
-
 def render_machine(
-    entry: Entry, reference: Reference, generated: datetime, preview: bool = False
+    entry: Entry,
+    view: MachineView,
+    views: list[MachineView],
+    same_model: list[MachineView],
+    reference: Reference,
+    generated: datetime,
+    preview: bool = False,
 ) -> str:
-    """Page machine : sections du rapport (mêmes graphiques, même synthèse), sans
-    recommandations ni JSON embarqué. Points recalculés contre la référence du paquet, analyse
-    avec les seuils par défaut."""
-    ex = entry.export
-    scored = replace(
-        ex,
-        backend_scores=entry.scores.backends,
-        categories=entry.scores.categories,
-        combined=entry.scores.combined,
-        reference=reference.info(),
+    """Page machine (design Machine.dc.html) : points recalculés contre la référence du paquet,
+    fiabilité jugée avec les seuils par défaut, sans recommandations."""
+    ctx = _common("machine", view.name, "../", generated, preview)
+    ctx["tip_keys"] = [
+        "geomean",
+        "points",
+        "native",
+        "fps",
+        "glmark2",
+        "vkmark",
+        "burst",
+        "median",
+        "cv",
+        "warmup",
+        "qd",
+        "iops",
+        "epp",
+        "governor",
+    ]
+    ctx.update(machine_context(entry, view, views, same_model, reference))
+    ctx.update(
+        view=view,
+        kind_mark=KIND_MARKS[view.kind],
+        settings_note=settings_note(entry.export.settings),
+        csv_name=FR["js"]["raw_csv_name"].replace("{machine}", view.slug),
     )
-    settings = RunSettings()
-    ctx = Context(scored, analyze(scored, settings), settings, settings_note(ex.settings))
-    intro = (
-        '<p><a href="../index.html">← Classement</a></p>'
-        f'<p class="muted">Fichier <code>results/{e(entry.slug)}.json</code> · points recalculés '
-        f"contre la référence {e(reference.machine)} (1000 points).</p>"
-    )
-    if entry.stale:
-        intro += f"<p>{STALE_BADGE} Ce fichier a été {STALE_NOTE}</p>"
-    sections = render_sections(
-        ctx, with_recommendations=False, embed_json=False, after_header=_ranking_block(entry)
-    )
-    return _page(f"{ex.machine} · hwbench", intro + sections, generated, preview, root="../")
+    return ENV.get_template("machine.html").render(ctx)
 
 
 def build_site(
@@ -524,10 +447,13 @@ def build_site(
     for key in CATEGORY_KEYS:
         html = render_classement(views, key, reference, generated, skipped, preview)
         (out_dir / PAGE_FILES[key]).write_text(html, encoding="utf-8")
-    for entry in entries:
-        (out_dir / "machines" / f"{entry.slug}.html").write_text(
-            render_machine(entry, reference, generated, preview), encoding="utf-8"
-        )
+    same_model = same_model_groups(views)
+    for entry, view in zip(entries, views, strict=True):
+        html = render_machine(entry, view, views, same_model(view), reference, generated, preview)
+        (out_dir / "machines" / f"{entry.slug}.html").write_text(html, encoding="utf-8")
+        # JSON source téléchargeable : le fichier soumis, relu borné comme à la validation
+        source = read_bounded(results_dir / f"{entry.slug}.json")
+        (out_dir / "machines" / f"{entry.slug}.json").write_bytes(source)
     (out_dir / "data.json").write_text(
         json.dumps(data_json(views, reference, generated), ensure_ascii=False, indent=1) + "\n",
         encoding="utf-8",

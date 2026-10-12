@@ -382,8 +382,53 @@ function initRanking() {
   render();
 }
 
+// ---------- Page machine : ajout d'une machine à « Face à… », CSV des résultats bruts ----------
+function initAddMachine() {
+  document.querySelectorAll('[data-add-target]').forEach((select) => {
+    const figure = document.getElementById(select.dataset.addTarget);
+    if (!figure) return;
+    const rows = figure.querySelector('[data-bars]');
+    const table = figure.querySelector('[data-bars-table]');
+    const top = Number(figure.dataset.top) || 1;
+    const template = rows.querySelector('.hw-hbars__row:not(.is-hl)') || rows.firstElementChild;
+    select.closest('[data-add-machine]').hidden = false;
+    let added = null;
+    select.addEventListener('change', () => {
+      if (added) { added.row.remove(); added.tr.remove(); added = null; }
+      const points = Number(select.value);
+      if (!select.value || !Number.isFinite(points)) return;
+      const name = select.options[select.selectedIndex].textContent + ' · ' + select.dataset.added;
+      const row = template.cloneNode(true);
+      row.classList.add('is-added');
+      const labels = row.querySelector('.hw-hbars__label');
+      labels.replaceChildren(Object.assign(document.createElement('span'), { textContent: name }));
+      row.querySelector('.hw-bar>i').style.setProperty('--f', Math.min(1, Math.max(0.003, points / top)).toFixed(4));
+      row.querySelector('.hw-num').textContent = NUM.format(points);
+      rows.appendChild(row);
+      const tr = document.createElement('tr');
+      const th = Object.assign(document.createElement('th'), { scope: 'row', textContent: name });
+      tr.append(th, Object.assign(document.createElement('td'), { textContent: NUM.format(points) }));
+      table.appendChild(tr);
+      added = { row, tr };
+    });
+  });
+}
+function initTableCSV() {
+  document.querySelectorAll('[data-csv-table]').forEach((button) => {
+    const table = document.getElementById(button.dataset.csvTable);
+    if (!table) return;
+    button.hidden = false;
+    button.addEventListener('click', () => {
+      const rows = [...table.rows].map((tr) => [...tr.cells].map((cell) => cell.textContent.trim()));
+      downloadCSV(button.dataset.csvName || 'hwbench.csv', rows);
+    });
+  });
+}
+
 initTheme();
 initMenu();
+initAddMachine();
+initTableCSV();
 initTips();
 initRanking();
 initReveal();

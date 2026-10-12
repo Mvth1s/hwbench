@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import tip, bars, sr_table with context %}
+{% set m = t.machine %}
+{% set ch = t.charts %}
+{% block main %}
+<nav class="hw-crumbs" aria-label="{{ m.crumbs }}"><ol>
+  <li><a href="{{ root }}index.html">{{ m.rank }}</a></li><li aria-hidden="true">/</li>
+  <li>{{ t.kinds[view.kind] }}</li><li aria-hidden="true">/</li>
+  <li aria-current="page">{{ view.slug }}</li>
+</ol></nav>
+
+<section class="hw-section hw-mhero" aria-labelledby="h-m">
+  <div class="hw-mhero__text">
+    <div class="hw-badges">
+      <span class="hw-badge hw-badge--{{ hero.rel }}">{{ t.reliability[hero.rel] }}{% if hero.cv %} · {{ hero.cv }}{% endif %}</span>
+      <span class="hw-badge"><span aria-hidden="true">{{ kind_mark }}</span> {{ t.kinds[view.kind] }}</span>
+      {% if view.stale %}<span class="hw-badge hw-badge--stale">{{ t.stale }}</span>{% endif %}
+      <span class="hw-badge">{{ hero.exported }}</span>
+    </div>
+    <h1 class="hw-h1 hw-h1--machine" id="h-m">{{ view.name }}</h1>
+    <dl class="hw-specs">
+      <dt>{{ m.cpu }}</dt><dd>{{ hero.cpu }}</dd>
+      <dt>{{ m.gpu }}</dt><dd>{{ hero.gpu }}</dd>
+      {% if hero.ram %}<dt>{{ m.ram }}</dt><dd>{{ hero.ram }}</dd>{% endif %}
+    </dl>
+    {% if view.stale %}<p class="hw-callout">{{ m.stale_p }}</p>{% endif %}
+  </div>
+  <div class="hw-scorepanel">
+    <div class="hw-scorepanel__head"><span class="hw-kicker">{{ m.combined }}{{ tip("geomean") }}</span>{% if score.delta %}<span class="hw-mono-note">{{ score.delta }}</span>{% endif %}</div>
+    {% if score.value %}<div class="hw-scorepanel__value hw-num" data-count="{{ score.raw }}">{{ score.value }}</div>
+    {% else %}<p class="hw-scorepanel__none">{{ m.combined_missing }}</p>{% endif %}
+    <div class="hw-scorepanel__tiles">
+      <div><span class="hw-num">{% if score.rank %}#{{ score.rank }}{% else %}—{% endif %}</span><span>{{ score.rank_txt }}</span></div>
+      <div><span class="hw-num">{% if score.rank_kind %}#{{ score.rank_kind }}{% else %}—{% endif %}</span><span>{{ score.rank_kind_txt }}</span></div>
+      <div><span class="hw-num">{{ score.beat or "—" }}</span><span>{{ m.beat }}</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="hw-section hw-msplit">
+  <div class="hw-stack-20">
+    <h2 class="hw-h3 hw-h3--lg">{{ m.by_cat }}{{ tip("points") }}</h2>
+    {{ bars(categories.rows, m.by_cat, "", categories.ref_frac) }}
+    {% if categories.raw %}<details class="hw-acc hw-acc--sm"><summary>{{ m.raw_vals }}<span class="chev" aria-hidden="true">+</span></summary>
+      <table class="hw-kv"><tbody>{% for row in categories.raw %}<tr><th scope="row">{{ row.label }}</th><td class="hw-num">{{ row.value }}</td></tr>{% endfor %}</tbody></table>
+    </details>{% endif %}
+  </div>
+  {% if face %}<div class="hw-stack-20">
+    <div class="hw-split-head"><h2 class="hw-h3 hw-h3--lg">{{ m.face_to }}</h2><span class="hw-mono-note">{{ m.combined_lc }}</span></div>
+    {{ bars(face.rows, m.face_to, "", face.ref_frac, id="face-bars", top=face.top) }}
+    <label class="hw-field hw-add" data-add-machine hidden>{{ m.add_machine }}
+      <select class="hw-select" data-add-target="face-bars" data-added="{{ m.added }}"><option value="">{{ m.choose }}</option>{% for o in face.options %}<option value="{{ o.points }}">{{ o.name }}</option>{% endfor %}</select>
+    </label>
+  </div>{% endif %}
+</section>
+
+{% if same %}
+<section class="hw-section hw-msplit" aria-labelledby="h-same">
+  <div class="hw-stack-12"><h2 class="hw-h3 hw-h3--lg" id="h-same">{{ m.same_h }}</h2><p class="hw-mute hw-small">{{ same.text }}</p></div>
+  {{ bars(same.rows, m.same_h, "", same.ref_frac) }}
+</section>
+{% endif %}
+
+{% if cpu %}
+<section class="hw-section" aria-labelledby="h-cpu">
+  <div class="hw-split-head hw-split-head--end">
+    <h2 class="hw-h3 hw-h3--lg" id="h-cpu">{{ m.cpu_h }}{{ tip("native") }}</h2>
+    <p class="hw-scaling"><span class="hw-num">{{ cpu.scaling }}</span> {{ m.faster | replace("{workers}", cpu.workers) }}</p>
+  </div>
+  <div class="hw-table-wrap" role="region" aria-label="{{ m.cpu_h }}" tabindex="0" data-reveal>
+    <table class="hw-table hw-subtests">
+      <thead><tr><th scope="col">{{ m.subtest }}</th><th scope="col" class="hw-right">{{ m.single }}</th><th scope="col" class="hw-right">{{ m.multi | replace("{workers}", cpu.workers) }}</th><th scope="col" class="hw-col-gain">{{ m.gain }}</th></tr></thead>
+      <tbody>{% for row in cpu.rows %}<tr>
+        <th scope="row">{{ row.label }} <span class="hw-mono-note">{{ row.unit }}</span></th>
+        <td class="hw-num hw-right">{{ row.single }}</td><td class="hw-num hw-right">{{ row.multi }}</td>
+        <td class="hw-col-gain"><span class="hw-gain"><span class="hw-bar hw-bar--s2 hw-bar--ideal" aria-hidden="true"><i style="--f:{{ row.frac }}"></i></span><span class="hw-num">{{ row.gain }}</span></span></td>
+      </tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  <p class="hw-mono-note hw-right">{{ m.ideal | replace("{workers}", cpu.workers) }}</p>
+</section>
+{% endif %}
+
+{% if gpu %}
+<section class="hw-section" aria-labelledby="h-gpu">
+  <div class="hw-stack-6"><h2 class="hw-h3 hw-h3--lg" id="h-gpu">{{ m.gpu_h }}{{ tip("fps") }}</h2><p class="hw-mute hw-small">{{ gpu.text }}</p></div>
+  <div class="hw-grid-2">
+    {% for block in gpu.blocks %}<div class="hw-card hw-stack-14">
+      <h3 class="hw-h3 hw-split-head"><span>{{ block.title }}{{ tip(block.tip) }}</span><span class="hw-mono-note">{{ block.median }}</span></h3>
+      {{ bars(block.rows, block.title, "fps", tone="s3") }}
+    </div>{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="hw-section hw-msplit">
+  {% if runs_svg %}<figure class="hw-chart" id="fig-runs">
+    <figcaption class="hw-stack-12"><h2 class="hw-h3 hw-h3--lg">{{ m.rel_h }}</h2>
+      <span class="hw-legend">{{ m.runs_l }} · <span class="hw-acc-text">{{ m.burst_l }}</span>{{ tip("burst") }} · {{ m.median_l }}{{ tip("median") }} · {{ m.cv_l }}{{ tip("cv") }} · {{ warm }}{{ tip("warmup") }}</span></figcaption>
+    <div class="hw-scroll" role="region" aria-label="{{ ch.runs_caption }}" tabindex="0">{{ runs_svg }}</div>
+    {{ sr_table(ch.runs_caption, [ch.test, ch.runs, ch.median, ch.burst, ch.cv], runs_rows) }}
+  </figure>{% endif %}
+  {% if temps_svg %}<figure class="hw-chart" id="fig-temps">
+    <figcaption class="hw-stack-12"><h2 class="hw-h3 hw-h3--lg">{{ m.temp_h }}</h2><span class="hw-legend">{{ m.temp_p }}</span></figcaption>
+    <div class="hw-scroll" role="region" aria-label="{{ ch.temps_caption }}" tabindex="0">{{ temps_svg }}</div>
+    {{ sr_table(ch.temps_caption, [ch.test, ch.before, ch.after], temps_rows) }}
+  </figure>{% endif %}
+</section>
+
+<section class="hw-section hw-msplit">
+  {% if time %}<figure class="hw-chart">
+    <figcaption class="hw-stack-6"><h2 class="hw-h3 hw-h3--lg">{{ m.time_h }}</h2><span class="hw-mute hw-small">{{ m.time_p }}</span></figcaption>
+    <div class="hw-donut-wrap">{{ time.svg }}
+      <ul class="hw-donut-legend">{% for row in time.rows %}<li><span class="hw-swatch tone-{{ row.tone }}" aria-hidden="true"></span><span>{{ row.label }}</span><span class="hw-mono-note">{{ row.duration }}</span><span class="hw-num">{{ row.share }}</span></li>{% endfor %}</ul>
+    </div>
+  </figure>{% endif %}
+  {% if info.memory or info.seq or info.rand %}<div class="hw-info hw-info--inline hw-stack-14">
+    <p class="hw-kicker">{{ m.info_k }}</p>
+    {% if info.memory %}<h3 class="hw-h3">{{ m.mem_h }} <span class="hw-mono-note">{{ m.mem_unit }}</span></h3>
+    {{ bars(info.memory, m.mem_h, m.mem_unit) }}{% endif %}
+    {% if info.seq or info.rand %}<h3 class="hw-h3">{{ info.disk_title }} <span class="hw-mono-note">{{ m.seq_unit }} · {{ m.rand_unit }}</span>{{ tip("qd") }}{{ tip("iops") }}</h3>
+    {% if info.seq %}{{ bars(info.seq, info.disk_title, m.seq_unit) }}{% endif %}
+    {% if info.rand %}{{ bars(info.rand, info.disk_title, m.rand_unit) }}{% endif %}{% endif %}
+  </div>{% endif %}
+</section>
+
+<section class="hw-section hw-tech" aria-labelledby="h-tech">
+  <h2 class="hw-kicker" id="h-tech">{{ m.tech_h }}</h2>
+  <p class="hw-mono-note">{{ file_note }}</p>
+  <details class="hw-acc hw-acc--first"><summary>{{ m.comp }}<span class="chev" aria-hidden="true">+</span></summary>
+    <dl class="hw-dl-grid">{% for key, value in components %}<div><dt>{{ key }}</dt><dd>{{ value }}</dd></div>{% endfor %}</dl>
+  </details>
+  <details class="hw-acc"><summary>{{ m.cond }}<span class="chev" aria-hidden="true">+</span></summary>
+    <dl class="hw-dl-grid">{% for key, value in conditions %}<div><dt>{{ key }}{% if key == m.cond_k.epp %}{{ tip("epp") }}{% elif key == m.cond_k.governor %}{{ tip("governor") }}{% endif %}</dt><dd>{{ value }}</dd></div>{% endfor %}
+      <div><dt>{{ m.cond_k.settings }}</dt><dd>{{ settings_note }}</dd></div></dl>
+  </details>
+  {% if sensors %}<details class="hw-acc"><summary>{{ m.sensors }}<span class="chev" aria-hidden="true">+</span></summary>
+    <ul class="hw-sensors">{% for s in sensors %}<li>{{ s }}</li>{% endfor %}</ul>
+  </details>{% endif %}
+  <details class="hw-acc hw-acc--last"><summary>{{ m.raw_h }}<span class="chev" aria-hidden="true">+</span></summary>
+    <div class="hw-table-wrap" role="region" aria-label="{{ m.raw_h }}" tabindex="0">
+      <table class="hw-table hw-raw" id="raw-table">
+        <thead><tr><th scope="col">{{ m.head.test }}</th><th scope="col">{{ m.head.median }}</th><th scope="col">{{ m.head.runs }}</th><th scope="col">{{ m.head.cv }}</th><th scope="col">{{ m.head.burst }}</th><th scope="col">{{ m.head.warmup }}</th><th scope="col">{{ m.head.points }}</th><th scope="col">{{ m.head.status }}</th></tr></thead>
+        <tbody>{% for r in raw %}<tr>
+          <th scope="row">{{ r.label }}</th><td class="hw-num">{{ r.median }}</td><td class="hw-num hw-mute">{{ r.runs }}</td>
+          <td class="hw-num{% if r.noisy %} hw-alert{% endif %}">{{ r.cv }}</td><td class="hw-num">{{ r.burst }}</td><td class="hw-num">{{ r.warmup }}</td>
+          <td class="hw-num">{{ r.points }}</td><td class="hw-mute">{{ r.status }}</td>
+        </tr>{% endfor %}</tbody>
+      </table>
+    </div>
+    <div class="hw-tools">
+      <button type="button" class="hw-btn" data-csv-table="raw-table" data-csv-name="{{ csv_name }}" hidden>{{ m.csv }}</button>
+      <a class="hw-btn" href="{{ view.slug }}.json" download>{{ m.json }}</a>
+    </div>
+  </details>
+</section>
+{% endblock %}

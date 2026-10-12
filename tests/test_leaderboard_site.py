@@ -31,7 +31,13 @@ EVIL = '<script>alert("x")</script> & <img src=x onerror=alert(1)>'
 PACKAGE = Path(__file__).parents[1] / "src" / "hwbench" / "leaderboard"
 CLASSEMENT_PAGES = ("index.html", "cpu-single.html", "cpu-multi.html", "gpu.html")
 # seules URL externes autorisées dans le site (aucune ressource externe : liens seulement)
-EXTERNAL_OK = ("https://github.com/Mvth1s/hwbench", "https://fio.readthedocs.io/")
+EXTERNAL_OK = (
+    "https://github.com/Mvth1s/hwbench",
+    "https://fio.readthedocs.io/",
+    "https://docs.kernel.org/admin-guide/pm/",
+    "https://github.com/glmark2/glmark2",
+    "https://github.com/vkmark/vkmark",
+)
 
 
 def results_dir(tmp_path):
@@ -489,7 +495,7 @@ def test_preview_site_is_marked_and_not_indexed(tmp_path) -> None:
     assert 'href="../index.html">le classement officiel</a>' in (out / "index.html").read_text()
     machine_page = (out / "machines" / "rapide.html").read_text()
     assert 'href="../../index.html">le classement officiel</a>' in machine_page
-    assert 'href="../index.html">← Classement</a>' in machine_page  # reste dans la preview
+    assert 'href="../index.html">Classement</a>' in machine_page  # reste dans la preview
 
 
 # --- CLI ---
@@ -560,36 +566,102 @@ def test_real_site_has_no_ambiguous_plural(tmp_path) -> None:
         assert "(s)" not in page.read_text(), page.name
 
 
-# --- Page machine (rendu du rapport, jusqu'à la page machine du design) ---
+# --- Page machine ---
+
+EXPORTS = Path(__file__).parent / "fixtures" / "exports"  # copies figées, jamais results/
 
 
-def test_machine_page_details(tmp_path) -> None:
-    out = site(tmp_path)
-    page = (out / "machines" / "rapide.html").read_text()
-    assert "<h1>Desktop rapide</h1>" in page
-    assert "results/rapide.json" in page
-    assert "2000 pts" in page  # combiné recalculé
-    assert "native-cpu-single" in page and "200,0 indice brut" in page
-    assert "non classé" in (out / "machines" / "portable.html").read_text()  # GPU et combiné
-    assert "mesuré le 03/10/2026" in page  # en-tête : date de l'export
-    assert "Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)" in page  # détail : renderer complet
+def real_site(tmp_path) -> Path:
+    """Site des deux sessions réelles figées, notées contre la référence du paquet."""
+    import shutil
+
+    from hwbench.scoring import load_reference
+
+    d = tmp_path / "results"
+    d.mkdir()
+    for name in ("asrock-b850-riptide-wifi", "dell-latitude-5420"):
+        shutil.copy(EXPORTS / f"{name}-schema2.json", d / f"{name}.json")
+    out = tmp_path / "_site"
+    reference = load_reference()
+    assert reference is not None
+    build_site(d, out, reference, generated=NOW)
+    return out
 
 
-def test_machine_page_reuses_the_report_sections(tmp_path) -> None:
-    page = (site(tmp_path) / "machines" / "rapide.html").read_text()
-    for section in ("classement", "synthese", "conditions", "cpu", "fiabilite", "annexe"):
-        assert f'<section id="{section}">' in page, section
-    assert '<section id="recommandations">' not in page
-    assert "<script" not in page
+def test_machine_page_sections_from_a_real_session(tmp_path) -> None:
+    out = real_site(tmp_path)
+    page = (out / "machines" / "asrock-b850-riptide-wifi.html").read_text()
+    assert '<html lang="fr">' in page and "ASRock B850 Riptide WiFi · hwbench</title>" in page
+    assert 'href="../index.html">Classement</a>' in page  # fil d'Ariane
+    assert 'aria-current="page">asrock-b850-riptide-wifi</li>' in page
+    # en-tête : CPU brut, cœurs, GPU normalisé, RAM
+    assert "AMD Ryzen 7 8700F 8-Core Processor · 8 cœurs / 16 threads" in page
+    assert "<dd>AMD Radeon RX 9070 XT</dd>" in page and "Gio visibles" in page
+    # score combiné recalculé, rangs, comparaison à la référence
+    assert 'class="hw-scorepanel__value hw-num" data-count="' in page
+    assert ">#1</span><span>sur 2 machines</span>" in page
+    for section in (
+        "Par catégorie",
+        "Face à…",
+        "CPU · tests natifs",
+        "GPU · fps par scène",
+        "Fiabilité des mesures",
+        "Températures CPU",
+        "Répartition du temps de test",
+        "Composants",
+        "Conditions de mesure",
+        "Capteurs",
+        "Résultats bruts",
+    ):
+        assert section in page, section
+    assert "Multi (16)" in page and "plus rapide sur 16 processus" in page
+    assert "Exponentiation modulaire 2048 bits" in page  # libellés partagés (hwbench.labels)
+    assert "effect2d-edge" in page and "3840 × 2160" in page  # scènes, résolution
+    assert "secteur (pas de batterie)" in page and "amd-pstate-epp" in page
+    # chaque graphique SVG a son tableau équivalent
+    assert page.count('role="img"') == 3
+    assert "Dispersion des runs autour de la médiane</caption>" in page
+    assert "Température CPU avant et après chaque test</caption>" in page
+    # même modèle : un seul fichier, pas de section
+    assert "Même modèle, autres soumissions" not in page
 
 
-def test_machine_page_information_rows(tmp_path) -> None:
+def test_machine_page_json_source_is_the_submitted_file(tmp_path) -> None:
+    out = real_site(tmp_path)
+    for name in ("asrock-b850-riptide-wifi", "dell-latitude-5420"):
+        copy = out / "machines" / f"{name}.json"
+        assert copy.read_bytes() == (EXPORTS / f"{name}-schema2.json").read_bytes()
+        assert f'href="{name}.json" download' in (out / "machines" / f"{name}.html").read_text()
+
+
+def test_machine_page_memory_and_disk_information(tmp_path) -> None:
     d = results_dir(tmp_path)
     with_info = machine(1.0) + [make_result("native-memory-multi", 25_000.0), disk(3347, 238831)]
     write_export(export(with_info, "Avec mémoire et disque"), d / "infos.json")
     page = (site(tmp_path, d) / "machines" / "infos.html").read_text()
-    assert "Mémoire (information)" in page
-    assert "Lecture aléatoire 4K (QD32)" in page and "<td>1 Gio</td>" in page
+    info = page.split("Informations · hors classement", 1)[1].split("Détail technique", 1)[0]
+    assert "Mémoire multi (natif)" in info and "25\u202f000" in info
+    assert "Lecture séquentielle (1 Mio, QD8)" in info and "3\u202f347" in info
+    assert "Lecture aléatoire 4K (QD32)" in info and "239 k" in info
+
+
+def test_machine_page_without_combined_score(tmp_path) -> None:
+    page = (site(tmp_path) / "machines" / "portable.html").read_text()
+    assert "Non classé : score combiné calculé sans GPU complet" in page
+    assert 'id="face-bars"' not in page  # pas de comparaison sans score combiné
+    gpu_row = page.split("<span>GPU</span>", 1)[1].split("</div>", 1)[0]
+    assert "non classé" in gpu_row
+
+
+def test_machine_page_same_model_section(tmp_path) -> None:
+    d = results_dir(tmp_path)
+    write_export(export(machine(1.1), "Desktop moyen"), d / "moyen-bis.json")
+    page = (site(tmp_path, d) / "machines" / "moyen.html").read_text()
+    assert "Même modèle, autres soumissions" in page
+    assert (
+        "2 fichiers pour ce modèle. Dispersion du score combiné : 1\u202f000 – 1\u202f100" in page
+    )
+    assert "moyen-bis · 03/10/2026" in page and "Ce fichier" in page
 
 
 def test_machine_page_flags_stale_reference(tmp_path) -> None:
@@ -602,15 +674,25 @@ def test_machine_page_flags_stale_reference(tmp_path) -> None:
     assert round(category_points(entries["ancien"], None)) == 1000
     out = site(tmp_path, d)
     page = (out / "machines" / "ancien.html").read_text()
-    assert "à ré-exporter" in page and "référence antérieure" in page
-    assert "à ré-exporter" not in (out / "machines" / "moyen.html").read_text()
+    assert "hw-badge--stale" in page and "ancienne machine de référence" in page
+    assert "hw-badge--stale" not in (out / "machines" / "moyen.html").read_text()
 
 
-def _with_settings(tmp_path, settings: RunSettings | None) -> str:
+def test_machine_page_add_machine_options(tmp_path) -> None:
+    page = (site(tmp_path) / "machines" / "moyen.html").read_text()
+    face = page.split('id="face-bars"', 1)[1]
+    assert 'data-top="' in page.split('id="face-bars"', 1)[1][:40]
+    # sélecteur caché sans JS, options = autres machines classées au combiné (points bruts)
+    assert "data-add-machine hidden" in face
+    assert '<option value="2000.0">Desktop rapide</option>' in face
+    assert ">Portable sans GPU</option>" not in face
+
+
+def _with_settings(tmp_path, settings: RunSettings | None, cv: float = 0.0) -> str:
     d = tmp_path / "results"
     d.mkdir(parents=True)
     hot = replace(COOL_AC_STATE, cpu_temp_c=66.0)
-    results = [replace(r, state_before=hot) for r in machine(1.0)]
+    results = [replace(r, state_before=hot, stdev=r.value * cv / 100) for r in machine(1.0)]
     scores = score_results(results, REFERENCE)
     ex = build_export(snapshot(), "Seuils", results, scores, settings=settings)
     write_export(ex, d / "seuils.json")
@@ -620,14 +702,14 @@ def _with_settings(tmp_path, settings: RunSettings | None) -> str:
 
 
 def test_site_always_applies_the_default_thresholds(tmp_path) -> None:
-    # mesuré avec --hot-start 60 : 66 °C au départ y était « chaud »
-    page = _with_settings(tmp_path, RunSettings(hot_start_c=60.0, high_variance_cv_percent=2.0))
+    # mesuré avec un seuil de CV à 2 % : un CV de 3 % y était « à vérifier », pas sur le site
+    page = _with_settings(
+        tmp_path, RunSettings(hot_start_c=60.0, high_variance_cv_percent=2.0), 3.0
+    )
     assert "Les seuils de la mesure diffèrent des seuils par défaut" in page
     assert "départ chaud 60 °C au lieu de 70 °C" in page
     assert "seuil de CV 2 % au lieu de 5 %" in page
-    # le site juge avec 70 °C : aucun départ chaud signalé
-    assert "seuil de départ chaud)" not in page
-    assert "Tous les tests ont démarré sous le seuil de départ chaud 70 °C." in page
+    assert "hw-badge--ok" in page and "CV max 3,00 %" in page
 
 
 def test_site_notes_default_or_missing_settings(tmp_path) -> None:
