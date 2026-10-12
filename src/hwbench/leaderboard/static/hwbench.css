@@ -242,6 +242,7 @@ code{font:400 14px var(--hw-mono)}
 .hw-chart{margin:0;display:grid;gap:12px;align-content:start;position:relative}
 .hw-chart figcaption{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 16px}
 .hw-chart__title{font:600 15px var(--hw-font)}
+.hw-chart figcaption.hw-stack-6,.hw-chart figcaption.hw-stack-12{display:grid;justify-content:stretch}
 .hw-svg{display:block;width:100%;height:auto;overflow:visible}
 .hw-svg text{font:400 11px var(--hw-font);fill:var(--mute)}
 .hw-svg text.mono{font:400 10px var(--hw-mono)}
@@ -259,7 +260,9 @@ code{font:400 14px var(--hw-mono)}
 .hw-svg--wide{min-width:600px}
 .hw-hbars{margin:0;position:relative}
 .hw-hbars__rows{display:grid;gap:10px}
-.hw-hbars__row{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr) minmax(64px,auto);align-items:center;gap:12px}
+.hw-hbars__row{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr) var(--hw-value-w,6em);align-items:center;gap:12px}
+/* largeur de valeur fixe : toutes les pistes d'un graphique ont la même longueur (repère aligné) */
+.hw-hbars--delta{--hw-value-w:10.5em}
 .hw-hbars__label{font:400 13px/1.25 var(--hw-font);color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hw-hbars__row .hw-num{font:500 13px/1 var(--hw-mono);text-align:right;white-space:nowrap}
 .hw-hbars__label{display:flex;gap:8px;align-items:center;min-width:0}
@@ -270,7 +273,7 @@ code{font:400 14px var(--hw-mono)}
 .hw-hbars__reflabel{position:relative;height:14px}
 .hw-hbars__reflabel>span{position:absolute;left:calc(var(--r) * 100%);transform:translateX(-50%);font:400 11px/1 var(--hw-font);color:var(--mute);white-space:nowrap}
 .hw-mark{font-size:11px} .tone-s1{color:var(--s1)} .tone-s2{color:var(--s2)} .tone-s3{color:var(--s3)}
-@container (max-width:819px){.hw-hbars__row{grid-template-columns:minmax(0,120px) minmax(0,1fr) minmax(56px,auto)}}
+@container (max-width:819px){.hw-hbars__row{grid-template-columns:minmax(0,104px) minmax(0,1fr) var(--hw-value-w,5.5em)}.hw-hbars--delta{--hw-value-w:9em}}
 
 /* ---------- Informations hors classement (toujours isolées, cadre en pointillés) ---------- */
 .hw-info{display:grid;gap:32px;margin:0 clamp(12px,2cqi,32px) clamp(20px,2cqi,32px);border:1px dashed var(--line);border-radius:16px}

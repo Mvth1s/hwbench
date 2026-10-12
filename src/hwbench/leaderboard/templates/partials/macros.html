@@ -7,7 +7,7 @@
    frac, display ; facultatif : hl (mise en avant), tone (couleur), mark (forme), delta.
    ref_frac : repère pointillé de la référence 1000. #}
 {% macro bars(rows, caption, unit, ref_frac=none, tone="mute", id=none, top=none) -%}
-<figure class="hw-hbars" data-reveal{% if id %} id="{{ id }}"{% endif %}{% if top %} data-top="{{ top }}"{% endif %}>
+<figure class="hw-hbars{% if rows | selectattr("delta", "defined") | list %} hw-hbars--delta{% endif %}" data-reveal{% if id %} id="{{ id }}"{% endif %}{% if top %} data-top="{{ top }}"{% endif %}>
   <div class="hw-hbars__rows" aria-hidden="true" data-bars>
     {% for row in rows %}<div class="hw-hbars__row{% if row.get("hl") %} is-hl{% endif %}"><span class="hw-hbars__label">{% if row.get("mark") %}<span class="hw-mark tone-{{ row.get("tone") }}">{{ row.get("mark") }}</span>{% endif %}<span>{{ row.label }}</span></span><span class="hw-bar hw-bar--{{ row.get("tone") or tone }}{% if row.get("hl") %} is-top{% endif %}"><i style="--f:{{ row.frac }}"></i>{% if ref_frac %}<b class="hw-bar__ref" style="--r:{{ ref_frac }}"></b>{% endif %}</span><span class="hw-num">{{ row.display }}{% if row.get("delta") %} <span class="hw-mute">{{ row.get("delta") }}</span>{% endif %}</span></div>
     {% endfor %}
