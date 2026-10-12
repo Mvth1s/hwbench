@@ -79,10 +79,7 @@ FR: dict[str, Any] = {
             "à l'hébergeur. Contact : issues du dépôt GitHub."
         ),
         "host_t": "Hébergeur.",
-        "host": (
-            "GitHub, Inc. (GitHub Pages), 88 Colin P. Kelly Jr. Street, San Francisco, "
-            "CA 94107, États-Unis."
-        ),
+        "host": "GitHub, Inc. (service GitHub Pages), États-Unis.",
         "data_t": "Données personnelles.",
         "data": (
             "Aucun cookie, aucun traceur, aucune ressource tierce. Le thème choisi reste dans le "

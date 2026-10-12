@@ -674,3 +674,24 @@ def test_site_without_the_extra_explains_how_to_install_it(tmp_path, monkeypatch
     assert cli.main(["site", "--results", str(results_dir(tmp_path)), "--out", str(out)]) == 2
     assert "pip install 'hwbench[site]'" in capsys.readouterr().err
     assert not out.exists()
+
+
+def test_catalog_has_no_postal_address_or_phone() -> None:
+    """Aucune adresse postale ni aucun numéro de téléphone dans les textes du site."""
+    address = re.compile(
+        r"\b\d{5}\b|\bCA \d|\b(street|avenue|boulevard|rue|bd|chemin|allée)\b"
+        r"|(\+\d{1,3}|\b0\d)([ .-]?\d{2}){4}",
+        re.IGNORECASE,
+    )
+
+    def strings(node: object) -> list[str]:
+        if isinstance(node, str):
+            return [node]
+        if isinstance(node, dict):
+            return [s for value in node.values() for s in strings(value)]
+        if isinstance(node, list):
+            return [s for value in node for s in strings(value)]
+        return []
+
+    found = [s for s in strings(FR) if address.search(s)]
+    assert found == []
