@@ -24,6 +24,7 @@ class Point:
     y: float
     kind: str  # desktop (cercle) ou laptop (carré)
     label: str
+    id: str = ""  # slug de la machine : sélection pour la comparaison (clic, JavaScript)
 
 
 def ticks(maximum: float) -> list[float]:
@@ -90,9 +91,8 @@ def scatter(points: list[Point], caption: str, x_label: str, y_label: str, ref: 
     r = 2.6 if len(points) > 120 else 4.2
     for p in points:
         parts.append(
-            f"<g><title>{escape(p.label)} — CPU {grouped(p.x)} · GPU {grouped(p.y)}</title>"
-            + _mark(p.kind, sx(p.x), sy(p.y), r, "pt")
-            + "</g>"
+            f'<g data-id="{escape(p.id)}"><title>{escape(p.label)} — CPU {grouped(p.x)} · '
+            f"GPU {grouped(p.y)}</title>" + _mark(p.kind, sx(p.x), sy(p.y), r, "pt") + "</g>"
         )
     parts.append("</svg>")
     return Markup("".join(parts))
