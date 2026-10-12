@@ -211,7 +211,7 @@ function initPNG() {
 }
 
 // ---------- Classement : filtres, tri, pagination, état d'URL ----------
-const DEFAULTS = { q: '', kind: 'all', cpu: 'all', gpu: 'all', rel: 'all', since: 'all', smin: '', smax: '', sort: 'rank', dir: '1', page: '1', per: '25' };
+const DEFAULTS = { q: '', kind: 'all', cpu: 'all', gpu: 'all', rel: 'all', since: 'all', smin: '', smax: '', sort: 'rank', dir: '1', page: '1', per: '25', sel: '' };
 const FILTER_KEYS = ['q', 'kind', 'cpu', 'gpu', 'rel', 'since', 'smin', 'smax'];
 
 function initRanking() {
@@ -369,8 +369,75 @@ function initRanking() {
     resets.forEach((b) => { if (!b.closest('[data-no-results]')) b.hidden = !filtered; });
     empty.hidden = visible.length > 0;
     table.closest('.hw-table-wrap').hidden = visible.length === 0;
+    updateURL();
+  }
+  function updateURL() {
     const q = query();
     try { history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash); } catch (e) { /* file:// */ }
+  }
+
+  // ---- sélection pour la comparaison : cases du tableau, barre de sélection, nuage de points ----
+  const tray = document.querySelector('[data-tray]');
+  const live = document.querySelector('[data-live]');
+  const known = new Map(rowData.map((r) => [r.tr.dataset.id, r]));
+  const MAX_SEL = 8;
+  let selected = state.sel.split(',').filter((id) => known.has(id)).slice(0, MAX_SEL);
+  const points = [...document.querySelectorAll('#fig-scatter g[data-id]')];
+  function syncSelection(announce) {
+    state.sel = selected.join(',');
+    rowData.forEach((r) => {
+      const box = r.tr.querySelector('[data-select]');
+      if (box) box.checked = selected.includes(r.tr.dataset.id);
+      r.tr.classList.toggle('is-selected', selected.includes(r.tr.dataset.id));
+    });
+    points.forEach((g) => {
+      const on = selected.includes(g.dataset.id);
+      g.classList.toggle('is-sel', on);
+      g.setAttribute('aria-pressed', String(on));
+    });
+    if (tray) {
+      tray.hidden = selected.length === 0;
+      const n = selected.length;
+      tray.querySelector('[data-tray-count]').textContent = fill(n > 1 ? I18N.sel_count_many : I18N.sel_count, { n });
+      const chips = tray.querySelector('[data-tray-chips]');
+      const tpl = document.getElementById('tpl-chip');
+      chips.replaceChildren(...selected.map((id) => {
+        const chip = tpl.content.firstElementChild.cloneNode(true);
+        chip.querySelector('[data-name]').textContent = known.get(id).name;
+        chip.setAttribute('aria-label', fill(I18N.sel_live_off, { name: known.get(id).name }));
+        chip.addEventListener('click', () => toggle(id));
+        return chip;
+      }));
+      const go = tray.querySelector('[data-tray-go]');
+      go.href = go.getAttribute('href').split('?')[0] + '?sel=' + encodeURIComponent(selected.join(','));
+      go.setAttribute('aria-disabled', String(n < 2));
+    }
+    if (announce && live) live.textContent = announce;
+    updateURL();
+  }
+  function toggle(id) {
+    const on = !selected.includes(id);
+    if (on && selected.length >= MAX_SEL) return;
+    selected = on ? [...selected, id] : selected.filter((x) => x !== id);
+    syncSelection(fill(on ? I18N.sel_live_on : I18N.sel_live_off, { name: known.get(id).name }));
+  }
+  rowData.forEach((r) => {
+    const box = r.tr.querySelector('[data-select]');
+    if (!box) return;
+    box.hidden = false;
+    box.addEventListener('change', () => toggle(r.tr.dataset.id));
+  });
+  if (tray) {
+    points.forEach((g) => {
+      g.setAttribute('role', 'button');
+      g.tabIndex = 0;
+      g.setAttribute('aria-label', fill(I18N.select_aria, { name: known.get(g.dataset.id)?.name || '' }));
+      g.addEventListener('click', () => toggle(g.dataset.id));
+      g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(g.dataset.id); } });
+    });
+    document.querySelectorAll('[data-js-only]').forEach((el) => { el.hidden = false; });
+    tray.querySelector('[data-tray-clear]').addEventListener('click', () => { selected = []; syncSelection(''); });
+    tray.querySelector('[data-tray-go]').addEventListener('click', (e) => { if (selected.length < 2) e.preventDefault(); });
   }
 
   pager.querySelector('[data-csv]').addEventListener('click', () => {
@@ -380,6 +447,7 @@ function initRanking() {
   });
 
   render();
+  syncSelection('');
 }
 
 // ---------- Page machine : ajout d'une machine à « Face à… », CSV des résultats bruts ----------
@@ -395,6 +463,8 @@ function initAddMachine() {
     let added = null;
     select.addEventListener('change', () => {
       if (added) { added.row.remove(); added.tr.remove(); added = null; }
+      const link = document.querySelector('[data-cmp-link]');
+      if (link) link.href = link.getAttribute('href').split('?')[0] + '?sel=' + encodeURIComponent(link.dataset.self);
       const points = Number(select.value);
       if (!select.value || !Number.isFinite(points)) return;
       const name = select.options[select.selectedIndex].textContent + ' · ' + select.dataset.added;
@@ -410,6 +480,8 @@ function initAddMachine() {
       tr.append(th, Object.assign(document.createElement('td'), { textContent: NUM.format(points) }));
       table.appendChild(tr);
       added = { row, tr };
+      const id = select.options[select.selectedIndex].dataset.id;
+      if (link && id) link.href = link.getAttribute('href').split('?')[0] + '?sel=' + encodeURIComponent(link.dataset.self + ',' + id);
     });
   });
 }
@@ -425,8 +497,245 @@ function initTableCSV() {
   });
 }
 
+
+// ---------- Comparaison : machines choisies (?sel=…&base=…), depuis data.json ----------
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const TONES = ['s1', 's2', 's3', 'acc'];
+const SMARKS = ['●', '■', '▲', '◆'];
+const SHAPES = ['circle', 'square', 'triangle', 'diamond'];
+const KEYS = ['cpu_single', 'cpu_multi', 'gpu', 'combined'];
+const PCT = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+function el(tag, attrs = {}, text) {
+  const node = document.createElementNS(SVG_NS, tag);
+  Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, String(v)));
+  if (text != null) node.textContent = text;
+  return node;
+}
+function mark(shape, x, y, r, cls) {
+  if (shape === 'square') return el('rect', { x: x - r * 0.88, y: y - r * 0.88, width: r * 1.76, height: r * 1.76, class: cls });
+  if (shape === 'triangle') return el('polygon', { points: `${x},${y - r * 1.15} ${x + r * 1.1},${y + r * 0.85} ${x - r * 1.1},${y + r * 0.85}`, class: cls });
+  if (shape === 'diamond') return el('polygon', { points: `${x},${y - r * 1.2} ${x + r * 1.2},${y} ${x},${y + r * 1.2} ${x - r * 1.2},${y}`, class: cls });
+  return el('circle', { cx: x, cy: y, r, class: cls });
+}
+function niceTicks(max) {
+  const steps = [50, 100, 250, 500, 1000, 2000, 2500, 5000, 10000];
+  const step = steps.find((s) => max / s <= 5) || 20000;
+  const out = [];
+  for (let v = 0; v <= max + 1e-9; v += step) out.push(v);
+  return out;
+}
+function radarSVG(series, caption) {
+  const size = 380, c = size / 2, R = c - 48;
+  const max = Math.max(1250, ...series.flatMap((s) => s.vals)) * 1.02;
+  const ang = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / 3;
+  const P = (i, v) => [c + Math.cos(ang(i)) * R * (v / max), c + Math.sin(ang(i)) * R * (v / max)];
+  const svg = el('svg', { class: 'hw-svg hw-svg--radar', viewBox: `0 0 ${size} ${size}`, role: 'img', 'aria-label': caption });
+  [250, 500, 750, 1000].forEach((t) => svg.append(el('polygon', { points: [0, 1, 2].map((i) => P(i, t).join(',')).join(' '), class: t === 1000 ? 'ref' : 'grid', fill: 'none' })));
+  [0, 1, 2].forEach((i) => {
+    const [x, y] = P(i, max);
+    svg.append(el('line', { x1: c, y1: c, x2: x, y2: y, class: 'grid' }));
+    const [lx, ly] = P(i, max * 1.14);
+    svg.append(el('text', { x: lx, y: ly + 4, 'text-anchor': 'middle', class: 'ink' }, I18N.axes[i]));
+  });
+  const [rx, ry] = P(0, 1000);
+  svg.append(el('text', { x: rx + 6, y: ry + 3 }, '1000'));
+  series.forEach((s, k) => {
+    const g = el('g', { class: `series tone-${TONES[k % 4]}` });
+    g.append(el('polygon', { points: s.vals.map((v, i) => P(i, v).join(',')).join(' '), class: `poly dash-${k % 4}` }));
+    s.vals.forEach((v, i) => { const [x, y] = P(i, v); g.append(mark(SHAPES[k % 4], x, y, 4, 'mk')); });
+    svg.append(g);
+  });
+  return svg;
+}
+function groupedSVG(groups, series, caption) {
+  const W = 640, H = 320, m = { l: 48, r: 10, t: 16, b: 34 };
+  const vals = groups.flatMap((g) => g.vals.filter((v) => v != null));
+  const max = Math.max(1250, ...vals) * 1.05;
+  const iw = W - m.l - m.r, ih = H - m.t - m.b, gw = iw / groups.length, n = series.length;
+  const bw = Math.min(28, (gw * 0.72) / n);
+  const Y = (v) => m.t + ih - (v / max) * ih;
+  const svg = el('svg', { class: 'hw-svg', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': caption });
+  niceTicks(max).forEach((t) => {
+    svg.append(el('line', { x1: m.l, x2: m.l + iw, y1: Y(t), y2: Y(t), class: t === 1000 ? 'ref' : 'grid' }));
+    svg.append(el('text', { x: m.l - 8, y: Y(t) + 4, 'text-anchor': 'end', class: 'mono' }, NUM.format(t)));
+  });
+  groups.forEach((g, gi) => {
+    g.vals.forEach((v, si) => {
+      if (v == null) return;
+      const x = m.l + gi * gw + (gw - bw * n) / 2 + si * bw;
+      const s = el('g', { class: `series tone-${TONES[si % 4]}` });
+      s.append(el('rect', { x: x + 1, y: Y(v), width: Math.max(1, bw - 2), height: m.t + ih - Y(v), class: 'gbar' }));
+      s.append(mark(SHAPES[si % 4], x + bw / 2, Y(v) - 8, 3.5, 'mk'));
+      s.append(el('title', {}, `${series[si]} · ${g.label} : ${NUM.format(v)}`));
+      svg.append(s);
+    });
+    svg.append(el('text', { x: m.l + gi * gw + gw / 2, y: H - 12, 'text-anchor': 'middle', class: 'ink' }, g.label));
+  });
+  return svg;
+}
+
+function initCompare() {
+  const root = document.querySelector('[data-cmp]');
+  if (!root) return;
+  fetch('data.json').then((r) => r.json()).then((data) => buildCompare(root, data)).catch(() => { /* page sans JS conservée */ });
+}
+function buildCompare(root, data) {
+  const byId = new Map(data.machines.map((m) => [m.id, m]));
+  const max = Number(root.dataset.max) || 8;
+  const ranked = data.machines.filter((m) => m.points.combined != null).sort((a, b) => b.points.combined - a.points.combined || a.id.localeCompare(b.id));
+  const rankOf = new Map(ranked.map((m, i) => [m.id, i + 1]));
+  const params = new URLSearchParams(location.search);
+  let sel = [...new Set((params.get('sel') || '').split(',').filter((id) => byId.has(id)))].slice(0, max);
+  let base = Math.min(Number(params.get('base')) || 0, Math.max(0, sel.length - 1));
+  const q = (s) => root.querySelector(s);
+  document.querySelector('[data-cmp-fallback]').hidden = true;
+  root.hidden = false;
+  document.querySelector('[data-cmp-tools]').hidden = false;
+  const title = document.querySelector('[data-cmp-title]');
+  const live = q('[data-live]');
+  const cards = q('[data-cards]');
+  const addCard = q('[data-add-card]');
+  const add = q('[data-cmp-add]');
+  const fmt = (v) => (v == null ? '—' : NUM.format(v));
+
+  function bars(target, key) {
+    const tpl = document.getElementById('tpl-cmp-bar');
+    const ms = sel.map((id) => byId.get(id));
+    const top = Math.max(1, ...ms.map((m) => m.info[key] || 0)) * 1.06;
+    target.replaceChildren(...ms.map((m, i) => {
+      const row = tpl.content.firstElementChild.cloneNode(true);
+      const markEl = row.querySelector('[data-mark]');
+      markEl.textContent = SMARKS[i % 4];
+      markEl.classList.add('tone-' + TONES[i % 4]);
+      row.querySelector('[data-label]').textContent = m.name;
+      row.querySelector('.hw-bar').classList.add('hw-bar--' + TONES[i % 4]);
+      row.querySelector('.hw-bar>i').style.setProperty('--f', ((m.info[key] || 0) / top).toFixed(4));
+      row.querySelector('[data-value]').textContent = fmt(m.info[key]);
+      return row;
+    }));
+  }
+
+  function render() {
+    const ms = sel.map((id) => byId.get(id));
+    base = Math.min(base, Math.max(0, ms.length - 1));
+    title.textContent = ms.length ? fill(I18N.cmp_title, { n: ms.length }) : title.textContent;
+    // cartes
+    cards.querySelectorAll('.hw-cmpcard:not([data-add-card])').forEach((c) => c.remove());
+    const tpl = document.getElementById('tpl-cmp-card');
+    ms.forEach((m, i) => {
+      const card = tpl.content.firstElementChild.cloneNode(true);
+      card.classList.toggle('is-base', i === base);
+      const mk = card.querySelector('[data-mark]');
+      mk.textContent = SMARKS[i % 4];
+      mk.classList.add('tone-' + TONES[i % 4]);
+      card.querySelector('[data-rank]').textContent = rankOf.has(m.id) ? I18N.rank_prefix + rankOf.get(m.id) : I18N.unranked;
+      const x = card.querySelector('[data-remove]');
+      x.setAttribute('aria-label', fill(I18N.cmp_remove, { name: m.name }));
+      x.addEventListener('click', () => { sel = sel.filter((id) => id !== m.id); if (base >= sel.length) base = 0; live.textContent = fill(I18N.cmp_removed, { name: m.name }); render(); });
+      const name = card.querySelector('[data-name]');
+      name.textContent = m.name;
+      name.href = 'machines/' + encodeURIComponent(m.id) + '.html';
+      card.querySelector('[data-cpu]').textContent = m.cpu.model || '—';
+      card.querySelector('[data-gpu]').textContent = m.gpu.model || '—';
+      const combined = card.querySelector('[data-combined]');
+      combined.textContent = m.points.combined != null ? fmt(m.points.combined) : I18N.unranked;
+      combined.classList.toggle('is-unranked', m.points.combined == null);
+      const rel = card.querySelector('[data-rel]');
+      rel.textContent = (m.reliable ? '● ' : '▲ ') + I18N.reliability[m.reliable ? 'ok' : 'check'];
+      rel.classList.toggle('hw-alert', !m.reliable);
+      const radio = card.querySelector('[data-base]');
+      radio.checked = i === base;
+      radio.addEventListener('change', () => { base = i; render(); });
+      cards.insertBefore(card, addCard);
+    });
+    [...add.options].forEach((o) => { if (o.value) o.disabled = sel.includes(o.value); });
+    add.disabled = sel.length >= max;
+    const enough = ms.length >= 2;
+    q('[data-cmp-few]').hidden = enough;
+    q('[data-cmp-enough]').hidden = !enough;
+    if (enough) {
+      const b = ms[base];
+      q('[data-cmp-basetxt]').textContent = fill(I18N.cmp_base, { name: b.name });
+      const head = q('[data-cmp-head]');
+      head.querySelectorAll('th:not(:first-child)').forEach((th) => th.remove());
+      ms.forEach((m, i) => {
+        const th = document.createElement('th');
+        th.scope = 'col';
+        th.className = 'hw-right';
+        const mk = Object.assign(document.createElement('span'), { textContent: SMARKS[i % 4] + ' ', className: 'tone-' + TONES[i % 4] });
+        mk.setAttribute('aria-hidden', 'true');
+        th.append(mk, document.createTextNode(m.name));
+        head.append(th);
+      });
+      q('[data-cmp-rows]').replaceChildren(...KEYS.map((k) => {
+        const tr = document.createElement('tr');
+        tr.append(Object.assign(document.createElement('th'), { scope: 'row', textContent: I18N.categories[k] }));
+        ms.forEach((m) => {
+          const td = document.createElement('td');
+          td.className = 'hw-right';
+          const v = m.points[k], bv = b.points[k];
+          const val = Object.assign(document.createElement('span'), { className: 'hw-gap__v hw-num', textContent: v == null ? I18N.unranked : fmt(v) });
+          const d = document.createElement('span');
+          d.className = 'hw-gap__d hw-num';
+          if (m === b) d.textContent = I18N.cmp_base_cell;
+          else if (v != null && bv) {
+            const dv = (v / bv - 1) * 100;
+            d.textContent = (dv >= 0 ? '▲ +' : '▼ −') + PCT.format(Math.abs(dv)) + ' %';
+            d.classList.add(dv >= 0 ? 'is-up' : 'is-down');
+          }
+          td.append(val, d);
+          tr.append(td);
+        });
+        return tr;
+      }));
+      const full = ms.filter((m) => ['cpu_single', 'cpu_multi', 'gpu'].every((k) => m.points[k] != null)).slice(0, 4);
+      q('[data-cmp-radar]').replaceChildren(radarSVG(full.map((m) => ({ vals: ['cpu_single', 'cpu_multi', 'gpu'].map((k) => m.points[k]) })), document.querySelector('#fig-radar .hw-chart__title').textContent));
+      q('[data-cmp-legend]').replaceChildren(...full.map((m, i) => {
+        const li = document.createElement('li');
+        const mk = Object.assign(document.createElement('span'), { textContent: SMARKS[i % 4], className: 'tone-' + TONES[i % 4] });
+        mk.setAttribute('aria-hidden', 'true');
+        li.append(mk, document.createTextNode(' ' + m.name));
+        return li;
+      }));
+      q('[data-cmp-radarcap]').hidden = ms.length <= 4;
+      q('[data-cmp-group]').replaceChildren(groupedSVG(KEYS.map((k) => ({ label: I18N.categories[k], vals: ms.map((m) => m.points[k]) })), ms.map((m) => m.name), document.querySelector('#fig-group .hw-chart__title').textContent));
+      bars(q('[data-cmp-mem]'), 'memory_mibs');
+      bars(q('[data-cmp-seq]'), 'disk_seq_mibs');
+      // section masquée si aucune machine choisie n'a de mesure mémoire ni disque
+      q('[data-cmp-info]').hidden = !ms.some((m) => m.info.memory_mibs != null || m.info.disk_seq_mibs != null);
+    }
+    const p = new URLSearchParams();
+    if (sel.length) p.set('sel', sel.join(','));
+    if (base) p.set('base', String(base));
+    try { history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : '') + location.hash); } catch (e) { /* file:// */ }
+  }
+
+  add.addEventListener('change', () => {
+    const id = add.value;
+    add.value = '';
+    if (!id || sel.includes(id) || sel.length >= max) return;
+    sel = [...sel, id];
+    live.textContent = fill(I18N.cmp_added, { name: byId.get(id).name });
+    render();
+  });
+  const copy = document.querySelector('[data-cmp-copy]');
+  copy.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(location.href); } catch (e) { return; }
+    const label = copy.textContent;
+    copy.textContent = I18N.copied;
+    setTimeout(() => { copy.textContent = label; }, 1800);
+  });
+  document.querySelector('[data-cmp-csv]').addEventListener('click', () => {
+    const r1 = (v) => (v == null ? '' : v.toFixed(1));
+    const rows = sel.map((id) => byId.get(id)).map((m) => [m.name, r1(m.points.cpu_single), r1(m.points.cpu_multi), r1(m.points.gpu), r1(m.points.combined), r1(m.info.memory_mibs), r1(m.info.disk_seq_mibs)]);
+    downloadCSV(I18N.cmp_csv_name, [I18N.cmp_csv_head, ...rows]);
+  });
+  render();
+}
+
 initTheme();
 initMenu();
+initCompare();
 initAddMachine();
 initTableCSV();
 initTips();

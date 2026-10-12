@@ -185,7 +185,7 @@ def machine_context(
             "ref_frac": f"{1000 / top:.4f}",
             "top": f"{top:.1f}",
             "options": [
-                {"name": v.name, "points": f"{v.points['combined']:.1f}"}
+                {"id": v.slug, "name": v.name, "points": f"{v.points['combined']:.1f}"}
                 for _, v in table
                 if v.slug != view.slug
             ],

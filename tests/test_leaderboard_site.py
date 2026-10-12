@@ -63,7 +63,7 @@ def html_pages(out: Path) -> list[Path]:
 
 def ranking_rows(html: str) -> list[str]:
     body = html.split("<tbody>", 1)[1].split("</tbody>", 1)[0]
-    return re.findall(r"<tr data-rank.*?</tr>", body, re.S)
+    return re.findall(r"<tr data-id.*?</tr>", body, re.S)
 
 
 # --- Données : classement, points recalculés ---
@@ -191,7 +191,7 @@ def test_unranked_machines_stay_listed_at_the_end(tmp_path) -> None:
     assert names[-1] == "Portable sans GPU"  # combiné sans GPU : en fin de liste
     last = rows[-1]
     assert 'data-rank=""' in last and 'data-score=""' in last
-    assert ">non classé<" in last and ">—</td>" in last
+    assert ">non classé<" in last and "—</td>" in last.split('class="hw-col-name"', 1)[0]
     assert "1 machine non classée ici, en fin de liste" in (out / "index.html").read_text()
     # visible et classé (premier) dans les onglets CPU, non classé à l'onglet GPU
     single = ranking_rows((out / "cpu-single.html").read_text())
@@ -418,7 +418,8 @@ def _visible_text(template: str) -> list[str]:
     src = re.sub(r"\{\{.*?\}\}|\{%.*?%\}", " ", src, flags=re.S)
     src = re.sub(r"<[^>]*>", " ", src)
     attrs = [re.sub(r"\{\{.*?\}\}", "", a) for a in attrs]
-    return [w for w in (src.split() + attrs) if re.search(r"[A-Za-zÀ-ÿ]", w)]
+    # lettres latines, sans × (U+00D7) ni ÷ (U+00F7) qui sont des symboles
+    return [w for w in (src.split() + attrs) if re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ]", w)]
 
 
 def test_templates_have_no_hardcoded_text() -> None:
@@ -485,7 +486,7 @@ def test_preview_site_is_marked_and_not_indexed(tmp_path) -> None:
     out = site(tmp_path, preview=True)
     assert (out / "robots.txt").read_text() == "User-agent: *\nDisallow: /\n"
     pages = html_pages(out)
-    assert len(pages) == 8
+    assert len(pages) == 9
     for path in pages:
         html = path.read_text()
         assert html.count(ROBOTS_META) == 1, path.name
@@ -684,7 +685,7 @@ def test_machine_page_add_machine_options(tmp_path) -> None:
     assert 'data-top="' in page.split('id="face-bars"', 1)[1][:40]
     # sélecteur caché sans JS, options = autres machines classées au combiné (points bruts)
     assert "data-add-machine hidden" in face
-    assert '<option value="2000.0">Desktop rapide</option>' in face
+    assert '<option value="2000.0" data-id="rapide">Desktop rapide</option>' in face
     assert ">Portable sans GPU</option>" not in face
 
 
@@ -796,3 +797,39 @@ def test_machine_page_short_category_labels_for_narrow_screens(tmp_path) -> None
         assert (
             f'<span class="hw-wide">{label}</span><span class="hw-narrow">{short}</span>' in by_cat
         )
+
+
+# --- Comparaison ---
+
+
+def test_comparison_page_without_javascript_lists_every_machine(tmp_path) -> None:
+    out = site(tmp_path)
+    page = (out / "comparaison.html").read_text()
+    assert "Comparaison · hwbench</title>" in page
+    fallback = page.split("data-cmp-fallback", 1)[1].split("data-cmp hidden", 1)[0]
+    assert 'href="index.html">Aller au classement</a>' in fallback
+    rows = re.findall(r"<tr>\s*<th scope=\"row\">.*?</tr>", fallback, re.S)
+    names = [re.search(r">([^<]*)</a>", r).group(1) for r in rows]
+    assert names[:3] == [
+        "Desktop rapide",
+        "Desktop moyen",
+        "&lt;script&gt;alert(&#34;x&#34;)&lt;/script&gt; &amp; &lt;img src=x onerror=alert(1)&gt;",
+    ]
+    assert names[-1] == "Portable sans GPU"  # sans combiné : en fin de liste
+    assert ">2 000<" in rows[0] and ">—<" in rows[-1]
+    # application cachée sans JS, sélecteur limité aux machines connues
+    assert "data-cmp hidden" in page and 'data-max="8"' in page
+    assert '<option value="rapide">Desktop rapide · 2 000</option>' in page
+
+
+def test_comparison_is_linked_from_the_ranking_and_the_machine_pages(tmp_path) -> None:
+    out = site(tmp_path)
+    index = (out / "index.html").read_text()
+    assert 'href="comparaison.html">Comparer</a>' in index  # navigation
+    assert "data-tray hidden" in index and 'data-tray-go aria-disabled="true"' in index
+    row = next(r for r in ranking_rows(index) if 'data-id="rapide"' in r)
+    assert 'data-select hidden aria-label="Comparer Desktop rapide"' in row
+    assert '<g data-id="rapide">' in index  # point du nuage sélectionnable
+    page = (out / "machines" / "moyen.html").read_text()
+    assert 'href="../comparaison.html?sel=moyen" data-cmp-link data-self="moyen"' in page
+    assert 'data-id="rapide">Desktop rapide</option>' in page

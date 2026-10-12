@@ -80,7 +80,7 @@ PAGE_HREFS = {
     "soumettre": "soumettre.html",
     "mentions": "mentions-legales.html",
 }
-PAGES = frozenset({"classement"})
+PAGES = frozenset({"classement", "comparaison"})
 CONTRIBUTING = f"{GITHUB}/blob/main/CONTRIBUTING.md"
 HIST_MIN = 10  # machines classées à partir desquelles la distribution est tracée
 INFO_TOP = 8  # machines affichées par graphique mémoire / disque
@@ -175,6 +175,7 @@ def _row(rank: int | None, v: MachineView, key: str, top: float) -> dict[str, An
     return {
         "rank": rank,
         "rank_txt": f"{rank:02d}" if rank else "—",
+        "id": v.slug,
         "href": f"machines/{v.slug}.html",
         "name": v.name,
         "cpu": v.cpu or "—",
@@ -263,6 +264,7 @@ def classement_context(
             v.points[cats[2]] or 0.0,
             v.kind,
             v.name,
+            v.slug,
         )
         for v in full
     ]
@@ -337,6 +339,40 @@ def render_classement(
 ) -> str:
     ctx = classement_context(views, key, reference, generated, skipped or [], preview)
     return ENV.get_template("classement.html").render(ctx)
+
+
+def render_comparaison(views: list[MachineView], generated: datetime, preview: bool = False) -> str:
+    """Page Comparaison : sans JavaScript, toutes les machines côte à côte (points) ; avec, la
+    comparaison choisie (?sel=…&base=…), construite par le script depuis data.json."""
+    c = FR["comparaison"]
+    ctx = _common("comparaison", c["title"], "", generated, preview)
+    table = ranked(views, "combined")
+
+    def cell(value: float | None, digits: int = 0) -> str:
+        return "—" if value is None else grouped(value, digits)
+
+    ctx.update(
+        category_keys=CATEGORY_KEYS[1:] + CATEGORY_KEYS[:1],
+        category_labels={k: category_label(k) for k in CATEGORY_KEYS},
+        all_rows=[
+            {
+                "href": f"machines/{v.slug}.html",
+                "name": v.name,
+                "points": [cell(v.points[k]) for k in (*CATEGORY_KEYS[1:], CATEGORY_KEYS[0])],
+                "memory": cell(v.memory_mibs),
+                "disk": cell(v.disk_seq_mibs),
+            }
+            for _, v in table
+        ],
+        options=[
+            {
+                "id": v.slug,
+                "label": f"{v.name} · {grouped(p)}" if (p := v.points["combined"]) else v.name,
+            }
+            for _, v in table
+        ],
+    )
+    return ENV.get_template("comparaison.html").render(ctx)
 
 
 def _copy_tree(source: Traversable, target: Path) -> None:
@@ -447,6 +483,9 @@ def build_site(
     for key in CATEGORY_KEYS:
         html = render_classement(views, key, reference, generated, skipped, preview)
         (out_dir / PAGE_FILES[key]).write_text(html, encoding="utf-8")
+    (out_dir / "comparaison.html").write_text(
+        render_comparaison(views, generated, preview), encoding="utf-8"
+    )
     same_model = same_model_groups(views)
     for entry, view in zip(entries, views, strict=True):
         html = render_machine(entry, view, views, same_model(view), reference, generated, preview)

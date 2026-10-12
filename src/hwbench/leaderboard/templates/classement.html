@@ -92,8 +92,8 @@
         <th scope="col" class="hw-col-date" data-sort="date">{{ c.head.date }}</th>
       </tr></thead>
       <tbody>
-        {% for r in rows %}<tr data-rank="{{ r.rank or '' }}" data-score="{{ r.score_raw }}" data-name="{{ r.name }}" data-cpu="{{ r.cpu }}" data-gpu="{{ r.gpu }}" data-kind="{{ r.kind }}" data-cpub="{{ r.cpu_brand }}" data-gpub="{{ r.gpu_brand }}" data-rel="{{ r.rel }}" data-date="{{ r.date }}" data-cv="{{ r.cv }}">
-          <td class="hw-col-rank hw-num">{{ r.rank_txt }}</td>
+        {% for r in rows %}<tr data-id="{{ r.id }}" data-rank="{{ r.rank or '' }}" data-score="{{ r.score_raw }}" data-name="{{ r.name }}" data-cpu="{{ r.cpu }}" data-gpu="{{ r.gpu }}" data-kind="{{ r.kind }}" data-cpub="{{ r.cpu_brand }}" data-gpub="{{ r.gpu_brand }}" data-rel="{{ r.rel }}" data-date="{{ r.date }}" data-cv="{{ r.cv }}">
+          <td class="hw-col-rank hw-num">{% if links.comparaison %}<input type="checkbox" class="hw-check" data-select hidden aria-label="{{ c.select_aria | replace('{name}', r.name) }}"> {% endif %}{{ r.rank_txt }}</td>
           <td class="hw-col-name"><a href="{{ r.href }}">{{ r.name }}</a>{% if r.stale %} <span class="hw-badge hw-badge--stale">{{ t.stale }}</span>{% endif %}</td>
           <td class="hw-col-cpu">{{ r.cpu }}</td>
           <td class="hw-col-gpu">{{ r.gpu }}</td>
@@ -131,7 +131,7 @@
   <div class="hw-stack-6"><p class="hw-kicker">{{ c.viz_k }}</p><h2 class="hw-h2" id="h-viz">{{ c.viz_h }}</h2></div>
   <div class="hw-viz__grid">
     <figure class="hw-chart" id="fig-scatter">
-      <figcaption><span class="hw-chart__title">{{ c.scatter_h }}</span><span class="hw-mono-note">{{ c.legend_shapes }}</span></figcaption>
+      <figcaption><span class="hw-chart__title">{{ c.scatter_h }}</span><span class="hw-mono-note">{{ c.legend_shapes }}{% if links.comparaison %}<span data-js-only hidden> · {{ c.scatter_hint }}</span>{% endif %}</span></figcaption>
       {% if scatter %}{{ scatter }}
       <div class="hw-sr"><table><caption>{{ c.scatter_caption }}</caption><thead><tr><th scope="col">{{ t.charts.machine }}</th><th scope="col">{{ t.charts.cpu }}</th><th scope="col">{{ t.charts.y_gpu }}</th></tr></thead>
       <tbody>{% for p in scatter_rows %}<tr><th scope="row">{{ p.label }}</th><td>{{ p.x }}</td><td>{{ p.y }}</td></tr>{% endfor %}</tbody></table></div>
@@ -163,6 +163,18 @@
     {% endfor %}
   </div>
 </section>
+{% endif %}
+
+{% if rows and links.comparaison %}
+<div class="hw-tray" role="region" aria-label="{{ c.tray_aria }}" data-tray hidden>
+  <div class="hw-tray__list"><strong data-tray-count></strong><span class="hw-tray__chips" data-tray-chips></span></div>
+  <div class="hw-tray__actions">
+    <button type="button" class="hw-btn hw-btn--ghost" data-tray-clear>{{ c.clear_selection }}</button>
+    <a class="hw-btn hw-btn--primary" href="{{ links.comparaison }}" data-tray-go aria-disabled="true">{{ c.compare_cta }}<span class="hw-btn__icon" aria-hidden="true">→</span></a>
+  </div>
+</div>
+<div class="hw-sr" role="status" aria-live="polite" data-live></div>
+<template id="tpl-chip"><button type="button" class="hw-tray__chip"><span data-name></span><span aria-hidden="true">×</span></button></template>
 {% endif %}
 
 {% if skipped %}

@@ -49,8 +49,9 @@
     <div class="hw-split-head"><h2 class="hw-h3 hw-h3--lg">{{ m.face_to }}</h2><span class="hw-mono-note">{{ m.combined_lc }}</span></div>
     {{ bars(face.rows, m.face_to, "", face.ref_frac, id="face-bars", top=face.top) }}
     <label class="hw-field hw-add" data-add-machine hidden>{{ m.add_machine }}
-      <select class="hw-select" data-add-target="face-bars" data-added="{{ m.added }}"><option value="">{{ m.choose }}</option>{% for o in face.options %}<option value="{{ o.points }}">{{ o.name }}</option>{% endfor %}</select>
+      <select class="hw-select" data-add-target="face-bars" data-added="{{ m.added }}"><option value="">{{ m.choose }}</option>{% for o in face.options %}<option value="{{ o.points }}" data-id="{{ o.id }}">{{ o.name }}</option>{% endfor %}</select>
     </label>
+    {% if links.comparaison %}<a class="hw-btn" href="{{ links.comparaison }}?sel={{ view.slug }}" data-cmp-link data-self="{{ view.slug }}">{{ m.full_cmp }}</a>{% endif %}
   </div>{% endif %}
 </section>
 
