@@ -20,7 +20,7 @@ Machines de dev (Python 3.11+, shell fish) :
 
 - Python 3.11+, packaging via `pyproject.toml`, installable en `pipx install .`
 - `typer` pour les commandes, `rich` pour l'affichage
-- `jinja2` pour les templates du site du classement (le rapport HTML garde ses f-strings)
+- `jinja2` pour les templates du site du classement, en **extra optionnel `site`** (`pip install 'hwbench[site]'`, aussi dans `dev`) : le CLI de benchmark ne l'importe jamais (testé : `import hwbench.cli` ne charge ni `jinja2` ni `markupsafe`). Seuls `leaderboard/site.py` et `leaderboard/charts.py` l'importent, avec un message explicite (`leaderboard.SITE_EXTRA_MISSING`) ; `__main__` importe le site paresseusement (commande `site`, code 2 sans l'extra). La CI installe la wheel avec `[site]` (job `build` qui relance la suite, `site-prod`, `site-preview`). Le rapport HTML garde ses f-strings
 - `psutil` et `py-cpuinfo` pour la collecte de base
 - `pytest` pour les tests, `ruff` pour le lint
 - `mypy` en mode standard sur `src/` et `scripts/` (`tests/` exclu pour l'instant), `types-psutil` pour les stubs ; py-cpuinfo sans stubs, ignoré par un override
