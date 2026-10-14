@@ -26,13 +26,15 @@ HOST = (
     "GitHub, Inc. (service GitHub Pages), 88 Colin P. Kelly Jr. St., San Francisco, CA 94107, "
     "États-Unis."
 )
-# Contact privé pour l'exercice des droits (jamais une issue publique) : à fournir par
-# l'éditeur. Tant que ce texte est présent, la génération du site de production échoue.
+# Contact privé pour l'exercice des droits (jamais une issue publique), fourni par l'éditeur.
+# Tant que FR["contact_private"] vaut l'emplacement réservé, la génération du site de
+# production échoue (__main__, testé).
 CONTACT_PLACEHOLDER = "[adresse de contact à fournir]"
+CONTACT_PRIVATE = "mag.d3v+hwbench@pm.me"
 
 FR: dict[str, Any] = {
     "lang": "fr",
-    "contact_private": CONTACT_PLACEHOLDER,
+    "contact_private": CONTACT_PRIVATE,
     "site": {
         "name": "HWBENCH",
         "title_suffix": "hwbench",
@@ -83,7 +85,7 @@ FR: dict[str, Any] = {
             "license": "Licence AGPL-3.0 ↗",
             "mentions": "Mentions légales",
             "confidentialite": "Politique de confidentialité",
-            "accessibilite": "Accessibilité : partiellement conforme",
+            "accessibilite": "Accessibilité",
             "cookies": "Cookies : aucun",
         },
         "publisher_t": "Éditeur.",
@@ -878,26 +880,47 @@ FR: dict[str, Any] = {
                 "id": "accessibilite",
                 "h": "Accessibilité",
                 "items": [
-                    ["Objectif", "Le site vise le niveau AA des WCAG."],
-                    ["État", "Partiellement conforme : aucun audit n'a été réalisé."],
                     [
-                        "Mesures en place",
+                        "Contrastes",
                         (
-                            "Navigation complète au clavier avec focus visible ; chaque "
-                            "graphique est suivi d'un tableau équivalent pour les lecteurs "
-                            "d'écran ; la couleur n'est jamais seule porteuse d'information "
-                            "(formes et libellés) ; animations désactivées avec « réduire les "
-                            "animations » ; contraste du texte d'au moins {contrast}:1 dans les "
-                            "deux thèmes, vérifié automatiquement ; chaque page reste complète "
-                            "sans JavaScript."
+                            "Contraste du texte d'au moins {contrast}:1 sur les fonds du site, "
+                            "dans les deux thèmes, vérifié automatiquement par les tests à "
+                            "chaque modification."
                         ),
+                    ],
+                    [
+                        "Navigation au clavier",
+                        (
+                            "Liens, boutons, onglets, filtres et popups s'utilisent au clavier, "
+                            "avec un focus visible ; un lien d'évitement mène directement au "
+                            "contenu."
+                        ),
+                    ],
+                    [
+                        "Contenu sans JavaScript",
+                        (
+                            "Chaque page reste complète sans JavaScript : le script n'ajoute que "
+                            "le tri, les filtres, la comparaison choisie et la bascule de thème."
+                        ),
+                    ],
+                    [
+                        "Graphiques",
+                        (
+                            "Chaque graphique est suivi d'un tableau équivalent, masqué à "
+                            "l'écran et destiné aux lecteurs d'écran ; la couleur n'est jamais "
+                            "seule porteuse d'information (formes et libellés)."
+                        ),
+                    ],
+                    [
+                        "Animations",
+                        "Désactivées quand le système demande de réduire les animations.",
                     ],
                     [
                         "Limites connues",
                         (
                             "Les images PNG exportées n'ont pas de texte alternatif : l'export "
-                            "CSV donne les mêmes données sous une forme accessible. Le site n'a "
-                            "pas été testé avec un lecteur d'écran."
+                            "CSV donne les mêmes données sous forme de tableau. Le site n'a pas "
+                            "été testé avec un lecteur d'écran."
                         ),
                     ],
                     [
