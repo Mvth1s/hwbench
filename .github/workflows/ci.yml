@@ -575,8 +575,15 @@ jobs:
 
       - name: Générer le site de prod
         run: |
-          "$RUNNER_TEMP/venv/bin/python" -I -m hwbench.leaderboard site \
-            --results results --out "$RUNNER_TEMP/site"
+          py="$RUNNER_TEMP/venv/bin/python"
+          args=(--results results --out "$RUNNER_TEMP/site")
+          # --base-url : base absolue de la page 404 (servie à toute profondeur). Transition : sur
+          # un push de dev, ce job génère la prod depuis les sources de main, qui peuvent ne pas
+          # encore connaître l'option ; elle n'est passée que si l'aide la mentionne.
+          if "$py" -I -m hwbench.leaderboard site --help | grep -q -- --base-url; then
+            args+=(--base-url /hwbench/)
+          fi
+          "$py" -I -m hwbench.leaderboard site "${args[@]}"
 
       # Sur main : fichiers results/*.json ajoutés depuis le push précédent -> JSON sur une ligne
       # (rang au classement combiné), passé au job notify-site par env. Noms par -z / xargs -0.
@@ -646,8 +653,15 @@ jobs:
 
       - name: Générer la preview (bandeau, noindex, robots.txt)
         run: |
-          "$RUNNER_TEMP/venv/bin/python" -I -m hwbench.leaderboard site \
-            --results results --out "$RUNNER_TEMP/site" --preview
+          py="$RUNNER_TEMP/venv/bin/python"
+          args=(--results results --out "$RUNNER_TEMP/site" --preview)
+          # GitHub Pages ne sert que la 404 de la racine (prod) : celle de la preview n'est jamais
+          # servie, sa base est donnée par cohérence. Même transition que site-prod (sources de
+          # dev sur un push de main).
+          if "$py" -I -m hwbench.leaderboard site --help | grep -q -- --base-url; then
+            args+=(--base-url /hwbench/preview/)
+          fi
+          "$py" -I -m hwbench.leaderboard site "${args[@]}"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
