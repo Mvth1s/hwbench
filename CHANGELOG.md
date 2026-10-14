@@ -2,6 +2,188 @@
 
 <!-- version list -->
 
+## v0.8.0 (2026-10-14)
+
+### Bug Fixes
+
+- **site**: Align bar tracks and stack chart captions on the machine page
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Bound chart ticks and histogram bins for huge point values
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Drop the host postal address from the footer text
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Fit the selection box in the rank cell and keep bar tracks visible
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Restore the host address and drop unverified legal wording
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Set the private contact and list only accessibility measures
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Treat non-finite points as missing in views and charts
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+### Build System
+
+- Move Jinja2 to an optional site extra, imported lazily
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+### Chores
+
+- Ignore local site captures ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Add self-hosted fonts, OFL licences and hero images
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+### Continuous Integration
+
+- Install the site extra wherever the site is built or tested
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- Pass the site base URL for the not-found page ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- Publish to PyPI without waiting for an approval ([#45](https://github.com/Mvth1s/hwbench/pull/45),
+  [`24ab93c`](https://github.com/Mvth1s/hwbench/commit/24ab93c75afd87b0325309b60bf567aa8ca74bf1))
+
+- Retry the links check after transient github.com errors
+  ([#49](https://github.com/Mvth1s/hwbench/pull/49),
+  [`36651d8`](https://github.com/Mvth1s/hwbench/commit/36651d87fa2102862546d6a215b946f9895b65bb))
+
+### Documentation
+
+- Describe the automatic PyPI publication in CLAUDE.md
+  ([#45](https://github.com/Mvth1s/hwbench/pull/45),
+  [`24ab93c`](https://github.com/Mvth1s/hwbench/commit/24ab93c75afd87b0325309b60bf567aa8ca74bf1))
+
+- Describe the comparison page and selection ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- Describe the optional site extra ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- Describe the redesigned leaderboard site conventions
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- Describe the redesigned machine page ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- Record the private contact and the submission check rules
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- State the contact-details and legal-citation rules for site texts
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- Tidy CLAUDE.md and describe the content pages and base URL
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+### Features
+
+- **fmt**: Add grouped number formatting matching Intl fr-FR
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Add runs, temperature and test-time charts
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Add server-rendered scatter and histogram charts
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Add the Chronographe Carbone stylesheet and progressive script
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Add the comparison and selection texts to the catalogue
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Add the comparison page with selection from the ranking
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Add the French text catalogue ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Add the machine page texts and tooltips to the catalogue
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Add the methodology, submission, legal and not-found pages
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Add the page view model and data.json/CSV builders
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Build the machine page data ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Inject technical values into catalogue texts
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Inject the privacy rules into the submission file check
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Redesign the leaderboard site (Chronographe Carbone)
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Render the machine page from the design
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Render the ranking pages with Jinja2 templates
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Tag scatter points with their machine id
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Use short category labels for bars on narrow screens
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+### Refactoring
+
+- **notify**: Remove the pypi-pending command ([#45](https://github.com/Mvth1s/hwbench/pull/45),
+  [`24ab93c`](https://github.com/Mvth1s/hwbench/commit/24ab93c75afd87b0325309b60bf567aa8ca74bf1))
+
+### Testing
+
+- **site**: Cover the private contact, accessibility wording and privacy rules
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+- **site**: Parse templates with HTMLParser to find hardcoded text
+  ([#48](https://github.com/Mvth1s/hwbench/pull/48),
+  [`246ef4e`](https://github.com/Mvth1s/hwbench/commit/246ef4e7922b8355f2ed1c93b9e376ad3e47db6a))
+
+
 ## v0.7.0 (2026-10-11)
 
 ### Bug Fixes
