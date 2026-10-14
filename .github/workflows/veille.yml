@@ -13,7 +13,7 @@ permissions: {}
 
 jobs:
   veille:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read # extraction du script, de la référence et de ci.yml

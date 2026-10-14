@@ -66,6 +66,17 @@ def test_read_only_by_default_and_a_timeout_on_every_job(path: Path) -> None:
         assert isinstance(job.get("timeout-minutes"), int), f"{path.name}:{name}"
 
 
+# image épinglée : ubuntu-latest change de version sans prévenir (Ubuntu 26 en octobre 2026) ;
+# la migration se fait dans une PR dédiée, qui met à jour cette valeur
+RUNNER = "ubuntu-24.04"
+
+
+@pytest.mark.parametrize("path", FILES, ids=lambda p: p.name)
+def test_every_job_runs_on_the_pinned_runner_image(path: Path) -> None:
+    for name, job in load(path)["jobs"].items():
+        assert job.get("runs-on") == RUNNER, f"{path.name}:{name}"
+
+
 def test_id_token_only_where_it_is_needed() -> None:
     jobs = {
         f"{path.name}:{name}"
