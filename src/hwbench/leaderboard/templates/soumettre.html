@@ -54,5 +54,6 @@
     {% for f in c.faq %}<details class="hw-acc"><summary>{{ f.q }}<span class="chev" aria-hidden="true">+</span></summary><p class="hw-mute">{{ f.a | fill(facts) }}</p></details>{% endfor %}
   </section>
 </section>
+<script type="application/json" id="hw-privacy">{{ privacy_json }}</script>
 <template id="tpl-check"><li><span class="hw-check-mark" data-mark aria-hidden="true"></span><span><span class="hw-sr" data-sr></span><span data-label></span><span class="hw-mono-note hw-block" data-detail></span></span></li></template>
 {% endblock %}

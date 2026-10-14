@@ -6,10 +6,11 @@ n'est écrit dans le catalogue : les textes portent des marqueurs ({cv}, {versio
 par `fill` avec les valeurs lues dans le code et dans la référence du paquet.
 """
 
+import re
 from datetime import datetime
 from typing import Any
 
-from hwbench import __version__
+from hwbench import __version__, privacy
 from hwbench.benchmarks.external._gpu import RESOLUTION
 from hwbench.benchmarks.external.fio import JOBS
 from hwbench.display.fmt import compact, fr_date, grouped
@@ -123,3 +124,24 @@ def contrast_ratio(foreground: str, background: str) -> float:
 
     lighter, darker = sorted((luminance(foreground), luminance(background)), reverse=True)
     return (lighter + 0.05) / (darker + 0.05)
+
+
+def _js_pattern(pattern: re.Pattern[str]) -> dict[str, str]:
+    """Motif Python transmis au navigateur (syntaxe commune aux deux moteurs), drapeau i."""
+    return {"source": pattern.pattern, "flags": "i" if pattern.flags & re.IGNORECASE else ""}
+
+
+def privacy_rules() -> dict[str, object]:
+    """Règles de privacy.py pour le contrôle local de Soumettre : clés sensibles, valeurs
+    sensibles (MAC, UUID, EUI), clés autorisées avec le format exact de leur valeur. Le
+    JavaScript ne porte aucune liste en dur : il applique ces motifs."""
+    return {
+        "keys": _js_pattern(privacy.SENSITIVE_KEY_RE),
+        "values": [
+            _js_pattern(p) | {"name": name}
+            for p, name in zip(
+                privacy.SENSITIVE_VALUE_PATTERNS, privacy.SENSITIVE_VALUE_NAMES, strict=True
+            )
+        ],
+        "allowed": {key: _js_pattern(p) for key, p in privacy.NON_SENSITIVE_KEYS.items()},
+    }

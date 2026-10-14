@@ -397,6 +397,7 @@ def render_soumettre(reference: Reference, generated: datetime, preview: bool = 
     ctx = _common("soumettre", FR["soumettre"]["title"], "", generated, preview, reference)
     ctx.update(
         contributing=CONTRIBUTING,
+        privacy_json=_json_script(pages.privacy_rules()),
         current_schema=str(EXPORT_SCHEMA_VERSION),
         readable_schemas=pages.readable_schemas(),
     )

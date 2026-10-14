@@ -747,20 +747,37 @@ function initCopyCode() {
     });
   });
 }
-const ID_KEYS = /^(serial|serial_number|uuid|product_uuid|mac|mac_address|hostname|asset_tag|product_serial|board_serial|chassis_serial|chassis_asset_tag|eui64|nguid)$/i;
-function findIds(node, path = '', out = []) {
-  if (node && typeof node === 'object') {
+// Règles de privacy.py (clés et valeurs sensibles, clés autorisées), injectées par le
+// générateur dans #hw-privacy : aucune liste d'identifiants en dur ici.
+function privacyRules() {
+  try {
+    const raw = JSON.parse(document.getElementById('hw-privacy').textContent);
+    const re = (p) => new RegExp(p.source, p.flags);
+    return {
+      key: re(raw.keys),
+      values: raw.values.map((p) => ({ re: new RegExp(p.source, p.flags + 'g'), name: p.name })),
+      allowed: Object.fromEntries(Object.entries(raw.allowed).map(([k, p]) => [k, new RegExp('^(?:' + p.source + ')$', p.flags)])),
+    };
+  } catch (e) { return null; }
+}
+function findIds(node, rules, path = '', out = []) {
+  if (Array.isArray(node)) node.forEach((v, i) => findIds(v, rules, path + i + '.', out));
+  else if (node && typeof node === 'object') {
     Object.entries(node).forEach(([k, v]) => {
-      if (ID_KEYS.test(k) && v !== null && v !== '' && v !== false) out.push(path + k);
-      findIds(v, path + k + '.', out);
+      const allowed = rules.allowed[k] && typeof v === 'string' && rules.allowed[k].test(v);
+      if (!allowed && rules.key.test(k) && v !== null) out.push(path + k);
+      else if (!allowed) findIds(v, rules, path + k + '.', out);
     });
+  } else if (typeof node === 'string') {
+    rules.values.forEach((p) => { p.re.lastIndex = 0; if (p.re.test(node)) out.push(path.replace(/\.$/, '') + ' (' + p.name + ')'); });
   }
   return out;
 }
 function initFileCheck() {
   const drop = document.querySelector('[data-drop]');
   const report = document.querySelector('[data-check-report]');
-  if (!drop || !report || !window.FileReader) return;
+  const rules = privacyRules();
+  if (!drop || !report || !window.FileReader || !rules) return;
   const C = I18N.check || {};
   drop.hidden = false;
   report.hidden = false;
@@ -801,7 +818,7 @@ function initFileCheck() {
       checks.push(['version', version === report.dataset.version ? 'ok' : version ? 'warn' : 'ko', 'hwbench_version = ' + (version || '—') + ' / ' + report.dataset.version]);
       checks.push(['date', data.created ? 'ok' : 'ko', data.created || '—']);
       checks.push(['machine', data.machine ? 'ok' : 'ko', data.machine || '—']);
-      const ids = findIds(data);
+      const ids = findIds(data, rules);
       checks.push(['ids', ids.length ? 'ko' : 'ok', ids.length ? ids.slice(0, 3).join(', ') : '0']);
       checks.push(['name', /^[a-z0-9][a-z0-9-]*\.json$/.test(file.name) ? 'ok' : 'ko', file.name]);
       show(file.name, checks);
