@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import tip, bars with context %}
+{% set c = t.classement %}
+{% block main %}
+<section class="hw-section hw-hero" aria-labelledby="h-hero">
+  <div class="hw-hero__text">
+    <p class="hw-kicker">{{ kicker }}</p>
+    <h1 class="hw-h1" id="h-hero">{{ c.h1a }}<br>{{ c.h1b }}</h1>
+    <p class="hw-lede">{{ c.lede1 }} <strong>{{ c.lede2 }}</strong>{{ tip("points") }} {{ c.lede3 | fill(facts) }}{{ tip("geomean") }} {{ c.lede4 }}</p>
+    <div class="hw-hero__actions">
+      <a class="hw-btn" href="#classement">{{ c.see_rank }} <span aria-hidden="true">↓</span></a>
+      {% if links.methodologie %}<a class="hw-btn hw-btn--ghost" href="{{ links.methodologie }}#points">{{ c.how }}</a>{% endif %}
+    </div>
+  </div>
+  <div class="hw-hero__media" aria-hidden="true">
+    <img class="hw-hero__img hw-hero__img--light" src="{{ assets }}img/hero-tower-light.png" alt="" width="1200" height="900" decoding="async">
+    <img class="hw-hero__img hw-hero__img--dark" src="{{ assets }}img/hero-tower-dark.png" alt="" width="1200" height="900" decoding="async">
+    <span class="hw-hero__label">{{ c.object_label }}</span>
+  </div>
+</section>
+
+<section class="hw-section hw-podium" aria-label="{{ c.podium }}">
+  <ol>
+    {% for p in podium %}<li class="hw-podium__item{% if p.pos == 1 %} is-first{% endif %}">
+      <span class="hw-podium__pos">{{ c.podium_pos | replace("{pos}", p.pos) }}</span>
+      {% if p.filled %}<a class="hw-podium__name" href="{{ p.href }}"><span>{{ p.name }}</span><span class="hw-podium__sub">{{ p.sub }}</span></a>
+      <span class="hw-podium__score hw-num"{% if p.pos == 1 %} data-count="{{ p.score_raw }}"{% endif %}>{{ p.score }}</span>
+      {% else %}<a class="hw-podium__free" href="{{ submit_href }}">{{ c.free_spot }}</a>
+      <span class="hw-podium__score hw-num" aria-hidden="true">—</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+
+{% if not rows %}
+<section class="hw-section hw-empty">
+  <p class="hw-kicker">{{ c.empty_k }}</p>
+  <h2 class="hw-h2">{{ c.empty_h }}</h2>
+  <p class="hw-mute">{{ c.empty_p }} <code>{{ c.cmd_bench }}</code> · <code>{{ c.cmd_export }}</code></p>
+  <a class="hw-btn hw-btn--primary" href="{{ submit_href }}">{{ c.guide }}<span class="hw-btn__icon" aria-hidden="true">→</span></a>
+</section>
+{% else %}
+<section class="hw-section hw-rank" id="classement" aria-labelledby="h-rank">
+  <div class="hw-rank__head">
+    <div class="hw-stack-6"><p class="hw-kicker">{{ c.rank_k }}</p><h2 class="hw-h2" id="h-rank">{{ category_label }}</h2></div>
+    <nav class="hw-seg" aria-label="{{ c.cat_aria }}">
+      {% for tab in tabs %}<a href="{{ tab.href }}" data-tab{% if tab.current %} aria-current="page"{% endif %}><span class="hw-wide">{{ tab.label }}</span><span class="hw-narrow">{{ tab.short }}</span></a>{% endfor %}
+    </nav>
+  </div>
+
+  <div class="hw-filters" role="search" aria-label="{{ c.filters }}" data-filters hidden>
+    <div class="hw-filters__row">
+      <label class="hw-search"><span aria-hidden="true">⌕</span><span class="hw-sr">{{ c.search }}</span><input type="search" name="q" placeholder="{{ c.search_ph }}" autocomplete="off"></label>
+      <div class="hw-chips" role="group" aria-label="{{ c.type_aria }}">
+        <button type="button" class="hw-chip" data-kind="all" aria-pressed="true">{{ c.all }}</button>
+        <button type="button" class="hw-chip" data-kind="desktop" aria-pressed="false"><span aria-hidden="true">●</span>{{ t.kinds.desktop }}</button>
+        <button type="button" class="hw-chip" data-kind="laptop" aria-pressed="false"><span aria-hidden="true">■</span>{{ t.kinds.laptop }}</button>
+      </div>
+    </div>
+    <div class="hw-filters__grid">
+      <label class="hw-field">{{ c.cpu_brand }}<select class="hw-select" name="cpu"><option value="all">{{ c.any_brand }}</option>{% for key in ("AMD", "Intel", "other") %}<option value="{{ key }}">{{ t.brands[key] }}</option>{% endfor %}</select></label>
+      <label class="hw-field">{{ c.gpu_brand }}<select class="hw-select" name="gpu"><option value="all">{{ c.any_brand }}</option>{% for key in ("AMD", "Intel", "NVIDIA", "other") %}<option value="{{ key }}">{{ t.brands[key] }}</option>{% endfor %}</select></label>
+      <label class="hw-field">{{ c.rel }}<select class="hw-select" name="rel"><option value="all">{{ c.rel_all }}</option><option value="ok">{{ t.reliability.ok }}</option><option value="check">{{ t.reliability.check }}</option></select></label>
+      <label class="hw-field">{{ c.since }}<select class="hw-select" name="since"><option value="all">{{ c.since_all }}</option>{% for days, label in c.since_days.items() %}<option value="{{ days }}">{{ label }}</option>{% endfor %}</select></label>
+      <fieldset class="hw-field hw-range"><legend>{{ c.range }}</legend>
+        <input class="hw-input hw-num" type="number" inputmode="numeric" min="0" step="50" name="smin" aria-label="{{ c.min }}" placeholder="{{ c.min }}">
+        <input class="hw-input hw-num" type="number" inputmode="numeric" min="0" step="50" name="smax" aria-label="{{ c.max }}" placeholder="{{ c.max }}">
+      </fieldset>
+    </div>
+    <div class="hw-filters__foot">
+      <p class="hw-count hw-num" role="status" aria-live="polite" data-count-text></p>
+      <button type="button" class="hw-btn hw-btn--ghost" data-reset hidden>{{ c.reset }}</button>
+    </div>
+  </div>
+
+  <div class="hw-empty-filter" data-no-results hidden>
+    <strong>{{ c.no_res }}</strong><span class="hw-mute">{{ c.no_res_p }}</span>
+    <button type="button" class="hw-btn" data-reset>{{ c.reset }}</button>
+  </div>
+
+  <div class="hw-table-wrap" role="region" aria-label="{{ c.table_aria }}" tabindex="0" data-reveal>
+    <table class="hw-table hw-ranking" id="rank-table" data-category="{{ category }}" data-generated="{{ generated_day }}">
+      <caption class="hw-sr">{{ c.caption | replace("{category}", category_label) }}</caption>
+      <thead><tr>
+        <th scope="col" class="hw-col-rank" data-sort="rank" aria-sort="ascending">{{ c.head.rank }}</th>
+        <th scope="col" data-sort="name">{{ c.head.name }}</th>
+        <th scope="col" data-sort="cpu">{{ c.head.cpu }}</th>
+        <th scope="col" data-sort="gpu">{{ c.head.gpu }}</th>
+        <th scope="col" data-sort="kind">{{ c.head.type }}</th>
+        <th scope="col" class="hw-col-score" data-sort="score">{{ c.head.score }}</th>
+        <th scope="col">{{ c.head.rel }}</th>
+        <th scope="col" class="hw-col-date" data-sort="date">{{ c.head.date }}</th>
+      </tr></thead>
+      <tbody>
+        {% for r in rows %}<tr data-id="{{ r.id }}" data-rank="{{ r.rank or '' }}" data-score="{{ r.score_raw }}" data-name="{{ r.name }}" data-cpu="{{ r.cpu }}" data-gpu="{{ r.gpu }}" data-kind="{{ r.kind }}" data-cpub="{{ r.cpu_brand }}" data-gpub="{{ r.gpu_brand }}" data-rel="{{ r.rel }}" data-date="{{ r.date }}" data-cv="{{ r.cv }}">
+          <td class="hw-col-rank hw-num">{% if links.comparaison %}<input type="checkbox" class="hw-check" data-select hidden aria-label="{{ c.select_aria | replace('{name}', r.name) }}"> {% endif %}{{ r.rank_txt }}</td>
+          <td class="hw-col-name"><a href="{{ r.href }}">{{ r.name }}</a>{% if r.stale %} <span class="hw-badge hw-badge--stale">{{ t.stale }}</span>{% endif %}</td>
+          <td class="hw-col-cpu">{{ r.cpu }}</td>
+          <td class="hw-col-gpu">{{ r.gpu }}</td>
+          <td class="hw-col-kind"><span aria-hidden="true">{{ r.kind_mark }}</span> {{ r.kind_label }}</td>
+          <td class="hw-col-score">{% if r.score %}<span class="hw-scorebar"><span class="hw-bar{% if r.rank == 1 %} is-top{% endif %}" aria-hidden="true"><i style="--f:{{ r.frac }}"></i></span><span class="hw-num">{{ r.score }}</span></span>{% else %}<span class="hw-unranked">{{ t.unranked }}</span>{% endif %}</td>
+          <td class="hw-col-rel hw-rel--{{ r.rel }}"><span aria-hidden="true">{{ r.rel_mark }}</span> {{ r.rel_label }}</td>
+          <td class="hw-col-date hw-num">{{ r.date_txt }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <nav class="hw-pager" aria-label="{{ c.pagination }}" data-pager hidden>
+    <div class="hw-pager__nav">
+      <button type="button" class="hw-icon-btn hw-icon-btn--lg" data-page="first" aria-label="{{ c.first_p }}">«</button>
+      <button type="button" class="hw-icon-btn hw-icon-btn--lg" data-page="prev" aria-label="{{ c.prev_p }}">←</button>
+      <span class="hw-num hw-mute" data-page-text></span>
+      <button type="button" class="hw-icon-btn hw-icon-btn--lg" data-page="next" aria-label="{{ c.next_p }}">→</button>
+      <button type="button" class="hw-icon-btn hw-icon-btn--lg" data-page="last" aria-label="{{ c.last_p }}">»</button>
+    </div>
+    <label class="hw-per">{{ c.per_page }}<select class="hw-select hw-num" name="per"><option>25</option><option>50</option><option>100</option></select></label>
+    <div class="hw-pager__tools">
+      <button type="button" class="hw-btn" data-csv>{{ c.csv }}</button>
+      <button type="button" class="hw-btn" data-copy>{{ c.copy_link }}</button>
+    </div>
+  </nav>
+
+  <p class="hw-legend">● {{ c.legend_ok }} · ▲ {{ c.legend_check | fill(facts) }}{{ tip("cv") }} · ◇ {{ c.legend_stale }} · {{ c.legend_shapes }}</p>
+  {% if unranked_note %}<p class="hw-legend">{{ unranked_note }}</p>{% endif %}
+  <p class="hw-legend">{{ c.downloads }} <a href="data.json">{{ c.download_json }}</a> · <a href="classement.csv">{{ c.download_csv }}</a></p>
+</section>
+
+<section class="hw-section hw-viz" aria-labelledby="h-viz">
+  <div class="hw-stack-6"><p class="hw-kicker">{{ c.viz_k }}</p><h2 class="hw-h2" id="h-viz">{{ c.viz_h }}</h2></div>
+  <div class="hw-viz__grid">
+    <figure class="hw-chart" id="fig-scatter">
+      <figcaption><span class="hw-chart__title">{{ c.scatter_h }}</span><span class="hw-mono-note">{{ c.legend_shapes }}{% if links.comparaison %}<span data-js-only hidden> · {{ c.scatter_hint }}</span>{% endif %}</span></figcaption>
+      {% if scatter %}{{ scatter }}
+      <div class="hw-sr"><table><caption>{{ c.scatter_caption }}</caption><thead><tr><th scope="col">{{ t.charts.machine }}</th><th scope="col">{{ t.charts.cpu }}</th><th scope="col">{{ t.charts.y_gpu }}</th></tr></thead>
+      <tbody>{% for p in scatter_rows %}<tr><th scope="row">{{ p.label }}</th><td>{{ p.x }}</td><td>{{ p.y }}</td></tr>{% endfor %}</tbody></table></div>
+      <button type="button" class="hw-btn hw-btn--sm" data-png="fig-scatter" data-png-name="hwbench-cpu-gpu.png" hidden>{{ c.png }}</button>
+      {% else %}<p class="hw-note">{{ c.few_none }}</p>{% endif %}
+    </figure>
+    <figure class="hw-chart" id="fig-hist">
+      <figcaption><span class="hw-chart__title">{{ c.hist_h }} · {{ category_label }}</span></figcaption>
+      {% if hist %}{{ hist.svg }}
+      <div class="hw-sr"><table><caption>{{ c.hist_h }} · {{ category_label }}</caption><thead><tr><th scope="col">{{ t.charts.band }}</th><th scope="col">{{ t.charts.machines }}</th></tr></thead>
+      <tbody>{% for band, count in hist.bands %}<tr><th scope="row">{{ band }}</th><td>{{ count }}</td></tr>{% endfor %}</tbody></table></div>
+      <button type="button" class="hw-btn hw-btn--sm" data-png="fig-hist" data-png-name="hwbench-distribution-{{ category }}.png" hidden>{{ c.png }}</button>
+      {% else %}<p class="hw-note">{{ hist_few }}</p>{% endif %}
+    </figure>
+  </div>
+</section>
+
+<section class="hw-info hw-section" aria-labelledby="h-info">
+  <div class="hw-stack-8">
+    <p class="hw-kicker">{{ c.info_k }}</p>
+    <h2 class="hw-h2" id="h-info">{{ c.info_h }}</h2>
+    <p class="hw-mute hw-info__p">{{ c.info_p }}{{ tip("fio") }} {{ info_missing }}</p>
+  </div>
+  <div class="hw-info__grid">
+    {% for block in info_blocks %}<div class="hw-stack-14">
+      <h3 class="hw-h3">{{ block.title }} <span class="hw-mono-note">{{ block.unit }}</span>{% if block.tip %}{{ tip(block.tip) }}{% endif %}</h3>
+      {% if block.rows %}{{ bars(block.rows, block.title, block.unit) }}{% else %}<p class="hw-note">—</p>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if rows and links.comparaison %}
+<div class="hw-tray" role="region" aria-label="{{ c.tray_aria }}" data-tray hidden>
+  <div class="hw-tray__list"><strong data-tray-count></strong><span class="hw-tray__chips" data-tray-chips></span></div>
+  <div class="hw-tray__actions">
+    <button type="button" class="hw-btn hw-btn--ghost" data-tray-clear>{{ c.clear_selection }}</button>
+    <a class="hw-btn hw-btn--primary" href="{{ links.comparaison }}" data-tray-go aria-disabled="true">{{ c.compare_cta }}<span class="hw-btn__icon" aria-hidden="true">→</span></a>
+  </div>
+</div>
+<div class="hw-sr" role="status" aria-live="polite" data-live></div>
+<template id="tpl-chip"><button type="button" class="hw-tray__chip"><span data-name></span><span aria-hidden="true">×</span></button></template>
+{% endif %}
+
+{% if skipped %}
+<section class="hw-section">
+  <h2 class="hw-h3">{{ c.skipped_h }}</h2>
+  <ul class="hw-mute hw-skipped">{% for s in skipped %}<li>{{ s }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}

@@ -7,7 +7,7 @@ from hwbench import labels
 from hwbench.analysis import Finding, FindingCode, Status, analyze
 from hwbench.display import bench, compare, scores
 from hwbench.export import load_export
-from hwbench.leaderboard import site
+from hwbench.leaderboard import machine as site_machine
 from hwbench.report import texts
 from hwbench.report.texts import (
     MULTI_GAIN_MIN,
@@ -187,7 +187,7 @@ def test_synthesis_limit() -> None:
 
 
 def test_one_label_table_for_terminal_report_and_site() -> None:
-    for module in (bench, scores, compare, site):
+    for module in (bench, scores, compare, site_machine):
         assert module.CATEGORY_LABELS is labels.CATEGORY_LABELS
     assert texts.bench_label is labels.bench_label
     assert labels.CATEGORY_LABELS[Category.CPU_MULTI] == "CPU multi-core"

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% set c = t.comparaison %}
+{% block main %}
+<section class="hw-section hw-cmp" aria-labelledby="h-cmp">
+  <div class="hw-cmp__head">
+    <div class="hw-stack-6"><p class="hw-kicker">{{ c.kicker }}</p><h1 class="hw-h1 hw-h1--cmp" id="h-cmp" data-cmp-title>{{ c.h1 }}</h1></div>
+    <div class="hw-cmp__tools" data-cmp-tools hidden>
+      <button type="button" class="hw-btn" data-cmp-copy>{{ c.copy_link }}</button>
+      <button type="button" class="hw-btn" data-cmp-csv>{{ c.csv }}</button>
+    </div>
+  </div>
+
+  {# Sans JavaScript : explication, lien vers le classement, toutes les machines côte à côte #}
+  <div class="hw-stack-20" data-cmp-fallback>
+    <p class="hw-mute hw-cmp__nojs">{{ c.nojs_p }}</p>
+    <p class="hw-cmp__nojs-link"><a class="hw-btn" href="index.html">{{ c.to_rank }}</a></p>
+    <div class="hw-table-wrap" role="region" aria-label="{{ c.all_caption }}" tabindex="0">
+      <table class="hw-table hw-cmp-all">
+        <caption class="hw-sr">{{ c.all_caption }}</caption>
+        <thead><tr><th scope="col">{{ c.head.name }}</th>{% for key in category_keys %}<th scope="col" class="hw-right">{{ category_labels[key] }}</th>{% endfor %}<th scope="col" class="hw-right">{{ c.head.memory }}</th><th scope="col" class="hw-right">{{ c.head.disk }}</th></tr></thead>
+        <tbody>{% for row in all_rows %}<tr>
+          <th scope="row"><a href="{{ row.href }}">{{ row.name }}</a></th>
+          {% for value in row.points %}<td class="hw-num hw-right">{{ value }}</td>{% endfor %}
+          <td class="hw-num hw-right">{{ row.memory }}</td><td class="hw-num hw-right">{{ row.disk }}</td>
+        </tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+
+  {# Avec JavaScript : comparaison choisie (?sel=…&base=…), construite depuis data.json #}
+  <div class="hw-stack-40" data-cmp hidden data-max="8">
+    <section class="hw-cards" aria-label="{{ c.selected }}" data-cards>
+      <div class="hw-card hw-cmpcard hw-cmpcard--add" data-add-card>
+        <label class="hw-field">{{ c.add }}
+          <select class="hw-select" data-cmp-add><option value="">{{ c.choose }}</option>{% for o in options %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select>
+        </label>
+        <span class="hw-mono-note">{{ c.max }}</span>
+      </div>
+    </section>
+
+    <div class="hw-empty-filter" data-cmp-few hidden>
+      <strong>{{ c.few_h }}</strong><span class="hw-mute">{{ c.few_p }}</span>
+      <a class="hw-btn" href="index.html">{{ c.to_rank }}</a>
+    </div>
+
+    <div class="hw-stack-40" data-cmp-enough hidden>
+      <section class="hw-stack-14" aria-labelledby="h-diff">
+        <div class="hw-split-head"><h2 class="hw-h3 hw-h3--lg" id="h-diff">{{ c.diff_h }}</h2><span class="hw-mono-note" data-cmp-basetxt></span></div>
+        <div class="hw-table-wrap hw-table-wrap--rule" role="region" aria-label="{{ c.diff_h }}" tabindex="0">
+          <table class="hw-table hw-gaps"><thead><tr data-cmp-head><th scope="col">{{ c.cat }}</th></tr></thead><tbody data-cmp-rows></tbody></table>
+        </div>
+        <p class="hw-legend">{{ c.diff_note }}</p>
+      </section>
+
+      <section class="hw-grid-2 hw-grid-2--flush">
+        <figure class="hw-chart" id="fig-radar">
+          <figcaption><span class="hw-chart__title">{{ c.radar_h }}</span></figcaption>
+          <div class="hw-radar" data-cmp-radar></div>
+          <ul class="hw-series-legend" data-cmp-legend></ul>
+          <p class="hw-legend" data-cmp-radarcap hidden>{{ c.radar_cap }}</p>
+          <button type="button" class="hw-btn hw-btn--sm" data-png="fig-radar" data-png-name="hwbench-radar.png" hidden>{{ c.png }}</button>
+        </figure>
+        <figure class="hw-chart" id="fig-group">
+          <figcaption><span class="hw-chart__title">{{ c.group_h }}</span></figcaption>
+          <div data-cmp-group></div>
+          <button type="button" class="hw-btn hw-btn--sm" data-png="fig-group" data-png-name="hwbench-categories.png" hidden>{{ c.png }}</button>
+        </figure>
+      </section>
+
+      <section class="hw-info hw-info--inline hw-stack-20" aria-labelledby="h-cmp-info" data-cmp-info>
+        <div class="hw-stack-6"><p class="hw-kicker">{{ c.info_k }}</p><h2 class="hw-h3 hw-h3--lg" id="h-cmp-info">{{ c.info_h }}</h2><p class="hw-mute hw-small">{{ c.info_p }}</p></div>
+        <div class="hw-info__grid">
+          <div class="hw-stack-12"><h3 class="hw-h3">{{ c.mem_h }} <span class="hw-mono-note">{{ c.mibs }}</span></h3><div class="hw-hbars"><div class="hw-hbars__rows" data-cmp-mem></div></div></div>
+          <div class="hw-stack-12"><h3 class="hw-h3">{{ c.seq_h }} <span class="hw-mono-note">{{ c.mibs }}</span></h3><div class="hw-hbars"><div class="hw-hbars__rows" data-cmp-seq></div></div></div>
+        </div>
+      </section>
+    </div>
+    <div class="hw-sr" role="status" aria-live="polite" data-live></div>
+  </div>
+</section>
+
+<template id="tpl-cmp-card"><article class="hw-card hw-cmpcard">
+  <div class="hw-cmpcard__top"><span class="hw-cmpcard__rank"><span data-mark aria-hidden="true"></span><span class="hw-num" data-rank></span></span><button type="button" class="hw-cmpcard__x" data-remove><span aria-hidden="true">×</span></button></div>
+  <a class="hw-cmpcard__name" data-name></a>
+  <span class="hw-cmpcard__sub"><span data-cpu></span><br><span data-gpu></span></span>
+  <div class="hw-cmpcard__foot"><span class="hw-num" data-combined></span><span class="hw-cmpcard__rel" data-rel></span></div>
+  <label class="hw-cmpcard__base"><input type="radio" name="base" class="hw-check" data-base> {{ c.as_base }}</label>
+</article></template>
+<template id="tpl-cmp-bar"><div class="hw-hbars__row"><span class="hw-hbars__label"><span class="hw-mark" data-mark></span><span data-label></span></span><span class="hw-bar"><i></i></span><span class="hw-num" data-value></span></div></template>
+{% endblock %}

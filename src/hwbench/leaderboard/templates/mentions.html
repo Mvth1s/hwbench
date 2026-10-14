@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% set c = t.mentions %}
+{% block main %}
+<section class="hw-section hw-doc hw-legal">
+  <p class="hw-kicker">{{ c.kicker }}</p>
+  <h1 class="hw-h1 hw-h1--legal">{{ c.h1 }}</h1>
+  <nav aria-label="{{ c.toc }}"><ul class="hw-linkchips">{% for sec in c.secs %}<li><a class="hw-btn" href="#{{ sec.id }}">{{ sec.h }}</a></li>{% endfor %}</ul></nav>
+  {% for sec in c.secs %}
+  <section class="hw-legal__sec" id="{{ sec.id }}" aria-labelledby="h-{{ sec.id }}">
+    <h2 class="hw-h2" id="h-{{ sec.id }}">{{ sec.h }}</h2>
+    <dl>{% for k, v in sec["items"] %}<div><dt>{{ k }}</dt><dd>{{ v | fill(facts) }}</dd></div>{% endfor %}</dl>
+    {% if sec.get("links") %}<ul class="hw-linkchips">{% for label, href in sec["links"] %}<li><a class="hw-btn" href="{{ href }}" rel="noopener">{{ label }} ↗</a></li>{% endfor %}</ul>{% endif %}
+  </section>
+  {% endfor %}
+  <p class="hw-mono-note">{{ c.updated }}</p>
+</section>
+{% endblock %}

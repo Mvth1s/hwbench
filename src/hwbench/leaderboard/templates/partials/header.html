@@ -1,0 +1,13 @@
+<header class="hw-header">
+<div class="hw-header__bar">
+  <a class="hw-logo" href="{{ root }}index.html" aria-label="{{ t.header.home_aria }}"><span>{{ t.site.name }}</span><span class="hw-logo__version" aria-hidden="true">{{ version }}</span></a>
+  <nav class="hw-nav" id="hw-nav" aria-label="{{ t.header.nav_aria }}">
+    {% for item in nav %}<a href="{{ item.href }}"{% if item.key == page %} aria-current="page"{% endif %}>{{ item.label }}</a>{% endfor %}
+  </nav>
+  <div class="hw-header__actions">
+    <button type="button" class="hw-icon-btn" data-theme-toggle hidden aria-label="{{ t.header.theme }}" title="{{ t.header.theme }}"><span aria-hidden="true">◐</span></button>
+    <a class="hw-btn hw-btn--primary" href="{{ submit_href }}"><span class="hw-wide">{{ t.header.submit }}</span><span class="hw-narrow">{{ t.header.submit_short }}</span><span class="hw-btn__icon" aria-hidden="true">→</span></a>
+    <button type="button" class="hw-btn hw-menu-btn" data-menu-toggle hidden aria-expanded="false" aria-controls="hw-nav">{{ t.header.menu }}</button>
+  </div>
+</div>
+</header>

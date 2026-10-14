@@ -1,4 +1,5 @@
-"""python -m hwbench.leaderboard validate FICHIERS… | site [--results DIR] [--out DIR] [--preview]
+"""python -m hwbench.leaderboard validate FICHIERS…
+| site [--results DIR] [--out DIR] [--preview] [--base-url /hwbench/]
 | summary [--results DIR] [--new FICHIERS…]"""
 
 import argparse
@@ -7,10 +8,18 @@ import os
 import sys
 from pathlib import Path
 
-from hwbench.leaderboard.site import build_site, load_entries, ranking
+from hwbench.leaderboard import SITE_EXTRA_MISSING, SITE_EXTRA_MODULES
+from hwbench.leaderboard.catalog import CONTACT_PLACEHOLDER, FR
+from hwbench.leaderboard.entries import load_entries, ranking
 from hwbench.leaderboard.validate import validate_file
 from hwbench.report.texts import plural
 from hwbench.scoring import load_reference
+
+CONTACT_MISSING = (
+    'contact privé non renseigné (catalog.FR["contact_private"]) : la page des mentions '
+    "légales doit donner une adresse pour l'exercice des droits avant toute publication du "
+    "site de production (--preview pour un site de vérification)"
+)
 
 
 def _annotation(text: str) -> str:
@@ -45,12 +54,28 @@ def _validate(files: list[Path]) -> int:
     return 1 if failed else 0
 
 
-def _site(results: Path, out: Path, preview: bool = False) -> int:
+def _site(results: Path, out: Path, preview: bool = False, base_url: str = "/") -> int:
+    try:  # import paresseux : seule cette commande demande l'extra « site » (Jinja2)
+        from hwbench.leaderboard.site import build_site
+    except ModuleNotFoundError as exc:
+        if exc.name not in SITE_EXTRA_MODULES:
+            raise
+        print(f"Erreur : {SITE_EXTRA_MISSING}", file=sys.stderr)
+        return 2
+    if not preview and FR["contact_private"] == CONTACT_PLACEHOLDER:
+        # le site de production ne se publie pas sans contact privé pour l'exercice des droits
+        print(f"Erreur : {CONTACT_MISSING}", file=sys.stderr)
+        return 2
+    if not base_url.startswith("/") or not base_url.endswith("/"):
+        print(
+            f"Erreur : --base-url doit commencer et finir par « / » : {base_url}", file=sys.stderr
+        )
+        return 2
     reference = load_reference()
     if reference is None:
         print("Erreur : pas de référence dans le paquet.", file=sys.stderr)
         return 2
-    entries = build_site(results, out, reference, preview=preview)
+    entries = build_site(results, out, reference, preview=preview, base_url=base_url)
     print(f"Site écrit dans {out} ({plural(len(entries), 'machine', 'machines')}).")
     return 0
 
@@ -92,6 +117,11 @@ def main(argv: list[str] | None = None) -> int:
     site.add_argument(
         "--preview", action="store_true", help="preview de la branche dev (bandeau, noindex)"
     )
+    site.add_argument(
+        "--base-url",
+        default="/",
+        help="chemin absolu de la racine du site, pour la page 404 (ex. /hwbench/)",
+    )
     summary = sub.add_parser("summary", help="rangs au classement combiné, en JSON")
     summary.add_argument("--results", type=Path, default=Path("results"))
     summary.add_argument("--new", nargs="+", type=Path, help="seulement ces fichiers")
@@ -100,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
         return _validate(args.files)
     if args.command == "summary":
         return _summary(args.results, args.new)
-    return _site(args.results, args.out, args.preview)
+    return _site(args.results, args.out, args.preview, args.base_url)
 
 
 if __name__ == "__main__":
