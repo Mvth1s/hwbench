@@ -733,8 +733,91 @@ function buildCompare(root, data) {
   render();
 }
 
+// ---------- Soumettre : boutons « Copier » et contrôle local du fichier JSON ----------
+function initCopyCode() {
+  document.querySelectorAll('[data-copy-code]').forEach((button) => {
+    const code = button.parentElement.querySelector('code');
+    if (!code || !navigator.clipboard) return;
+    button.hidden = false;
+    const label = button.textContent;
+    button.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(code.textContent); } catch (e) { return; }
+      button.textContent = button.dataset.copied;
+      setTimeout(() => { button.textContent = label; }, 1600);
+    });
+  });
+}
+const ID_KEYS = /^(serial|serial_number|uuid|product_uuid|mac|mac_address|hostname|asset_tag|product_serial|board_serial|chassis_serial|chassis_asset_tag|eui64|nguid)$/i;
+function findIds(node, path = '', out = []) {
+  if (node && typeof node === 'object') {
+    Object.entries(node).forEach(([k, v]) => {
+      if (ID_KEYS.test(k) && v !== null && v !== '' && v !== false) out.push(path + k);
+      findIds(v, path + k + '.', out);
+    });
+  }
+  return out;
+}
+function initFileCheck() {
+  const drop = document.querySelector('[data-drop]');
+  const report = document.querySelector('[data-check-report]');
+  if (!drop || !report || !window.FileReader) return;
+  const C = I18N.check || {};
+  drop.hidden = false;
+  report.hidden = false;
+  document.querySelectorAll('[data-nojs-note]').forEach((n) => { n.hidden = true; });
+  const card = report.querySelector('[data-check-card]');
+  card.hidden = true;
+  const readable = report.dataset.readable.split(',');
+  const tone = { ok: ['✓', C.pass], warn: ['!', C.note], ko: ['✕', C.fail] };
+  function show(name, checks) {
+    const worst = checks.some((c) => c[1] === 'ko') ? 'ko' : checks.some((c) => c[1] === 'warn') ? 'warn' : 'ok';
+    const verdict = report.querySelector('[data-verdict]');
+    verdict.textContent = tone[worst][0] + ' ' + C[worst];
+    verdict.className = 'hw-check-verdict is-' + worst;
+    report.querySelector('[data-file-name]').textContent = name;
+    const tpl = document.getElementById('tpl-check');
+    report.querySelector('[data-checks]').replaceChildren(...checks.map(([key, status, detail]) => {
+      const li = tpl.content.firstElementChild.cloneNode(true);
+      const mk = li.querySelector('[data-mark]');
+      mk.textContent = tone[status][0];
+      mk.classList.add('is-' + status);
+      li.querySelector('[data-sr]').textContent = tone[status][1] + ' : ';
+      li.querySelector('[data-label]').textContent = C[key];
+      li.querySelector('[data-detail]').textContent = detail;
+      return li;
+    }));
+    card.hidden = false;
+    report.querySelector('[data-idle]').hidden = true;
+  }
+  function analyse(file) {
+    if (!file) return;
+    file.text().then((text) => {
+      const checks = [];
+      let data;
+      try { data = JSON.parse(text); checks.push(['json', 'ok', NUM.format(text.length / 1024) + ' Kio']); } catch (e) { checks.push(['json', 'ko', String(e.message).slice(0, 80)]); show(file.name, checks); return; }
+      const schema = String(data.schema_version ?? '');
+      checks.push(['schema', readable.includes(schema) ? 'ok' : 'ko', 'schema_version = ' + (schema || '—')]);
+      const version = String(data.hwbench_version || '');
+      checks.push(['version', version === report.dataset.version ? 'ok' : version ? 'warn' : 'ko', 'hwbench_version = ' + (version || '—') + ' / ' + report.dataset.version]);
+      checks.push(['date', data.created ? 'ok' : 'ko', data.created || '—']);
+      checks.push(['machine', data.machine ? 'ok' : 'ko', data.machine || '—']);
+      const ids = findIds(data);
+      checks.push(['ids', ids.length ? 'ko' : 'ok', ids.length ? ids.slice(0, 3).join(', ') : '0']);
+      checks.push(['name', /^[a-z0-9][a-z0-9-]*\.json$/.test(file.name) ? 'ok' : 'ko', file.name]);
+      show(file.name, checks);
+    });
+  }
+  const input = drop.querySelector('[data-file]');
+  input.addEventListener('change', () => analyse(input.files[0]));
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('is-over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('is-over'));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('is-over'); analyse(e.dataTransfer.files[0]); });
+}
+
 initTheme();
 initMenu();
+initCopyCode();
+initFileCheck();
 initCompare();
 initAddMachine();
 initTableCSV();

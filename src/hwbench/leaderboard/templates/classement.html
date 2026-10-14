@@ -6,7 +6,7 @@
   <div class="hw-hero__text">
     <p class="hw-kicker">{{ kicker }}</p>
     <h1 class="hw-h1" id="h-hero">{{ c.h1a }}<br>{{ c.h1b }}</h1>
-    <p class="hw-lede">{{ c.lede1 }} <strong>{{ c.lede2 }}</strong>{{ tip("points") }} {{ c.lede3 | replace("{reference}", reference_machine) }}{{ tip("geomean") }} {{ c.lede4 }}</p>
+    <p class="hw-lede">{{ c.lede1 }} <strong>{{ c.lede2 }}</strong>{{ tip("points") }} {{ c.lede3 | fill(facts) }}{{ tip("geomean") }} {{ c.lede4 }}</p>
     <div class="hw-hero__actions">
       <a class="hw-btn" href="#classement">{{ c.see_rank }} <span aria-hidden="true">↓</span></a>
       {% if links.methodologie %}<a class="hw-btn hw-btn--ghost" href="{{ links.methodologie }}#points">{{ c.how }}</a>{% endif %}
@@ -122,7 +122,7 @@
     </div>
   </nav>
 
-  <p class="hw-legend">● {{ c.legend_ok }} · ▲ {{ c.legend_check | replace("{cv}", cv_threshold) }}{{ tip("cv") }} · ◇ {{ c.legend_stale }} · {{ c.legend_shapes }}</p>
+  <p class="hw-legend">● {{ c.legend_ok }} · ▲ {{ c.legend_check | fill(facts) }}{{ tip("cv") }} · ◇ {{ c.legend_stale }} · {{ c.legend_shapes }}</p>
   {% if unranked_note %}<p class="hw-legend">{{ unranked_note }}</p>{% endif %}
   <p class="hw-legend">{{ c.downloads }} <a href="data.json">{{ c.download_json }}</a> · <a href="classement.csv">{{ c.download_csv }}</a></p>
 </section>

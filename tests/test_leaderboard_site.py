@@ -33,6 +33,9 @@ CLASSEMENT_PAGES = ("index.html", "cpu-single.html", "cpu-multi.html", "gpu.html
 # seules URL externes autorisées dans le site (aucune ressource externe : liens seulement)
 EXTERNAL_OK = (
     "https://github.com/Mvth1s/hwbench",
+    "https://github.com/akopytov/sysbench",
+    "https://docs.github.com/fr/site-policy/privacy-policies/github-general-privacy-statement",
+    "https://www.cnil.fr/",
     "https://fio.readthedocs.io/",
     "https://docs.kernel.org/admin-guide/pm/",
     "https://github.com/glmark2/glmark2",
@@ -368,7 +371,9 @@ def test_internal_links_and_assets_resolve(tmp_path) -> None:
             if not parts.path:  # ancre de la même page
                 assert parts.fragment in parser.ids, (path.name, url)
                 continue
-            target = (path.parent / parts.path).resolve()
+            # 404 : chemins absolus depuis la base (« / » par défaut)
+            base = out if parts.path.startswith("/") else path.parent
+            target = (base / parts.path.lstrip("/")).resolve()
             assert target.is_file(), (path.name, url)
     css = (out / "assets" / "hwbench.css").read_text()
     for url in re.findall(r"url\(([^)]+)\)", css):
@@ -478,7 +483,9 @@ def test_production_site_has_no_preview_marks(tmp_path) -> None:
     assert not (out / "robots.txt").exists()
     for path in html_pages(out):
         html = path.read_text()
-        assert ROBOTS_META not in html and "preview-banner" not in html
+        # la 404 n'est jamais indexée, preview ou non
+        assert (ROBOTS_META in html) == (path.name == "404.html"), path.name
+        assert "preview-banner" not in html
         assert "hw-preview" not in html and "<title>Preview" not in html
 
 
@@ -486,7 +493,7 @@ def test_preview_site_is_marked_and_not_indexed(tmp_path) -> None:
     out = site(tmp_path, preview=True)
     assert (out / "robots.txt").read_text() == "User-agent: *\nDisallow: /\n"
     pages = html_pages(out)
-    assert len(pages) == 9
+    assert len(pages) == 13
     for path in pages:
         html = path.read_text()
         assert html.count(ROBOTS_META) == 1, path.name
@@ -504,6 +511,7 @@ def test_preview_site_is_marked_and_not_indexed(tmp_path) -> None:
 
 def test_cli_site(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    monkeypatch.setitem(FR, "contact_private", "contact@example.org")
     out = tmp_path / "_site"
     assert cli.main(["site", "--results", str(results_dir(tmp_path)), "--out", str(out)]) == 0
     assert "(4 machines)" in capsys.readouterr().out
@@ -760,7 +768,7 @@ def test_site_without_the_extra_explains_how_to_install_it(tmp_path, monkeypatch
 
 
 # Seuls textes autorisés à porter une adresse postale : celle de l'hébergeur (obligation légale).
-HOST_ADDRESS_KEYS = {"footer.host"}
+HOST_ADDRESS_KEYS = {"footer.host", "mentions.host"}
 
 
 def test_catalog_has_no_personal_contact_details() -> None:
@@ -833,3 +841,167 @@ def test_comparison_is_linked_from_the_ranking_and_the_machine_pages(tmp_path) -
     page = (out / "machines" / "moyen.html").read_text()
     assert 'href="../comparaison.html?sel=moyen" data-cmp-link data-self="moyen"' in page
     assert 'data-id="rapide">Desktop rapide</option>' in page
+
+
+# --- Pages de contenu : valeurs injectées, 404, mentions ---
+
+
+def _catalog_strings(node: object, path: str = "") -> list[tuple[str, str]]:
+    if isinstance(node, str):
+        return [(path, node)]
+    if isinstance(node, dict):
+        return [x for k, v in node.items() for x in _catalog_strings(v, f"{path}.{k}".lstrip("."))]
+    if isinstance(node, list):
+        return [x for v in node for x in _catalog_strings(v, path)]
+    return []
+
+
+def test_catalog_has_no_hardcoded_versions_or_thresholds() -> None:
+    """Versions, schéma, seuils, nombre de runs, référence : injectés depuis le code
+    (pages.facts), jamais écrits dans le catalogue."""
+    from hwbench import __version__
+    from hwbench.scoring import load_reference
+
+    licences = re.compile(r"AGPL-3\.0(-or-later)?|CC0-1\.0|SIL Open Font License")
+    forbidden = re.compile(
+        r"\b\d+\.\d+(\.\d+)*\b"  # numéro de version
+        r"|\d+(,\d+)?\s?%"  # seuil en pourcentage
+        r"|\b\d+(,\d+)?\s?°C"  # seuil de température
+        r"|\b(schéma|schema)\s+\d|hwbench\s+\d|\b\d+\s+runs?\b"
+        r"|\b\d+\s?s\b"  # durée en secondes
+    )
+    found = [
+        (path, text)
+        for path, text in _catalog_strings(FR)
+        if forbidden.search(licences.sub("", text))
+    ]
+    assert found == []
+    reference = load_reference()
+    assert reference is not None
+    dump = json.dumps(FR, ensure_ascii=False)
+    assert __version__ not in dump and reference.machine not in dump
+
+
+def test_methodology_injects_values_from_the_code(tmp_path) -> None:
+    from hwbench import __version__
+    from hwbench.runner import DEFAULT_MAX_WARMUP_S
+
+    page = (site(tmp_path) / "methodologie.html").read_text()
+    settings = RunSettings()
+    assert f"Méthodologie · hwbench {__version__}" in page
+    assert f"au-dessus de {settings.hot_start_c:g} °C" in page
+    assert f"Au-delà de {settings.high_variance_cv_percent:g} % sur au moins un test" in page
+    assert f"au moins {settings.runs} fois" in page
+    assert f"à {settings.warmup_tolerance_percent:g} % près" in page
+    lo, hi = min(DEFAULT_MAX_WARMUP_S.values()), max(DEFAULT_MAX_WARMUP_S.values())
+    assert f"limite de {lo:g} à {hi:g} s" in page
+    assert f"machine de référence, {REFERENCE.machine}, mesurée le 29/09/2026" in page
+    assert REFERENCE.digest[:19] in page
+    # tableau des tests : une ligne par entrée de la référence, versions de la référence
+    table = page.split('class="hw-table hw-benches"', 1)[1].split("</table>", 1)[0]
+    assert table.count('<th scope="row">') == len(REFERENCE.entries)
+    assert "outil 1.0.20" in table and "protocole 1" in table
+    # exemple calculé, pas écrit : ∛(1000 × 1000 × 250) = 630, moyenne arithmétique 750
+    assert "donnerait 750 ; la moyenne géométrique donne 630" in page
+    for anchor in ("points", "combine", "categories", "protocole", "outils", "reference"):
+        assert f'id="{anchor}"' in page and f'href="#{anchor}"' in page
+
+
+def test_submit_page_describes_the_real_flow(tmp_path) -> None:
+    from hwbench import __version__
+    from hwbench.export import EXPORT_SCHEMA_VERSION, READABLE_SCHEMA_VERSIONS
+
+    page = (site(tmp_path) / "soumettre.html").read_text()
+    for command in (
+        "pipx install hwbench",
+        "hwbench export -o results/&lt;nom&gt;.json",
+        "python -m hwbench.leaderboard validate results/&lt;nom&gt;.json",
+    ):
+        assert f"<pre><code>{command}" in page, command
+    assert "git add results/&lt;nom&gt;.json &amp;&amp; git commit" in page
+    assert "chore(results): add &lt;nom&gt;" in page
+    assert "results.yml" in page and "vers dev" in page and f"hwbench {__version__}" in page
+    assert "data-copy-code hidden" in page  # boutons « Copier » : JavaScript seulement
+    assert f'data-schema="{EXPORT_SCHEMA_VERSION}"' in page
+    assert 'data-readable="' + ",".join(map(str, READABLE_SCHEMA_VERSIONS)) + '"' in page
+    assert 'href="https://github.com/Mvth1s/hwbench/blob/main/CONTRIBUTING.md"' in page
+    assert "data-drop hidden" in page and "data-nojs-note" in page
+
+
+def test_legal_page(tmp_path) -> None:
+    from hwbench.leaderboard.catalog import CONTACT_PLACEHOLDER, HOST
+
+    page = (site(tmp_path) / "mentions-legales.html").read_text()
+    for anchor in ("mentions", "confidentialite", "cookies", "accessibilite"):
+        assert f'id="{anchor}"' in page and f'href="#{anchor}"' in page
+    assert "Projet open source non commercial, édité à titre non professionnel." in page
+    assert HOST in page and page.count("88 Colin P. Kelly") == 2  # mentions et pied de page
+    # droits : contact privé (jamais une issue publique), réclamation CNIL sans article cité
+    rights = page.split("Vos droits</dt>", 1)[1].split("</dd>", 1)[0]
+    assert CONTACT_PLACEHOLDER in rights and "issue" not in rights
+    assert "auprès de la CNIL" in page and 'href="https://www.cnil.fr/"' in page
+    assert "hwbench.theme" in page
+    for unverified in ("6-III", "article", "art. "):
+        assert unverified not in page, unverified
+    # liens du pied de page vers les ancres
+    index = (tmp_path / "_site" / "index.html").read_text()
+    assert 'href="mentions-legales.html#confidentialite"' in index
+
+
+def test_not_found_page_uses_the_base_url(tmp_path) -> None:
+    out = tmp_path / "_site"
+    build_site(results_dir(tmp_path), out, REFERENCE, generated=NOW, base_url="/hwbench/")
+    page = (out / "404.html").read_text()
+    assert ROBOTS_META in page
+    assert 'href="/hwbench/assets/hwbench.css"' in page
+    assert 'action="/hwbench/index.html"' in page and 'name="q"' in page
+    hrefs = re.findall(r'href="([^"#]+)', page)
+    internal = [h for h in hrefs if not h.startswith("https://")]
+    assert internal and all(h.startswith("/hwbench/") for h in internal), internal
+    # les autres pages gardent des liens relatifs
+    assert 'href="/hwbench/' not in (out / "index.html").read_text()
+
+
+def test_base_url_must_be_an_absolute_directory(tmp_path) -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="base_url"):
+        build_site(results_dir(tmp_path), tmp_path / "_site", REFERENCE, base_url="hwbench")
+
+
+def test_production_build_requires_the_private_contact(tmp_path, monkeypatch, capsys) -> None:
+    """Tant que le contact privé est un emplacement réservé, le site de production ne se
+    génère pas (code 2) ; la preview, si."""
+    from hwbench.leaderboard.catalog import CONTACT_PLACEHOLDER
+
+    monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    assert FR["contact_private"] == CONTACT_PLACEHOLDER
+    results = str(results_dir(tmp_path))
+    out = tmp_path / "prod"
+    assert cli.main(["site", "--results", results, "--out", str(out)]) == 2
+    assert "contact privé non renseigné" in capsys.readouterr().err and not out.exists()
+    preview = tmp_path / "preview"
+    assert cli.main(["site", "--results", results, "--out", str(preview), "--preview"]) == 0
+    monkeypatch.setitem(FR, "contact_private", "contact@example.org")
+    assert cli.main(["site", "--results", results, "--out", str(out)]) == 0
+    assert "contact@example.org" in (out / "mentions-legales.html").read_text()
+    assert cli.main(["site", "--results", results, "--out", str(out), "--base-url", "x"]) == 2
+
+
+def _tokens(css: str, selector: str) -> dict[str, str]:
+    block = css.split(selector, 1)[1].split("}", 1)[0]
+    return dict(re.findall(r"--(\w+):\s*(#[0-9A-Fa-f]{6})", block))
+
+
+def test_text_colours_meet_the_contrast_minimum() -> None:
+    """Contraste du texte (WCAG AA) dans les deux thèmes, annoncé par les mentions légales."""
+    from hwbench.leaderboard.pages import CONTRAST_MIN, contrast_ratio
+
+    css = (PACKAGE / "static" / "hwbench.css").read_text()
+    for selector in (":root{", ":root[data-theme=dark]{"):
+        tokens = _tokens(css, selector)
+        for background in ("bg", "card", "soft"):
+            for text in ("ink", "mute", "acc", "s2", "s3"):
+                ratio = contrast_ratio(tokens[text], tokens[background])
+                assert ratio >= CONTRAST_MIN, (selector, text, background, round(ratio, 2))
+        assert contrast_ratio(tokens["onacc"], tokens["acc"]) >= CONTRAST_MIN, selector

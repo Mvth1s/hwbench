@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% set c = t.soumettre %}
+{% block main %}
+<section class="hw-section hw-doc">
+  <header class="hw-sub__head">
+    <div class="hw-stack-20">
+      <p class="hw-kicker">{{ c.kicker }}</p>
+      <h1 class="hw-h1">{{ c.h1 }}</h1>
+      <p class="hw-lede hw-lede--lg">{{ c.lede }}</p>
+    </div>
+    <dl class="hw-facts">{% for k, v in c.facts %}<div><dt>{{ k }}</dt><dd class="hw-num">{{ v }}</dd></div>{% endfor %}</dl>
+  </header>
+
+  <section class="hw-stack-12" aria-labelledby="h-steps">
+    <h2 class="hw-h2" id="h-steps">{{ c.steps_h }}</h2>
+    <ol class="hw-steps">
+      {% for s in c.steps %}<li class="hw-step">
+        <span class="hw-step__num hw-num" aria-hidden="true">{{ "%02d" | format(loop.index) }}</span>
+        <div class="hw-stack-12">
+          <h3 class="hw-h3 hw-h3--step">{{ s.h }}</h3>
+          <p class="hw-mute">{{ s.p | fill(facts) }}</p>
+          {% if s.code %}<div class="hw-code"><pre><code>{{ s.code }}</code></pre><button type="button" class="hw-code__copy" data-copy-code hidden data-copied="{{ c.copied }}" aria-label="{{ c.copy_aria | replace('{step}', s.h) }}">{{ c.copy_btn }}</button></div>{% endif %}
+        </div>
+      </li>{% endfor %}
+    </ol>
+    <p><a href="{{ contributing }}" rel="noopener">{{ c.guide }} ↗</a></p>
+  </section>
+
+  <section class="hw-check-sec" aria-labelledby="h-check">
+    <div class="hw-stack-14">
+      <p class="hw-kicker">{{ c.check_k }}</p>
+      <h2 class="hw-h2" id="h-check">{{ c.check_h }}</h2>
+      <p class="hw-mute">{{ c.check_p }}</p>
+      <p class="hw-note" data-nojs-note>{{ c.nojs }}</p>
+      <label class="hw-drop" data-drop hidden>
+        <span class="hw-drop__icon" aria-hidden="true">{ }</span>
+        <span class="hw-drop__title">{{ c.drop }}</span>
+        <span class="hw-mute">{{ c.drop_sub }}</span>
+        <input type="file" accept=".json,application/json" class="hw-sr" data-file>
+      </label>
+    </div>
+    <div class="hw-stack-12" aria-live="polite" data-check-report hidden data-schema="{{ current_schema }}" data-readable="{{ readable_schemas }}" data-version="{{ version }}">
+      <div class="hw-card hw-stack-12" data-check-card>
+        <div class="hw-split-head"><strong class="hw-check-verdict" data-verdict></strong><span class="hw-mono-note" data-file-name></span></div>
+        <ul class="hw-check-list" data-checks></ul>
+        <p class="hw-legend">{{ c.ci_note }}</p>
+      </div>
+      <p class="hw-note" data-idle>{{ c.idle }}</p>
+    </div>
+  </section>
+
+  <section class="hw-stack-12 hw-faq" aria-labelledby="h-faq">
+    <h2 class="hw-h2" id="h-faq">{{ c.faq_h }}</h2>
+    {% for f in c.faq %}<details class="hw-acc"><summary>{{ f.q }}<span class="chev" aria-hidden="true">+</span></summary><p class="hw-mute">{{ f.a | fill(facts) }}</p></details>{% endfor %}
+  </section>
+</section>
+<template id="tpl-check"><li><span class="hw-check-mark" data-mark aria-hidden="true"></span><span><span class="hw-sr" data-sr></span><span data-label></span><span class="hw-mono-note hw-block" data-detail></span></span></li></template>
+{% endblock %}

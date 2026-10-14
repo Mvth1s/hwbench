@@ -30,7 +30,8 @@ except ModuleNotFoundError as exc:
 
 from hwbench import __version__
 from hwbench.display.fmt import compact, fr_date, grouped
-from hwbench.leaderboard import charts
+from hwbench.export import EXPORT_SCHEMA_VERSION
+from hwbench.leaderboard import charts, pages
 from hwbench.leaderboard.catalog import (
     FR,
     GITHUB,
@@ -45,6 +46,7 @@ from hwbench.leaderboard.entries import (
     ranking,
 )
 from hwbench.leaderboard.machine import machine_context, same_model_groups
+from hwbench.leaderboard.pages import facts, fill
 from hwbench.leaderboard.validate import read_bounded
 from hwbench.leaderboard.views import (
     CATEGORY_KEYS,
@@ -70,6 +72,7 @@ ENV = Environment(
     lstrip_blocks=True,
     keep_trailing_newline=True,
 )
+ENV.filters["fill"] = fill  # {{ texte | fill(facts) }} : valeurs techniques injectées
 
 # Pages du site, dans l'ordre de la navigation : fichier de sortie. Seules les pages déjà
 # générées (PAGES) apparaissent dans la navigation et le pied de page.
@@ -80,7 +83,7 @@ PAGE_HREFS = {
     "soumettre": "soumettre.html",
     "mentions": "mentions-legales.html",
 }
-PAGES = frozenset({"classement", "comparaison"})
+PAGES = frozenset(PAGE_HREFS)
 CONTRIBUTING = f"{GITHUB}/blob/main/CONTRIBUTING.md"
 HIST_MIN = 10  # machines classées à partir desquelles la distribution est tracée
 INFO_TOP = 8  # machines affichées par graphique mémoire / disque
@@ -103,9 +106,15 @@ def _href(key: str, root: str) -> str | None:
 
 
 def _common(
-    page_key: str, title: str, root: str, generated: datetime, preview: bool
+    page_key: str,
+    title: str,
+    root: str,
+    generated: datetime,
+    preview: bool,
+    reference: Reference,
 ) -> dict[str, Any]:
-    """Contexte commun à toutes les pages (layout, en-tête, pied de page)."""
+    """Contexte commun à toutes les pages (layout, en-tête, pied de page). `root` : chemin vers
+    la racine du site, relatif (« », « ../ ») ou absolu (404 : base de l'URL)."""
     t = FR
     links = {key: _href(key, root) for key in PAGE_HREFS}
     nav = [
@@ -159,7 +168,8 @@ def _common(
         "nav": nav,
         "footer_columns": columns,
         "submit_href": links["soumettre"] or CONTRIBUTING,
-        "cv_threshold": compact(RunSettings().high_variance_cv_percent),
+        "facts": facts(reference, generated),
+        "noindex": False,
         "tip_keys": [],
         "i18n_json": _json_script(t["js"]),
     }
@@ -221,7 +231,7 @@ def classement_context(
     c = FR["classement"]
     label = category_label(key)
     title = c["title"].replace("{category}", label)
-    ctx = _common("classement", title, "", generated, preview)
+    ctx = _common("classement", title, "", generated, preview, reference)
     ctx["tip_keys"] = ["points", "geomean", "cv", "fio", "iops"]
     table = ranked(views, key)
     scores = [s for _, v in table if (s := v.points[key]) is not None]
@@ -286,7 +296,6 @@ def classement_context(
         kicker=c["kicker"]
         .replace("{machines}", machines(len(views)))
         .replace("{date}", fr_date(generated.date().isoformat()) or ""),
-        reference_machine=reference.machine,
         tabs=[
             {
                 "href": PAGE_FILES[k],
@@ -341,11 +350,13 @@ def render_classement(
     return ENV.get_template("classement.html").render(ctx)
 
 
-def render_comparaison(views: list[MachineView], generated: datetime, preview: bool = False) -> str:
+def render_comparaison(
+    views: list[MachineView], reference: Reference, generated: datetime, preview: bool = False
+) -> str:
     """Page Comparaison : sans JavaScript, toutes les machines côte à côte (points) ; avec, la
     comparaison choisie (?sel=…&base=…), construite par le script depuis data.json."""
     c = FR["comparaison"]
-    ctx = _common("comparaison", c["title"], "", generated, preview)
+    ctx = _common("comparaison", c["title"], "", generated, preview, reference)
     table = ranked(views, "combined")
 
     def cell(value: float | None, digits: int = 0) -> str:
@@ -373,6 +384,39 @@ def render_comparaison(views: list[MachineView], generated: datetime, preview: b
         ],
     )
     return ENV.get_template("comparaison.html").render(ctx)
+
+
+def render_methodologie(reference: Reference, generated: datetime, preview: bool = False) -> str:
+    ctx = _common("methodologie", FR["methodologie"]["title"], "", generated, preview, reference)
+    ctx["tip_keys"] = []
+    ctx.update(pages.methodologie(reference))
+    return ENV.get_template("methodologie.html").render(ctx)
+
+
+def render_soumettre(reference: Reference, generated: datetime, preview: bool = False) -> str:
+    ctx = _common("soumettre", FR["soumettre"]["title"], "", generated, preview, reference)
+    ctx.update(
+        contributing=CONTRIBUTING,
+        current_schema=str(EXPORT_SCHEMA_VERSION),
+        readable_schemas=pages.readable_schemas(),
+    )
+    return ENV.get_template("soumettre.html").render(ctx)
+
+
+def render_mentions(reference: Reference, generated: datetime, preview: bool = False) -> str:
+    ctx = _common("mentions", FR["mentions"]["title"], "", generated, preview, reference)
+    return ENV.get_template("mentions.html").render(ctx)
+
+
+def render_404(
+    reference: Reference, generated: datetime, base_url: str, preview: bool = False
+) -> str:
+    """404 servie par GitHub Pages à n'importe quelle profondeur : liens et assets absolus,
+    à partir de `base_url` (« /hwbench/ » en prod). Sous /preview/, GitHub sert la 404 de la
+    prod : ses liens mènent à la prod (voir CLAUDE.md)."""
+    ctx = _common("404", FR["notfound"]["title"], base_url, generated, preview, reference)
+    ctx["noindex"] = True
+    return ENV.get_template("404.html").render(ctx)
 
 
 def _copy_tree(source: Traversable, target: Path) -> None:
@@ -439,7 +483,7 @@ def render_machine(
 ) -> str:
     """Page machine (design Machine.dc.html) : points recalculés contre la référence du paquet,
     fiabilité jugée avec les seuils par défaut, sans recommandations."""
-    ctx = _common("machine", view.name, "../", generated, preview)
+    ctx = _common("machine", view.name, "../", generated, preview, reference)
     ctx["tip_keys"] = [
         "geomean",
         "points",
@@ -472,9 +516,14 @@ def build_site(
     reference: Reference,
     generated: datetime | None = None,
     preview: bool = False,
+    base_url: str = "/",
 ) -> list[Entry]:
     """Site statique dans `out_dir`. `preview` : site de la branche dev, publié sous /preview/
-    du site officiel (bandeau, titres préfixés, noindex, robots.txt)."""
+    du site officiel (bandeau, titres préfixés, noindex, robots.txt). `base_url` : chemin absolu
+    de la racine du site (« /hwbench/ »), utilisé par la seule page 404 ; les autres pages ont
+    des liens relatifs."""
+    if not base_url.startswith("/") or not base_url.endswith("/"):
+        raise ValueError(f"base_url doit commencer et finir par « / » : {base_url!r}")
     generated = generated or datetime.now(UTC)
     entries, skipped = load_entries(results_dir, reference)
     views = [machine_view(entry) for entry in entries]
@@ -483,8 +532,15 @@ def build_site(
     for key in CATEGORY_KEYS:
         html = render_classement(views, key, reference, generated, skipped, preview)
         (out_dir / PAGE_FILES[key]).write_text(html, encoding="utf-8")
+    for name, html in (
+        ("methodologie.html", render_methodologie(reference, generated, preview)),
+        ("soumettre.html", render_soumettre(reference, generated, preview)),
+        ("mentions-legales.html", render_mentions(reference, generated, preview)),
+        ("404.html", render_404(reference, generated, base_url, preview)),
+    ):
+        (out_dir / name).write_text(html, encoding="utf-8")
     (out_dir / "comparaison.html").write_text(
-        render_comparaison(views, generated, preview), encoding="utf-8"
+        render_comparaison(views, reference, generated, preview), encoding="utf-8"
     )
     same_model = same_model_groups(views)
     for entry, view in zip(entries, views, strict=True):

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% set c = t.methodologie %}
+{% block main %}
+<section class="hw-section hw-doc">
+  <header class="hw-doc__head">
+    <p class="hw-kicker">{{ c.kicker | fill(facts) }}</p>
+    <h1 class="hw-h1">{{ c.h1 }}</h1>
+    <p class="hw-lede hw-lede--lg">{{ c.lede }}</p>
+  </header>
+  <div class="hw-doc__layout">
+    <nav class="hw-toc" aria-label="{{ c.toc }}">
+      <p class="hw-kicker">{{ c.toc }}</p>
+      <ol>{% for sec in c.secs %}<li><a href="#{{ sec.id }}"><span class="hw-num">{{ "%02d" | format(loop.index) }}</span>{{ sec.h }}</a></li>{% endfor %}</ol>
+    </nav>
+    <div class="hw-doc__body">
+      {% for sec in c.secs %}
+      <section class="hw-doc__sec" id="{{ sec.id }}" aria-labelledby="h-{{ sec.id }}">
+        <div class="hw-doc__title"><span class="hw-num">{{ "%02d" | format(loop.index) }}</span><h2 class="hw-h2" id="h-{{ sec.id }}">{{ sec.h }}</h2></div>
+        {% for p in sec.ps %}<p>{{ p | fill(facts) }}</p>{% endfor %}
+        {% if sec.id == "combine" %}
+        <figure class="hw-formula">
+          <code>{{ c.formula }}</code>
+          <div class="hw-formula__cards">{% for e in example %}<div><span class="hw-kicker">{{ e.k }}</span><span class="hw-num">{{ e.v }}</span><span class="hw-mute">{{ e.n }}</span></div>{% endfor %}</div>
+          <figcaption>{{ c.ex_cap | fill(example_values) }}</figcaption>
+        </figure>
+        {% elif sec.id == "categories" %}
+        <div class="hw-doc__boxes">
+          <div class="hw-doc__box"><strong class="hw-kicker hw-kicker--ink">{{ c.ranked }}</strong><ul>{% for x in c.ranked_l %}<li>{{ x }}</li>{% endfor %}</ul></div>
+          <div class="hw-doc__box hw-doc__box--info"><strong class="hw-kicker">{{ c.info }}</strong><ul>{% for x in c.info_l %}<li>{{ x }}</li>{% endfor %}</ul></div>
+        </div>
+        {% elif sec.id == "outils" %}
+        <div class="hw-table-wrap" role="region" aria-label="{{ c.bench_cap }}" tabindex="0">
+          <table class="hw-table hw-benches">
+            <caption class="hw-sr">{{ c.bench_cap }}</caption>
+            <thead><tr>{% for h in c.bench_head %}<th scope="col">{{ h }}</th>{% endfor %}</tr></thead>
+            <tbody>{% for b in benches %}<tr>
+              <th scope="row"><a href="{{ b.doc }}" rel="noopener">{{ b.name }}</a></th>
+              <td class="hw-mute">{{ b.what }}</td><td class="hw-num">{{ b.unit }}</td><td>{{ b.category }}</td>
+              <td{% if not b.official %} class="hw-mute"{% endif %}>{% if b.official %}{{ c.status_official }}{% else %}{{ c.status_indicative }}{% endif %}</td>
+              <td class="hw-num hw-mute">{{ b.version }}</td>
+            </tr>{% endfor %}</tbody>
+          </table>
+        </div>
+        {% elif sec.id == "conditions" %}
+        <ul class="hw-linkchips">{% for label, href in c.kernel_links %}<li><a class="hw-btn" href="{{ href }}" rel="noopener">{{ label }} ↗</a></li>{% endfor %}</ul>
+        {% endif %}
+      </section>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

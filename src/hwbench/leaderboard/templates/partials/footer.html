@@ -17,7 +17,7 @@
     <p><strong>{{ t.footer.data_t }}</strong> {{ t.footer.data }}</p>
   </div>
   <div class="hw-footer__bottom">
-    <span>{{ t.footer.copyright | replace("{date}", generated_txt) }}</span>
+    <span>{{ t.footer.copyright | fill(facts) | replace("{date}", generated_txt) }}</span>
     <span>{{ t.footer.trademarks }}</span>
     <a href="#top">{{ t.footer.top }}</a>
   </div>
