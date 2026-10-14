@@ -16,9 +16,23 @@ from hwbench.labels import CATEGORY_LABELS
 from hwbench.results import Category
 
 GITHUB = "https://github.com/Mvth1s/hwbench"
+GITHUB_PRIVACY = (
+    "https://docs.github.com/fr/site-policy/privacy-policies/github-general-privacy-statement"
+)
+CNIL = "https://www.cnil.fr/"
+# Adresse vérifiée le 12/10/2026 sur la déclaration de confidentialité de GitHub
+# (docs.github.com, github-general-privacy-statement, en vigueur au 27/04/2026).
+HOST = (
+    "GitHub, Inc. (service GitHub Pages), 88 Colin P. Kelly Jr. St., San Francisco, CA 94107, "
+    "États-Unis."
+)
+# Contact privé pour l'exercice des droits (jamais une issue publique) : à fournir par
+# l'éditeur. Tant que ce texte est présent, la génération du site de production échoue.
+CONTACT_PLACEHOLDER = "[adresse de contact à fournir]"
 
 FR: dict[str, Any] = {
     "lang": "fr",
+    "contact_private": CONTACT_PLACEHOLDER,
     "site": {
         "name": "HWBENCH",
         "title_suffix": "hwbench",
@@ -78,22 +92,16 @@ FR: dict[str, Any] = {
             "issues du dépôt GitHub."
         ),
         "host_t": "Hébergeur.",
-        # adresse vérifiée le 12/10/2026 sur la déclaration de confidentialité de GitHub
-        # (docs.github.com, github-general-privacy-statement, en vigueur au 27/04/2026)
-        "host": (
-            "GitHub, Inc. (service GitHub Pages), 88 Colin P. Kelly Jr. St., San Francisco, "
-            "CA 94107, États-Unis."
-        ),
+        "host": HOST,
         "data_t": "Données personnelles.",
         "data": (
             "Aucun cookie, aucun traceur, aucune ressource tierce. Le thème choisi reste dans le "
-            "stockage local de votre navigateur. L'hébergeur journalise les adresses IP pour la "
-            "sécurité du service. Les résultats soumis sont publics : retrait et droits RGPD "
-            "(art. 15 à 21) sur simple demande via une issue ; réclamation possible auprès de la "
-            "CNIL."
+            "stockage local de votre navigateur. L'hébergeur journalise des données techniques de "
+            "connexion pour la sécurité du service. Les résultats soumis sont publics ; retrait et "
+            "exercice de vos droits : voir les mentions légales."
         ),
         "copyright": (
-            "© 2026 contributeurs hwbench · code AGPL-3.0 · résultats CC0-1.0 · généré le "
+            "© {year} contributeurs hwbench · code AGPL-3.0 · résultats CC0-1.0 · généré le "
             "{date} UTC"
         ),
         "trademarks": (
@@ -149,7 +157,7 @@ FR: dict[str, Any] = {
                     "Plus il est bas, plus le résultat est reproductible. Au-delà de {cv} % sur "
                     "au moins un test, la machine est marquée « À vérifier »."
                 ),
-                "e": "CV 0,8 % : les runs sont quasi identiques.",
+                "e": "Un CV proche de zéro : les runs sont quasi identiques.",
                 "links": [],
             },
             "fio": {
@@ -249,7 +257,7 @@ FR: dict[str, Any] = {
                 "term": "warm-up",
                 "d": (
                     "Des passages préliminaires non comptés, répétés jusqu'à deux résultats "
-                    "consécutifs proches (3 % par défaut), dans une durée plafonnée."
+                    "consécutifs à {tolerance} % près, dans une durée plafonnée."
                 ),
                 "w": "On mesure la machine dans son régime normal, pas pendant sa mise en route.",
                 "e": "",
@@ -259,8 +267,8 @@ FR: dict[str, Any] = {
                 "t": "QD — profondeur de file",
                 "term": "profondeur de file",
                 "d": (
-                    "Le nombre de demandes envoyées au disque en même temps (8 en séquentiel, 32 "
-                    "en aléatoire 4K)."
+                    "Le nombre de demandes envoyées au disque en même temps ({qd_seq} en "
+                    "séquentiel, {qd_rand} en aléatoire 4K)."
                 ),
                 "w": (
                     "Un SSD récent est bien plus rapide quand on lui donne plusieurs demandes à "
@@ -436,6 +444,490 @@ FR: dict[str, Any] = {
         "compare_cta": "Comparer",
         "select_head": "Comparer",
         "select_aria": "Comparer {name}",
+    },
+    "methodologie": {
+        "title": "Méthodologie",
+        "kicker": "Méthodologie · hwbench {version}",
+        "h1": "Comment une machine gagne ses points.",
+        "lede": (
+            "Tout ce que mesure hwbench, comment chaque mesure devient un score, et ce que ces "
+            "chiffres ne disent pas. Les résultats bruts restent publics : chacun peut refaire le "
+            "calcul."
+        ),
+        "toc": "Sommaire",
+        "formula": "combiné = ∛( single × multi × GPU )",
+        "ex_cap": (
+            "Exemple : une machine très forte en CPU mais faible en GPU ne compense pas sa "
+            "faiblesse. La moyenne arithmétique donnerait {arith} ; la moyenne géométrique donne "
+            "{geo}."
+        ),
+        "ex_points": "points",
+        "ex_combined": "COMBINÉ",
+        "ranked": "CLASSÉES",
+        "ranked_l": [
+            "CPU single-core (tests natifs, un processus)",
+            "CPU multi-core (tests natifs, un processus par thread logique)",
+            "GPU (glmark2 et vkmark)",
+            "Score combiné = moyenne géométrique des trois",
+        ],
+        "info": "INFORMATIONS · HORS CLASSEMENT",
+        "info_l": [
+            "Mémoire : bande passante de copie (natif ; sysbench pour information)",
+            "Disque : fio, séquentiel et aléatoire 4K",
+            "Dépendent du système de fichiers et du SSD",
+            "Jamais mélangées au classement",
+        ],
+        "bench_cap": "Les tests et outils de la référence actuelle",
+        "bench_head": ["Test", "Ce qu'il mesure", "Unité", "Catégorie", "Statut", "Version"],
+        "status_official": "officiel",
+        "status_indicative": "indicatif",
+        "protocol_v": "protocole {protocol}",
+        "tool_v": "outil {tool}",
+        "what": {
+            "native-cpu-single": "Hachage, compression, calcul sur grands nombres (1 processus)",
+            "native-cpu-multi": "Les mêmes charges, un processus par thread logique",
+            "sysbench-cpu-single": "Recherche de nombres premiers (1 thread)",
+            "sysbench-cpu-multi": "Recherche de nombres premiers (tous les threads)",
+            "glmark2": "Scènes OpenGL rendues hors écran",
+            "vkmark": "Scènes Vulkan rendues sans affichage",
+            "native-memory-single": "Copie de gros blocs mémoire (1 processus)",
+            "native-memory-multi": "Copie de gros blocs mémoire (un processus par thread)",
+            "sysbench-memory-single": "Lecture séquentielle de la mémoire (1 thread)",
+            "sysbench-memory-multi": "Lecture séquentielle de la mémoire (tous les threads)",
+            "fio-disk": "Lecture et écriture séquentielles et aléatoires 4K",
+        },
+        "docs": "Documentation",
+        "secs": [
+            {
+                "id": "points",
+                "h": "Le système de points",
+                "ps": [
+                    (
+                        "Chaque test vaut 1000 points sur la machine de référence, {reference}, "
+                        "mesurée le {reference_date}. Une machine qui obtient 1500 points est "
+                        "1,5 fois plus rapide que la référence sur ce test ; 500 points, deux "
+                        "fois plus lente."
+                    ),
+                    (
+                        "Les points rendent comparables des mesures exprimées dans des unités "
+                        "différentes : images par seconde, événements par seconde, mébioctets "
+                        "par seconde ou indice interne."
+                    ),
+                ],
+            },
+            {
+                "id": "combine",
+                "h": "Le score combiné",
+                "ps": [
+                    (
+                        "Le classement principal utilise la moyenne géométrique des trois "
+                        "catégories classées, à pondérations égales : on multiplie les trois "
+                        "scores, puis on prend la racine cubique."
+                    ),
+                    (
+                        "Une moyenne classique laisserait un score exceptionnel masquer une "
+                        "faiblesse ; la moyenne géométrique récompense l'équilibre. Une machine "
+                        "sans GPU mesuré, ou avec un GPU mesuré par une partie seulement des "
+                        "outils, n'est pas classée au combiné."
+                    ),
+                ],
+            },
+            {
+                "id": "categories",
+                "h": "Catégories classées et informations",
+                "ps": [
+                    (
+                        "Trois catégories forment le classement. La mémoire et le disque sont "
+                        "mesurés et publiés, mais restent à part : leurs résultats dépendent trop "
+                        "du système de fichiers, du SSD et de son remplissage pour être comparés "
+                        "honnêtement."
+                    )
+                ],
+            },
+            {
+                "id": "protocole",
+                "h": "Le protocole de mesure",
+                "ps": [
+                    (
+                        "Avant chaque test, des passes d'échauffement (warm-up) sont répétées "
+                        "jusqu'à deux résultats consécutifs à {tolerance} % près, dans une "
+                        "limite de {warmup_min} à {warmup_max} s selon la catégorie. Le test est "
+                        "ensuite lancé au moins {runs} fois ; la médiane des runs est retenue."
+                    ),
+                    (
+                        "Le premier passage à froid (burst) est enregistré à part et n'est "
+                        "jamais noté : son écart avec la médiane révèle un processeur qui "
+                        "accélère brièvement puis ralentit en chauffant."
+                    ),
+                    (
+                        "Le coefficient de variation (CV) mesure la dispersion des runs. "
+                        "Au-delà de {cv} % sur au moins un test, la machine est marquée « À "
+                        "vérifier » : elle reste classée, mais signalée. Un test qui démarre "
+                        "au-dessus de {hot} °C est signalé comme départ chaud."
+                    ),
+                    (
+                        "Un résultat noté contre une ancienne machine de référence est marqué "
+                        "« À ré-exporter » : ses points sont recalculés à partir de ses valeurs "
+                        "brutes, mais les tests dont la version a changé depuis ne sont pas notés."
+                    ),
+                ],
+            },
+            {
+                "id": "outils",
+                "h": "Les outils",
+                "ps": [
+                    (
+                        "Les tests natifs de hwbench sont la base officielle des points CPU ; "
+                        "sysbench est mesuré pour information. glmark2 et vkmark se lisent "
+                        "séparément : leurs fps ne sont jamais comparés entre eux. Deux mesures "
+                        "ne sont comparables qu'avec la même version de protocole, la même "
+                        "version d'outil et le même mode de rendu."
+                    )
+                ],
+            },
+            {
+                "id": "conditions",
+                "h": "Les conditions de mesure",
+                "ps": [
+                    (
+                        "Chaque export enregistre l'alimentation (secteur ou batterie), l'EPP "
+                        "(le réglage qui arbitre entre vitesse et économie d'énergie), le profil "
+                        "de la plateforme et le governor (la règle de fréquence du noyau Linux). "
+                        "Ces informations sont affichées sur chaque page machine."
+                    )
+                ],
+            },
+            {
+                "id": "limites",
+                "h": "Ce que les chiffres ne disent pas",
+                "ps": [
+                    (
+                        "Les températures ne sont relevées qu'avant et après chaque test, pas "
+                        "pendant : les graphiques relient deux instants, ils ne montrent pas "
+                        "l'évolution réelle."
+                    ),
+                    (
+                        "Les résultats sont déclaratifs, soumis par pull request. Les fichiers "
+                        "sont vérifiés (format, absence d'identifiant, cohérence des points), "
+                        "mais pas reproduits sur la machine d'origine."
+                    ),
+                    (
+                        "Un même modèle peut obtenir des scores différents selon le BIOS, les "
+                        "pilotes, le refroidissement et la température de la pièce."
+                    ),
+                ],
+            },
+            {
+                "id": "reference",
+                "h": "Changer de référence",
+                "ps": [
+                    (
+                        "La référence actuelle est {reference}, mesurée le {reference_date} "
+                        "(empreinte {digest}). Si elle change, tous les points sont recalculés "
+                        "à partir des valeurs brutes ; les anciens exports sont marqués « À "
+                        "ré-exporter »."
+                    )
+                ],
+            },
+        ],
+        "kernel_links": [
+            ["amd-pstate", "https://docs.kernel.org/admin-guide/pm/amd-pstate.html"],
+            ["intel_pstate", "https://docs.kernel.org/admin-guide/pm/intel_pstate.html"],
+            ["CPU Performance Scaling", "https://docs.kernel.org/admin-guide/pm/cpufreq.html"],
+        ],
+    },
+    "soumettre": {
+        "title": "Soumettre un résultat",
+        "kicker": "Soumettre un résultat",
+        "h1": "Ajoutez votre machine au classement.",
+        "lede": (
+            "Une mesure, un fichier JSON, une pull request vers la branche dev. Pendant les "
+            "tests, la machine doit rester au repos."
+        ),
+        "facts": [
+            ["FICHIER", "1 JSON"],
+            ["LICENCE", "CC0-1.0"],
+            ["VALIDATION", "CI"],
+        ],
+        "steps_h": "Cinq étapes",
+        "copy_btn": "Copier",
+        "copied": "Copié ✓",
+        "copy_aria": "Copier la commande : {step}",
+        "steps": [
+            {
+                "h": "Installer la dernière version",
+                "p": (
+                    "La validation exige un export de hwbench {version}, noté contre la "
+                    "référence actuelle, avec des tests à leur version courante."
+                ),
+                "code": "pipx install hwbench        # ou : pipx upgrade hwbench",
+            },
+            {
+                "h": "Mesurer dans de bonnes conditions",
+                "p": (
+                    "Sur secteur, profil d'énergie « performance », navigateur et autres "
+                    "programmes fermés, depuis la session graphique pour les tests GPU. "
+                    "Installez sysbench, glmark2 et vkmark si possible : le score GPU, et donc "
+                    "le score combiné, ne sont classés qu'avec les mêmes outils que la machine "
+                    "de référence."
+                ),
+                "code": "",
+            },
+            {
+                "h": "Exporter dans un clone de votre fork",
+                "p": (
+                    "Forkez le dépôt sur GitHub, clonez votre fork, puis exportez. <nom> : "
+                    "minuscules, chiffres et tirets (mon-desktop, latitude-5420). Il apparaît "
+                    "publiquement dans l'adresse de la page de la machine : n'y mettez pas votre "
+                    "nom si vous ne souhaitez pas qu'il soit publié."
+                ),
+                "code": "hwbench export -o results/<nom>.json",
+            },
+            {
+                "h": "Vérifier avant d'envoyer",
+                "p": (
+                    "Depuis le clone, avec hwbench installé en mode développement "
+                    "(pip install -e .). Vous pouvez aussi déposer le fichier ci-dessous pour un "
+                    "premier contrôle dans le navigateur."
+                ),
+                "code": "python -m hwbench.leaderboard validate results/<nom>.json",
+            },
+            {
+                "h": "Ouvrir la pull request vers dev",
+                "p": (
+                    "Avec un message de commit conventionnel. La CI (workflow results.yml) "
+                    "valide le fichier : schéma d'export connu, aucun identifiant, référence "
+                    "actuelle et non forcée, versions des tests à jour, points cohérents avec "
+                    "les résultats bruts. Une fois la pull request fusionnée, la machine "
+                    "apparaît sur le site à la release suivante."
+                ),
+                "code": ('git add results/<nom>.json && git commit -m "chore(results): add <nom>"'),
+            },
+        ],
+        "guide": "Guide de contribution complet",
+        "check_k": "Vérification locale",
+        "check_h": "Contrôlez votre fichier avant la pull request.",
+        "check_p": "Le fichier est lu dans votre navigateur : il n'est envoyé nulle part.",
+        "drop": "Choisissez votre fichier JSON",
+        "drop_sub": "ou déposez-le ici",
+        "idle": "Aucun fichier analysé pour l'instant.",
+        "nojs": (
+            "Le contrôle dans le navigateur demande JavaScript ; la commande de l'étape 4 fait "
+            "la même vérification, et davantage."
+        ),
+        "ci_note": (
+            "Ce contrôle couvre la forme du fichier. La validation de l'étape 4 et la CI "
+            "vérifient en plus la référence, les versions des tests et la cohérence des points."
+        ),
+        "faq_h": "Questions fréquentes",
+        "faq": [
+            {
+                "q": "Quelles données sont publiées ?",
+                "a": (
+                    "Les composants sans aucun identifiant (CPU, GPU, carte mère, disques, RAM, "
+                    "capteurs), les résultats bruts de chaque run, les versions des outils et "
+                    "les conditions de mesure. Numéros de série, UUID, adresses MAC, nom d'hôte "
+                    "et asset tags ne sont jamais collectés dans un export, et la validation "
+                    "refuse tout fichier qui en contiendrait."
+                ),
+            },
+            {
+                "q": "Sous quelle licence ?",
+                "a": (
+                    "Les fichiers de résultats sont publiés sous CC0-1.0 (domaine public). Le "
+                    "code de hwbench reste sous AGPL-3.0-or-later."
+                ),
+            },
+            {
+                "q": "Mon résultat est marqué « À vérifier ».",
+                "a": (
+                    "Au moins un test a un coefficient de variation supérieur à {cv} % : ses "
+                    "runs étaient trop dispersés. Fermez les programmes en arrière-plan, "
+                    "branchez le secteur et relancez la mesure."
+                ),
+            },
+            {
+                "q": "Comment retirer mon résultat ?",
+                "a": (
+                    "Ouvrez une pull request qui supprime results/<nom>.json, ou écrivez à "
+                    "l'adresse indiquée dans les mentions légales. Le fichier est retiré du "
+                    "dépôt et du site au déploiement suivant."
+                ),
+            },
+        ],
+    },
+    "mentions": {
+        "title": "Mentions légales",
+        "kicker": "Informations légales",
+        "h1": "Mentions légales, confidentialité et accessibilité",
+        "toc": "Sur cette page",
+        "updated": "Dernière mise à jour : 12/10/2026",
+        "host": HOST,
+        "secs": [
+            {
+                "id": "mentions",
+                "h": "Mentions légales",
+                "items": [
+                    [
+                        "Éditeur",
+                        "Projet open source non commercial, édité à titre non professionnel.",
+                    ],
+                    [
+                        "Contact",
+                        (
+                            "Questions générales : issues du dépôt GitHub (publiques). Données "
+                            "personnelles : voir « Vos droits » ci-dessous."
+                        ),
+                    ],
+                    ["Hébergeur", "{host}"],
+                    [
+                        "Propriété intellectuelle",
+                        (
+                            "Code source sous licence AGPL-3.0-or-later. Fichiers de résultats "
+                            "sous licence CC0-1.0 (domaine public). Polices Schibsted Grotesk, "
+                            "IBM Plex Mono et Michroma sous licence SIL Open Font License, "
+                            "hébergées sur le site avec leur texte de licence. Les marques "
+                            "citées appartiennent à leurs détenteurs."
+                        ),
+                    ],
+                ],
+            },
+            {
+                "id": "confidentialite",
+                "h": "Données personnelles",
+                "items": [
+                    [
+                        "Ce que traite le site",
+                        (
+                            "Rien côté serveur : le site est statique, sans compte, sans "
+                            "formulaire envoyé à un serveur, sans mesure d'audience et sans "
+                            "ressource chargée depuis un tiers. Le contrôle d'un fichier sur la "
+                            "page « Soumettre » se fait dans votre navigateur ; le fichier n'est "
+                            "envoyé nulle part."
+                        ),
+                    ],
+                    [
+                        "Résultats publiés",
+                        (
+                            "Les fichiers soumis sont publiés tels quels : composants sans "
+                            "identifiant (numéros de série, UUID, adresses MAC, nom d'hôte et "
+                            "asset tags ne sont pas collectés, et un filtre les retire de "
+                            "l'export par précaution), mesures, versions des outils, conditions "
+                            "de test, et le nom de fichier choisi. La validation refuse tout "
+                            "fichier qui contiendrait un identifiant."
+                        ),
+                    ],
+                    [
+                        "Pseudonyme GitHub",
+                        (
+                            "Le pseudonyme GitHub de l'auteur d'une pull request est visible dans "
+                            "la pull request et dans l'historique du dépôt."
+                        ),
+                    ],
+                    [
+                        "Préférence de thème",
+                        (
+                            "Le thème choisi (clair ou sombre) est conservé dans le stockage "
+                            "local de votre navigateur, sous la clé hwbench.theme. Il ne quitte "
+                            "pas votre appareil et ne sert à aucun suivi."
+                        ),
+                    ],
+                    [
+                        "Journaux de l'hébergeur",
+                        (
+                            "GitHub enregistre des données techniques de connexion, dont "
+                            "l'adresse IP, pour le fonctionnement et la sécurité de GitHub "
+                            "Pages, selon sa propre déclaration de confidentialité."
+                        ),
+                    ],
+                    [
+                        "Vos droits",
+                        (
+                            "Pour accéder aux données qui vous concernent, les faire rectifier "
+                            "ou effacer (retrait d'un résultat), ou vous opposer à leur "
+                            "publication, écrivez à {contact_private}. Le fichier est retiré du "
+                            "dépôt et du site au déploiement suivant ; l'historique git peut "
+                            "en conserver une trace."
+                        ),
+                    ],
+                    [
+                        "Réclamation",
+                        "Vous pouvez introduire une réclamation auprès de la CNIL.",
+                    ],
+                ],
+                "links": [
+                    ["Déclaration de confidentialité de GitHub", GITHUB_PRIVACY],
+                    ["CNIL", CNIL],
+                ],
+            },
+            {
+                "id": "cookies",
+                "h": "Cookies et stockage local",
+                "items": [
+                    ["Cookies", "Le site ne dépose aucun cookie."],
+                    [
+                        "Stockage local",
+                        (
+                            "Seule la préférence de thème est conservée (clé hwbench.theme). "
+                            "Vous pouvez l'effacer depuis les réglages de votre navigateur."
+                        ),
+                    ],
+                ],
+            },
+            {
+                "id": "accessibilite",
+                "h": "Accessibilité",
+                "items": [
+                    ["Objectif", "Le site vise le niveau AA des WCAG."],
+                    ["État", "Partiellement conforme : aucun audit n'a été réalisé."],
+                    [
+                        "Mesures en place",
+                        (
+                            "Navigation complète au clavier avec focus visible ; chaque "
+                            "graphique est suivi d'un tableau équivalent pour les lecteurs "
+                            "d'écran ; la couleur n'est jamais seule porteuse d'information "
+                            "(formes et libellés) ; animations désactivées avec « réduire les "
+                            "animations » ; contraste du texte d'au moins {contrast}:1 dans les "
+                            "deux thèmes, vérifié automatiquement ; chaque page reste complète "
+                            "sans JavaScript."
+                        ),
+                    ],
+                    [
+                        "Limites connues",
+                        (
+                            "Les images PNG exportées n'ont pas de texte alternatif : l'export "
+                            "CSV donne les mêmes données sous une forme accessible. Le site n'a "
+                            "pas été testé avec un lecteur d'écran."
+                        ),
+                    ],
+                    [
+                        "Signaler un problème",
+                        (
+                            "Ouvrez une issue sur le dépôt GitHub en décrivant la page, l'outil "
+                            "utilisé et le problème rencontré."
+                        ),
+                    ],
+                ],
+            },
+        ],
+    },
+    "notfound": {
+        "title": "Page introuvable",
+        "kicker": "Erreur 404 · page introuvable",
+        "code": "404",
+        "h1": "Aucun résultat à cette adresse.",
+        "p": (
+            "La page a peut-être été renommée, ou la machine retirée du classement. Cherchez-la "
+            "par son nom, son CPU ou son GPU."
+        ),
+        "search": "Rechercher",
+        "search_ph": "Machine, CPU, GPU…",
+        "gauge": "{label} · 0",
+        "links": {
+            "classement": "Classement",
+            "methodologie": "Méthodologie",
+            "soumettre": "Soumettre un résultat",
+        },
     },
     "comparaison": {
         "title": "Comparaison",
@@ -659,6 +1151,21 @@ FR: dict[str, Any] = {
         "cmp_added": "{name} ajoutée",
         "cmp_removed": "{name} retirée",
         "rank_prefix": "#",
+        "check": {
+            "ok": "Prêt pour la pull request",
+            "warn": "Prêt, avec des points à vérifier",
+            "ko": "À corriger avant la pull request",
+            "pass": "Réussi",
+            "fail": "Échec",
+            "note": "Attention",
+            "json": "JSON lisible",
+            "schema": "Schéma d'export connu",
+            "version": "Version de hwbench à jour",
+            "date": "Date d'export",
+            "machine": "Nom de machine",
+            "ids": "Aucun identifiant (série, UUID, MAC, nom d'hôte, asset tag)",
+            "name": "Nom de fichier valide (minuscules, chiffres, tirets)",
+        },
         "unranked": "non classé",
         "axes": ["Single", "Multi", "GPU"],
         "categories": {
