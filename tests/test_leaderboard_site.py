@@ -769,6 +769,8 @@ def test_site_without_the_extra_explains_how_to_install_it(tmp_path, monkeypatch
 
 # Seuls textes autorisés à porter une adresse postale : celle de l'hébergeur (obligation légale).
 HOST_ADDRESS_KEYS = {"footer.host", "mentions.host"}
+# Seul texte autorisé à porter une adresse e-mail : le contact privé (exercice des droits).
+CONTACT_EMAIL_KEYS = ("contact_private",)
 
 
 def test_catalog_has_no_personal_contact_details() -> None:
@@ -791,7 +793,10 @@ def test_catalog_has_no_personal_contact_details() -> None:
         return []
 
     texts = strings(FR, "")
-    assert [p for p, s in texts if phone.search(s) or email.search(s)] == []
+    assert [p for p, s in texts if phone.search(s)] == []
+    # seule adresse e-mail : le contact privé pour l'exercice des droits
+    assert [p for p, s in texts if email.search(s)] == list(CONTACT_EMAIL_KEYS)
+    assert email.fullmatch(FR["contact_private"]) or "@" in FR["contact_private"]
     with_address = {p for p, s in texts if address.search(s)}
     assert with_address == HOST_ADDRESS_KEYS
     assert "Mvth1s" not in FR["footer"]["host"]
@@ -938,7 +943,8 @@ def test_legal_page(tmp_path) -> None:
     assert HOST in page and page.count("88 Colin P. Kelly") == 2  # mentions et pied de page
     # droits : contact privé (jamais une issue publique), réclamation CNIL sans article cité
     rights = page.split("Vos droits</dt>", 1)[1].split("</dd>", 1)[0]
-    assert CONTACT_PLACEHOLDER in rights and "issue" not in rights
+    assert FR["contact_private"] in rights and "issue" not in rights
+    assert CONTACT_PLACEHOLDER not in page
     assert "auprès de la CNIL" in page and 'href="https://www.cnil.fr/"' in page
     assert "hwbench.theme" in page
     for unverified in ("6-III", "article", "art. "):
@@ -975,7 +981,7 @@ def test_production_build_requires_the_private_contact(tmp_path, monkeypatch, ca
     from hwbench.leaderboard.catalog import CONTACT_PLACEHOLDER
 
     monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
-    assert FR["contact_private"] == CONTACT_PLACEHOLDER
+    monkeypatch.setitem(FR, "contact_private", CONTACT_PLACEHOLDER)
     results = str(results_dir(tmp_path))
     out = tmp_path / "prod"
     assert cli.main(["site", "--results", results, "--out", str(out)]) == 2
@@ -1005,3 +1011,49 @@ def test_text_colours_meet_the_contrast_minimum() -> None:
                 ratio = contrast_ratio(tokens[text], tokens[background])
                 assert ratio >= CONTRAST_MIN, (selector, text, background, round(ratio, 2))
         assert contrast_ratio(tokens["onacc"], tokens["acc"]) >= CONTRAST_MIN, selector
+
+
+def test_real_contact_lets_the_production_build_run(tmp_path, monkeypatch) -> None:
+    """Contact privé renseigné dans le catalogue : la génération de production passe."""
+    from hwbench.leaderboard.catalog import CONTACT_PLACEHOLDER, CONTACT_PRIVATE
+
+    assert FR["contact_private"] == CONTACT_PRIVATE != CONTACT_PLACEHOLDER
+    monkeypatch.setattr(cli, "load_reference", lambda: REFERENCE)
+    out = tmp_path / "prod"
+    args = ["site", "--results", str(results_dir(tmp_path)), "--out", str(out)]
+    assert cli.main([*args, "--base-url", "/hwbench/"]) == 0
+    assert CONTACT_PRIVATE in (out / "mentions-legales.html").read_text()
+
+
+def test_accessibility_text_makes_no_conformity_claim() -> None:
+    claims = re.compile(r"conform|\bWCAG\b|\bRGAA\b|\baccessibles?\b|\bAA\b", re.IGNORECASE)
+    found = [(p, t) for p, t in _catalog_strings(FR) if claims.search(t)]
+    assert found == []
+
+
+def test_submit_check_uses_the_privacy_rules_of_the_package(tmp_path) -> None:
+    """Contrôle local de Soumettre : règles de privacy.py injectées dans la page, aucune liste
+    d'identifiants en dur dans le JavaScript."""
+    import re as _re
+
+    from hwbench import privacy
+    from hwbench.leaderboard.pages import privacy_rules
+
+    page = (site(tmp_path) / "soumettre.html").read_text()
+    raw = page.split('id="hw-privacy">', 1)[1].split("</script>", 1)[0]
+    assert "<" not in raw
+    injected = json.loads(raw)
+    assert injected == privacy_rules()
+    assert injected["keys"] == {"source": privacy.SENSITIVE_KEY_RE.pattern, "flags": "i"}
+    assert [v["source"] for v in injected["values"]] == [
+        p.pattern for p in privacy.SENSITIVE_VALUE_PATTERNS
+    ]
+    assert injected["allowed"] == {
+        k: {"source": p.pattern, "flags": ""} for k, p in privacy.NON_SENSITIVE_KEYS.items()
+    }
+    js = (PACKAGE / "static" / "hwbench.js").read_text()
+    for key in ("asset_tag", "hostname", "serial_number", "mac_address", "nguid"):
+        assert key not in js, key
+    # les motifs Python sont aussi valides en JavaScript : pas de syntaxe propre à Python
+    for pattern in (privacy.SENSITIVE_KEY_RE, *privacy.SENSITIVE_VALUE_PATTERNS):
+        assert not _re.search(r"\(\?P|\(\?<[=!]|\\A|\\Z", pattern.pattern), pattern.pattern
