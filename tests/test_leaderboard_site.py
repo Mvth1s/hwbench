@@ -414,17 +414,60 @@ def test_installed_package_has_every_site_file() -> None:
 # --- Catalogue : aucun texte en dur ---
 
 
+class _TextCollector(HTMLParser):
+    """Texte visible d'un template et attributs lus à voix haute. Le parseur HTML de la
+    bibliothèque standard reconnaît les balises sans tenir compte de la casse ni des variantes
+    de fermeture (`</script >`) ; le contenu de <script> et <style> est ignoré."""
+
+    SPOKEN = ("aria-label", "title", "placeholder", "alt")
+    RAW = ("script", "style")
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.words: list[str] = []
+        self._raw = 0
+
+    def handle_starttag(self, tag, attrs) -> None:
+        if tag in self.RAW:
+            self._raw += 1
+        self.words += [v for k, v in attrs if k in self.SPOKEN and v and v.strip()]
+
+    def handle_endtag(self, tag) -> None:
+        if tag in self.RAW and self._raw:
+            self._raw -= 1
+
+    def handle_data(self, data) -> None:
+        if not self._raw:
+            self.words += data.split()
+
+
 def _visible_text(template: str) -> list[str]:
     """Texte d'un template hors balises Jinja et HTML, et valeurs des attributs lus à voix
     haute (aria-label, title, placeholder, alt) hors expressions."""
+    # syntaxe Jinja d'abord (elle peut contenir des guillemets au milieu d'un attribut)
     src = re.sub(r"\{#.*?#\}", "", template, flags=re.S)
-    attrs = re.findall(r'(?:aria-label|title|placeholder|alt)="([^"]*)"', src)
-    src = re.sub(r"<script.*?</script>", "", src, flags=re.S)
     src = re.sub(r"\{\{.*?\}\}|\{%.*?%\}", " ", src, flags=re.S)
-    src = re.sub(r"<[^>]*>", " ", src)
-    attrs = [re.sub(r"\{\{.*?\}\}", "", a) for a in attrs]
+    collector = _TextCollector()
+    collector.feed(src)
+    collector.close()
     # lettres latines, sans × (U+00D7) ni ÷ (U+00F7) qui sont des symboles
-    return [w for w in (src.split() + attrs) if re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ]", w)]
+    return [w for w in collector.words if re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ]", w)]
+
+
+def test_visible_text_ignores_scripts_whatever_their_spelling() -> None:
+    """Régression (alerte CodeQL py/bad-tag-filter) : <SCRIPT> en majuscules et </script >
+    ne provoquent pas de faux échec, et le texte en dur hors script reste détecté."""
+    variants = (
+        "<SCRIPT>var texte = 'Bonjour';</SCRIPT>",
+        "<script>var texte = 'Bonjour';</script >",
+        "<Script type=\"module\">var texte = 'Bonjour';</sCrIpT\n>",
+        "<STYLE>.x::after{content:'Bonjour'}</style>",
+    )
+    for markup in variants:
+        assert _visible_text(f"<p>{{{{ t.x }}}}</p>{markup}") == [], markup
+        assert _visible_text(f"{markup}<p>Texte en dur</p>") == ["Texte", "en", "dur"], markup
+    assert _visible_text('<button aria-label="Fermer">{{ t.x }}</button>') == ["Fermer"]
+    assert _visible_text('<input placeholder="{{ t.ph }}" title=" ">') == []
 
 
 def test_templates_have_no_hardcoded_text() -> None:
