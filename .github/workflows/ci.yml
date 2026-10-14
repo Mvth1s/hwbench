@@ -225,7 +225,9 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           python -m venv "$RUNNER_TEMP/wheel"
-          "$RUNNER_TEMP/wheel/bin/pip" install dist/*.whl pytest pyyaml # dépendances des tests
+          # extra « site » (Jinja2) : la suite teste aussi le site du classement
+          wheel=(dist/*.whl)
+          "$RUNNER_TEMP/wheel/bin/pip" install "${wheel[0]}[site]" pytest pyyaml # dépendances des tests
           "$RUNNER_TEMP/wheel/bin/python" -I -c 'import hwbench; assert "site-packages" in hwbench.__file__, hwbench.__file__'
           test "$("$RUNNER_TEMP/wheel/bin/hwbench" --version)" = "hwbench $VERSION"
           "$RUNNER_TEMP/wheel/bin/pytest" -q -p no:cacheprovider
@@ -300,17 +302,40 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # jeton du workflow passé à lychee (API GitHub, limite de débit) : lecture seule
+    permissions:
+      contents: read
+    env:
+      # lychee 0.24.2 (lychee-lib/src/retry.rs) : --max-retries et --retry-wait-time (attente
+      # doublée à chaque essai) ne valent que pour les 429, les timeouts et les coupures
+      # réseau ; un 503 n'est jamais réessayé, d'où le second passage plus bas. 429 accepté
+      # (limite de débit, pas un lien mort).
+      # CHANGELOG.md : des centaines de liens de commits, générés ; fixtures : pas de la doc
+      LYCHEE_ARGS: >-
+        --no-progress --max-concurrency 8
+        --max-retries 3 --retry-wait-time 5
+        --accept '100..=103,200..=299,429'
+        --exclude-path 'CHANGELOG\.md' --exclude-path 'tests/fixtures'
+        './**/*.md'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # CHANGELOG.md : des centaines de liens de commits, générés ; fixtures : pas de la doc
-      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+      - id: lychee
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
-          args: >-
-            --no-progress --max-concurrency 8
-            --exclude-path 'CHANGELOG\.md' --exclude-path 'tests/fixtures'
-            './**/*.md'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: ${{ env.LYCHEE_ARGS }}
+          fail: false
+      # 503 passagers de github.com (arrivé sur la PR #48) : second passage après une pause
+      - name: Pause avant le second passage
+        if: steps.lychee.outputs.exit_code != '0'
+        run: sleep 60
+      - if: steps.lychee.outputs.exit_code != '0'
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: ${{ env.LYCHEE_ARGS }}
 
   ci-ok:
     needs: [changes, lint, typecheck, test, build, audit, commitlint]
@@ -460,7 +485,7 @@ jobs:
     if: "!cancelled() && needs.release.result == 'success'"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Required reviewers sur l'environnement : la publication attend une approbation manuelle
+    # environnement limité à main, sans approbation : publication automatique après la release
     environment:
       name: pypi
       url: https://pypi.org/project/hwbench/
@@ -477,8 +502,8 @@ jobs:
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
 
   # Notifications Discord (scripts/discord_notify.py) dans des jobs à part, sans id-token :
-  # #releases et « PyPI en attente d'approbation » (#deploiements) dès la GitHub Release, puis
-  # « publié sur PyPI » (#deploiements). Un échec de notification ne fait jamais rien échouer.
+  # #releases dès la GitHub Release, puis « publié sur PyPI » (#deploiements). Un échec de
+  # notification ne fait jamais rien échouer.
   notify-release:
     needs: release
     if: "!cancelled() && needs.release.result == 'success'"
@@ -498,14 +523,6 @@ jobs:
           DISCORD_WEBHOOK_RELEASES: ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
           TAG: ${{ needs.release.outputs.tag }}
         run: python3 scripts/discord_notify.py release --tag "$TAG"
-
-      - name: Notifier #deploiements (PyPI en attente d'approbation)
-        continue-on-error: true
-        env:
-          DISCORD_WEBHOOK_DEPLOIEMENTS: ${{ secrets.DISCORD_WEBHOOK_DEPLOIEMENTS }}
-          TAG: ${{ needs.release.outputs.tag }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: python3 scripts/discord_notify.py pypi-pending --version "${TAG#v}" --run-url "$RUN_URL"
 
   notify-pypi:
     needs: [release, pypi]
@@ -571,16 +588,25 @@ jobs:
       - name: Installer hwbench (wheel testée sur main, sources de main sinon)
         run: |
           python -m venv "$RUNNER_TEMP/venv"
+          # extra « site » : Jinja2, absent de l'installation de base (CLI de benchmark)
           if [ "$ON_MAIN" = true ]; then
-            "$RUNNER_TEMP/venv/bin/pip" install "$RUNNER_TEMP"/dist/*.whl
+            wheel=("$RUNNER_TEMP"/dist/*.whl)
+            "$RUNNER_TEMP/venv/bin/pip" install "${wheel[0]}[site]"
           else
-            "$RUNNER_TEMP/venv/bin/pip" install .
+            "$RUNNER_TEMP/venv/bin/pip" install '.[site]'
           fi
 
       - name: Générer le site de prod
         run: |
-          "$RUNNER_TEMP/venv/bin/python" -I -m hwbench.leaderboard site \
-            --results results --out "$RUNNER_TEMP/site"
+          py="$RUNNER_TEMP/venv/bin/python"
+          args=(--results results --out "$RUNNER_TEMP/site")
+          # --base-url : base absolue de la page 404 (servie à toute profondeur). Transition : sur
+          # un push de dev, ce job génère la prod depuis les sources de main, qui peuvent ne pas
+          # encore connaître l'option ; elle n'est passée que si l'aide la mentionne.
+          if "$py" -I -m hwbench.leaderboard site --help | grep -q -- --base-url; then
+            args+=(--base-url /hwbench/)
+          fi
+          "$py" -I -m hwbench.leaderboard site "${args[@]}"
 
       # Sur main : fichiers results/*.json ajoutés depuis le push précédent -> JSON sur une ligne
       # (rang au classement combiné), passé au job notify-site par env. Noms par -z / xargs -0.
@@ -640,16 +666,25 @@ jobs:
       - name: Installer hwbench (wheel testée sur dev, sources de dev sinon)
         run: |
           python -m venv "$RUNNER_TEMP/venv"
+          # extra « site » : Jinja2, absent de l'installation de base (CLI de benchmark)
           if [ "$ON_DEV" = true ]; then
-            "$RUNNER_TEMP/venv/bin/pip" install "$RUNNER_TEMP"/dist/*.whl
+            wheel=("$RUNNER_TEMP"/dist/*.whl)
+            "$RUNNER_TEMP/venv/bin/pip" install "${wheel[0]}[site]"
           else
-            "$RUNNER_TEMP/venv/bin/pip" install .
+            "$RUNNER_TEMP/venv/bin/pip" install '.[site]'
           fi
 
       - name: Générer la preview (bandeau, noindex, robots.txt)
         run: |
-          "$RUNNER_TEMP/venv/bin/python" -I -m hwbench.leaderboard site \
-            --results results --out "$RUNNER_TEMP/site" --preview
+          py="$RUNNER_TEMP/venv/bin/python"
+          args=(--results results --out "$RUNNER_TEMP/site" --preview)
+          # GitHub Pages ne sert que la 404 de la racine (prod) : celle de la preview n'est jamais
+          # servie, sa base est donnée par cohérence. Même transition que site-prod (sources de
+          # dev sur un push de main).
+          if "$py" -I -m hwbench.leaderboard site --help | grep -q -- --base-url; then
+            args+=(--base-url /hwbench/preview/)
+          fi
+          "$py" -I -m hwbench.leaderboard site "${args[@]}"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

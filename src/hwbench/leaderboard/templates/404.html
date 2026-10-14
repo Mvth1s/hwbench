@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% set c = t.notfound %}
+{% block main %}
+<section class="hw-section hw-404">
+  <div class="hw-404__code" aria-hidden="true">
+    <span class="hw-num">{{ c.code }}</span>
+    <div class="hw-404__gauges">{% for key in ("cpu_single", "cpu_multi", "gpu") %}<div><span class="hw-bar"><i style="--f:0"></i></span><span class="hw-kicker">{{ c.gauge | replace("{label}", t.classement.short[key]) }}</span></div>{% endfor %}</div>
+  </div>
+  <div class="hw-stack-20">
+    <p class="hw-kicker">{{ c.kicker }}</p>
+    <h1 class="hw-h1 hw-h1--404">{{ c.h1 }}</h1>
+    <p class="hw-mute">{{ c.p }}</p>
+    <form class="hw-404__search" action="{{ root }}index.html" method="get" role="search">
+      <label class="hw-search"><span aria-hidden="true">⌕</span><span class="hw-sr">{{ c.search }}</span><input type="search" name="q" placeholder="{{ c.search_ph }}"></label>
+      <button type="submit" class="hw-btn hw-btn--primary hw-btn--plain">{{ c.search }}</button>
+    </form>
+    <ul class="hw-linkchips">{% for key, label in c.links.items() %}<li><a class="hw-btn" href="{{ links[key] }}">{{ label }}</a></li>{% endfor %}</ul>
+  </div>
+</section>
+{% endblock %}

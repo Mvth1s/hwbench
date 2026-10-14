@@ -35,7 +35,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# génération du site du classement (python -m hwbench.leaderboard site) : templates Jinja2
+site = ["jinja2>=3.1"]
 dev = [
+    "jinja2>=3.1", # tests du site (même contrainte que l'extra site)
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "ruff>=0.6",
@@ -61,7 +64,17 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 # référence du scoring, générée sur la machine de référence par `hwbench reference`
-hwbench = ["data/*.json"]
+hwbench = [
+    "data/*.json",
+    # site du classement : templates Jinja2 et assets statiques (la CI génère depuis la wheel)
+    "leaderboard/templates/*.html",
+    "leaderboard/templates/partials/*.html",
+    "leaderboard/static/*.css",
+    "leaderboard/static/*.js",
+    "leaderboard/static/*.svg",
+    "leaderboard/static/fonts/*",
+    "leaderboard/static/img/*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
