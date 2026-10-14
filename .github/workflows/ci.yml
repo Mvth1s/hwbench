@@ -302,17 +302,40 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # jeton du workflow passé à lychee (API GitHub, limite de débit) : lecture seule
+    permissions:
+      contents: read
+    env:
+      # lychee 0.24.2 (lychee-lib/src/retry.rs) : --max-retries et --retry-wait-time (attente
+      # doublée à chaque essai) ne valent que pour les 429, les timeouts et les coupures
+      # réseau ; un 503 n'est jamais réessayé, d'où le second passage plus bas. 429 accepté
+      # (limite de débit, pas un lien mort).
+      # CHANGELOG.md : des centaines de liens de commits, générés ; fixtures : pas de la doc
+      LYCHEE_ARGS: >-
+        --no-progress --max-concurrency 8
+        --max-retries 3 --retry-wait-time 5
+        --accept '100..=103,200..=299,429'
+        --exclude-path 'CHANGELOG\.md' --exclude-path 'tests/fixtures'
+        './**/*.md'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # CHANGELOG.md : des centaines de liens de commits, générés ; fixtures : pas de la doc
-      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+      - id: lychee
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
-          args: >-
-            --no-progress --max-concurrency 8
-            --exclude-path 'CHANGELOG\.md' --exclude-path 'tests/fixtures'
-            './**/*.md'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: ${{ env.LYCHEE_ARGS }}
+          fail: false
+      # 503 passagers de github.com (arrivé sur la PR #48) : second passage après une pause
+      - name: Pause avant le second passage
+        if: steps.lychee.outputs.exit_code != '0'
+        run: sleep 60
+      - if: steps.lychee.outputs.exit_code != '0'
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: ${{ env.LYCHEE_ARGS }}
 
   ci-ok:
     needs: [changes, lint, typecheck, test, build, audit, commitlint]
