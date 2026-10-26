@@ -12,7 +12,7 @@
     {% endfor %}
   </div>
   <div class="hw-footer__legal">
-    <p><strong>{{ t.footer.publisher_t }}</strong> {{ t.footer.publisher }}</p>
+    <p><strong>{{ t.footer.publisher_t }}</strong> {{ t.footer.publisher | fill(facts) }}</p>
     <p><strong>{{ t.footer.host_t }}</strong> {{ t.footer.host }}</p>
     <p><strong>{{ t.footer.data_t }}</strong> {{ t.footer.data }}</p>
   </div>
