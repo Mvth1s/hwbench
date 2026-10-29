@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v0.8.1 (2026-10-29)
+
+### Bug Fixes
+
+- **site**: Indiquer le contact privé RGPD dans le footer et les mentions
+  ([#53](https://github.com/Mvth1s/hwbench/pull/53),
+  [`e6603a4`](https://github.com/Mvth1s/hwbench/commit/e6603a4c4ecd2e2915e642a79ca8e465cb59f514))
+
+
 ## v0.8.0 (2026-10-14)
 
 ### Bug Fixes

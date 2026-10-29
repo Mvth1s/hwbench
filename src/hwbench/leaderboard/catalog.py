@@ -91,7 +91,8 @@ FR: dict[str, Any] = {
         "publisher_t": "Éditeur.",
         "publisher": (
             "Projet open source non commercial, édité à titre non professionnel. Contact : "
-            "issues du dépôt GitHub."
+            "issues du dépôt GitHub (publiques) ; données personnelles et retrait d'un "
+            "résultat : {contact_private}."
         ),
         "host_t": "Hébergeur.",
         "host": HOST,
@@ -763,7 +764,7 @@ FR: dict[str, Any] = {
         "kicker": "Informations légales",
         "h1": "Mentions légales, confidentialité et accessibilité",
         "toc": "Sur cette page",
-        "updated": "Dernière mise à jour : 12/10/2026",
+        "updated": "Dernière mise à jour : 26/10/2026",
         "host": HOST,
         "secs": [
             {
@@ -778,7 +779,8 @@ FR: dict[str, Any] = {
                         "Contact",
                         (
                             "Questions générales : issues du dépôt GitHub (publiques). Données "
-                            "personnelles : voir « Vos droits » ci-dessous."
+                            "personnelles : {contact_private}, jamais une issue publique (voir "
+                            "« Vos droits » ci-dessous)."
                         ),
                     ],
                     ["Hébergeur", "{host}"],
